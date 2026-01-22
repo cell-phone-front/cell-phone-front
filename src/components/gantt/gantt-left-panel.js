@@ -42,7 +42,8 @@ export default function GanttLeftPanel({
               style={{ height: groupHeaderHeight }}
               className={[
                 "group relative flex items-center",
-                "border-t border-border/60",
+                //그룹 헤더 위 가로줄
+                "border-t border-border/20",
                 "border-l-[5px]",
                 groupTint[gi % 4],
               ].join(" ")}
@@ -76,10 +77,10 @@ export default function GanttLeftPanel({
                       gi % 4 === 0
                         ? "bg-blue-500/35"
                         : gi % 4 === 1
-                        ? "bg-amber-500/35"
-                        : gi % 4 === 2
-                        ? "bg-emerald-500/35"
-                        : "bg-violet-500/35",
+                          ? "bg-amber-500/35"
+                          : gi % 4 === 2
+                            ? "bg-emerald-500/35"
+                            : "bg-violet-500/35",
                     ].join(" ")}
                     aria-hidden
                   />
@@ -92,7 +93,8 @@ export default function GanttLeftPanel({
               g.tasks.map((t) => (
                 <div
                   key={`${g.id}-${t.id}`}
-                  className="relative flex items-center border-t border-border/60 hover:bg-muted/20 transition-colors"
+                  // 작업 행(row)마다 생기는 가로줄
+                  className="relative flex items-center border-t border-border/35 hover:bg-muted/20 transition-colors"
                   style={{ height: rowHeight }}
                 >
                   <div className="min-w-0 w-full px-3">

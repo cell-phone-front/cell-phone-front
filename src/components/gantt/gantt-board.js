@@ -24,11 +24,11 @@ import {
 export default function GanttBoard({ groups }) {
   // ====== CONFIG ======
   const stepMinutes = 60;
-  const colWidth = 100;
+  const colWidth = 120;
   // 행전체높이
-  const rowHeight = 45;
+  const rowHeight = 50;
   // 표 타이틀높이
-  const groupHeaderHeight = 45;
+  const groupHeaderHeight = 50;
   const leftWidth = 235;
   const headerHeight = 36;
   const bottomScrollHeight = 16;

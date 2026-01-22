@@ -20,9 +20,11 @@ export default function Gantt() {
   return (
     <SidebarProvider className="h-screen pt-16">
       <AppSidebar />
-      <SidebarInset className="h-full flex flex-col">
+
+      {/* min-w-0 중요 (flex에서 오른쪽이 튀어나가는거 방지) */}
+      <SidebarInset className="h-full min-w-0 flex flex-col">
         <header className="h-16 shrink-0 flex items-center gap-2 px-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
@@ -42,9 +44,9 @@ export default function Gantt() {
           </div>
         </header>
 
-        {/* “간트” */}
-        <div className="flex-1 min-h-0 p-4 pt-0">
-          <div className="h-full w-full rounded-xl border bg-background overflow-hidden">
+        {/* ✅ 캘린더처럼 “박스 안”에 꽉 차게 */}
+        <div className="flex-1 min-h-0 min-w-0 p-4 pt-0">
+          <div className="h-full w-full rounded-xl border bg-background overflow-hidden min-w-0">
             <WorkGantt />
           </div>
         </div>

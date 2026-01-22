@@ -103,18 +103,18 @@ export default function GanttRightPanel({
                       return (
                         <div
                           key={`${g.id}-${t.id}-${gi}`}
-                          className="relative border-t border-border/65"
+                          className="relative border-t border-border/35"
                           style={{ height: rowHeight }}
                         >
                           {/* hover */}
                           <div className="absolute inset-0 hover:bg-muted/10 transition-colors" />
 
-                          {/* bar */}
+                          {/* 간트 그래프 bar */}
                           <div
                             className={[
                               "absolute border shadow-sm flex items-center rounded-sm",
                               "transition-shadow hover:shadow-md",
-                              "px-3 py-1 leading-tight",
+                              "px-3 py-4 leading-tight",
                               barClass,
                             ].join(" ")}
                             style={{

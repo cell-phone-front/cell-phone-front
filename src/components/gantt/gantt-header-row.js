@@ -30,10 +30,10 @@ export default function GanttHeaderRow({
             variant="ghost"
             size="sm"
             className={[
-              "h-7 px-2 rounded-md",
+              "mb-1 h-7 px-10 rounded-md transition-colors font-medium",
               activeTab === "work"
-                ? "font-semibold text-foreground"
-                : "font-normal text-muted-foreground hover:text-foreground",
+                ? "bg-gray-800 text-white hover:bg-gray-800"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700",
             ].join(" ")}
             onClick={() => setActiveTab("work")}
           >
@@ -44,10 +44,10 @@ export default function GanttHeaderRow({
             variant="ghost"
             size="sm"
             className={[
-              "h-7 px-2 rounded-md",
+              "mb-1 h-7 px-12 rounded-md transition-colors font-medium",
               activeTab === "tool"
-                ? "font-semibold text-foreground"
-                : "font-normal text-muted-foreground hover:text-foreground",
+                ? "bg-gray-800 text-white hover:bg-gray-800"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700",
             ].join(" ")}
             onClick={() => setActiveTab("tool")}
           >
@@ -61,7 +61,7 @@ export default function GanttHeaderRow({
         className="relative flex-1 overflow-hidden"
         style={{ height: headerHeight }}
       >
-        {/* ✅ 스크롤값에 맞춰서 시간축도 같이 움직이게 */}
+        {/*  스크롤값에 맞춰서 시간축도 같이 움직이게 */}
         <div
           className="will-change-transform"
           style={{
