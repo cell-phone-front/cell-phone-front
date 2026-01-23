@@ -1,4 +1,3 @@
-// src/components/gantt-test/gantt-header-row.js
 "use client";
 
 import React from "react";
@@ -19,13 +18,18 @@ export default function GanttHeaderRow({
   scrollLeft,
 }) {
   return (
-    <div className="flex border-b border-border/60 bg-muted/20">
+    <div className="flex bg-blue-200">
       {/* 왼쪽 헤더(탭) */}
       <div
         className="shrink-0 px-2 flex items-center gap-2"
         style={{ width: leftWidth, height: headerHeight }}
       >
-        <div className="flex items-center gap-1">
+        {/* <div className="text-[10px] text-muted-foreground flex justify-between w-full"> */}
+        <div className="text-[10px]  flex justify-between w-full">
+          <span>테이블</span>
+          <span>시간축</span>
+        </div>
+        {/* <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -53,7 +57,7 @@ export default function GanttHeaderRow({
           >
             툴
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* 오른쪽 헤더(시간축) */}
@@ -79,7 +83,7 @@ export default function GanttHeaderRow({
               return (
                 <div
                   key={i}
-                  className="h-full flex items-center justify-center text-[12.3px] leading-none text-muted-foreground border-l border-border/50"
+                  className="h-full flex items-center justify-center text-[12.3px] leading-none  border-l border-white/70"
                   style={{ width: colWidth }}
                 >
                   {pad2(d.getHours())}:00

@@ -32,9 +32,19 @@ export default function GanttRightPanel({
 }) {
   const barHeight = Math.min(44, rowHeight - 16);
   const barTop = Math.floor((rowHeight - barHeight) / 2) - 1;
+  const barPalette = [
+    "bg-[#86DCF0] ",
+    "bg-[#869AF0] ",
+    "bg-[#85BAEF] ",
+    "bg-[#34F7DC] ",
+  ];
+
+  function pickBarClass(gi) {
+    return barPalette[gi % barPalette.length];
+  }
 
   return (
-    <div className="relative flex-1 min-w-0 overflow-hidden bg-background">
+    <div className="relative flex-1 min-w-0 overflow-hidden bg-background ">
       <div
         ref={rightScrollYRef}
         onScroll={onRightScrollY}
@@ -63,7 +73,7 @@ export default function GanttRightPanel({
                   style={{ width: colWidth }}
                   className={[
                     "h-full border-l border-border/60",
-                    i % 2 === 0 ? "bg-sky-500/5" : "bg-transparent",
+                    i % 2 === 0 ? "bg-muted/30" : "bg-transparent",
                   ].join(" ")}
                 />
               ))}
@@ -103,35 +113,34 @@ export default function GanttRightPanel({
                       return (
                         <div
                           key={`${g.id}-${t.id}-${gi}`}
-                          className="relative border-t border-border/35"
+                          className="relative border-t border-border/40"
                           style={{ height: rowHeight }}
                         >
                           {/* hover */}
-                          <div className="absolute inset-0 hover:bg-muted/10 transition-colors" />
+                          <div className="absolute inset-0 hover:bg-blue-200/25 transition-colors" />
 
                           {/* 간트 그래프 bar */}
                           <div
                             className={[
-                              "absolute border shadow-sm flex items-center rounded-sm",
-                              "transition-shadow hover:shadow-md",
-                              "px-3 py-4 leading-tight",
+                              "absolute flex items-center rounded-xs",
+                              "px-3 py-5 leading-tight",
                               barClass,
                             ].join(" ")}
                             style={{
                               left,
                               width,
-                              top: 10,
+                              top: 4.5,
                               height: rowHeight - 20,
                             }}
                             title={`${g.title} / ${t.name}\n${fmtHM(
                               t.startAt,
                             )} ~ ${fmtHM(t.endAt)}`}
                           >
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold truncate">
+                            <div className="min-w-0 space-y-1">
+                              <div className="text-xs font-medium truncate">
                                 {t.name}
                               </div>
-                              <div className="text-[10px] text-muted-foreground truncate">
+                              <div className="text-[10px]  truncate">
                                 {fmtHM(t.startAt)} ~ {fmtHM(t.endAt)}
                               </div>
                             </div>

@@ -6,10 +6,7 @@ function Card({ className, ...props }) {
   return (
     <div
       data-slot="card"
-      className={cn(
-        "bg-card text-card-foreground flex flex-col  py-3 ",
-        className,
-      )}
+      className={cn("bg-card text-card-foreground flex flex-col", className)}
       {...props}
     />
   );
@@ -63,11 +60,7 @@ function CardAction({ className, ...props }) {
 
 function CardContent({ className, ...props }) {
   return (
-    <div
-      data-slot="card-content"
-      className={cn("px-6", className)}
-      {...props}
-    />
+    <div data-slot="card-content" className={cn("", className)} {...props} />
   );
 }
 

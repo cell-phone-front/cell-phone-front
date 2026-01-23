@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import GanttBoard from "@/components/gantt/gantt-board";
+import { Button } from "../ui/button";
 
 function addMin(date, min) {
   return new Date(date.getTime() + min * 60 * 1000);
@@ -60,6 +61,7 @@ function makeGroups({ groupCount = 4, tasksPerGroup = 6 }) {
 export default function Gantt() {
   const [groupCount, setGroupCount] = useState(4);
   const [tasksPerGroup, setTasksPerGroup] = useState(6);
+  const [activeTab, setActiveTab] = useState("work");
 
   const groups = useMemo(() => {
     return makeGroups({ groupCount, tasksPerGroup });
@@ -67,11 +69,43 @@ export default function Gantt() {
 
   return (
     <div className="h-full w-full flex flex-col min-h-0">
-      {/* 상단 바  */}
-      <div className="h-11 shrink-0 px-3 flex items-center gap-3">
-        <div className="font-semibold">member</div>
+      {/* 상단 바 (jobs 느낌으로 맞춤) */}
+      <div className="h-15 shrink-0 px-3 flex items-center ">
+        {/* 왼쪽 탭 */}
+        <div className="flex items-center gap-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("work")}
+            className={[
+              "text-lg font-semibold leading-none",
+              "bg-transparent hover:bg-transparent",
+              "underline-offset-[10px] decoration-2",
+              activeTab === "work"
+                ? "text-gray-900 underline decoration-gray-900"
+                : "text-gray-400 hover:text-gray-700 hover:underline hover:decoration-gray-300",
+            ].join(" ")}
+          >
+            작업
+          </button>
 
-        <div className="ml-auto flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab("tool")}
+            className={[
+              "text-lg font-semibold leading-none",
+              "bg-transparent hover:bg-transparent",
+              "underline-offset-[10px] decoration-2",
+              activeTab === "tool"
+                ? "text-gray-900 underline decoration-gray-900"
+                : "text-gray-400 hover:text-gray-700 hover:underline hover:decoration-gray-300",
+            ].join(" ")}
+          >
+            툴
+          </button>
+        </div>
+
+        {/* 오른쪽 입력 */}
+        <div className="ml-auto flex items-center gap-6 text-sm text-gray-600">
           <label className="flex items-center gap-2">
             그룹
             <input
@@ -80,7 +114,7 @@ export default function Gantt() {
               max={30}
               value={groupCount}
               onChange={(e) => setGroupCount(Number(e.target.value || 1))}
-              className="w-16 border rounded px-2 py-1"
+              className="h-9 w-16 rounded-md border px-2 text-sm"
             />
           </label>
 
@@ -92,7 +126,7 @@ export default function Gantt() {
               max={50}
               value={tasksPerGroup}
               onChange={(e) => setTasksPerGroup(Number(e.target.value || 1))}
-              className="w-16 border rounded px-2 py-1"
+              className="h-9 w-16 rounded-md border px-2 text-sm"
             />
           </label>
         </div>

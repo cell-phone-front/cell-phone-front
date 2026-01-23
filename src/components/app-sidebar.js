@@ -20,6 +20,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { NavCommunity } from "./nav-community";
 
 const data = {
   teams: [{ name: "Acme Inc", logo: SquareTerminal, plan: "Enterprise" }],
@@ -30,10 +31,30 @@ const data = {
   ],
 
   navMain: [
-    { title: "시뮬레이션", url: "/", icon: SquareTerminal },
-    { title: "간트", url: "/gantt", icon: Bot },
-    { title: "Documentation", url: "#", icon: BookOpen },
-    { title: "Settings", url: "#", icon: Settings2 },
+    {
+      title: "시뮬레이션",
+      url: "/",
+      icon: SquareTerminal,
+      items: [
+        { title: "jobs", url: "/jobs" },
+        { title: "tasks", url: "/tasks" },
+        { title: "tools", url: "/tools" },
+      ],
+    },
+    {
+      title: "간트",
+      url: "", // 상위 클릭 시 이동(원하면 #로 바꿔도 됨)
+      icon: Bot,
+      // isActive: true, // 기본으로 펼치고 싶으면 true
+      items: [
+        { title: "전체보기", url: "/gantt/member" },
+        { title: "멤버별", url: "/gantt" },
+      ],
+    },
+  ],
+  community: [
+    { name: "공지사항", url: "/notice", icon: Map },
+    { name: "자유게시판", url: "/work", icon: Frame },
   ],
 };
 
@@ -43,6 +64,7 @@ export function AppSidebar({ onNavigate, ...props }) {
       <SidebarContent>
         <NavProjects projects={data.projects} onNavigate={onNavigate} />
         <NavMain items={data.navMain} />
+        <NavCommunity projects={data.community} onNavigate={onNavigate} />
       </SidebarContent>
 
       <SidebarRail />

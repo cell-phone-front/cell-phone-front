@@ -39,7 +39,7 @@ export function CalendarCustomDays() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 bg-white">
           <Button
             variant="outline"
             size="sm"
@@ -56,7 +56,7 @@ export function CalendarCustomDays() {
               onClick={goPrev}
               className="h-7 w-7"
             >
-              <ChevronLeftIcon className="size-4" />
+              <ChevronLeftIcon className="size-5" />
             </Button>
 
             <div className="px-2 text-xs font-medium">{monthLabel}</div>
@@ -67,7 +67,7 @@ export function CalendarCustomDays() {
               onClick={goNext}
               className="h-7 w-7"
             >
-              <ChevronRightIcon className="size-4" />
+              <ChevronRightIcon className="size-5" />
             </Button>
           </div>
         </div>
@@ -93,12 +93,9 @@ export function CalendarCustomDays() {
             weekday:
               "flex-1 text-left pl-2 text-xs text-muted-foreground font-medium",
 
-            // ✅ 여기서 “주(week) 한 줄” 높이 컨트롤 가능
-            week: "flex w-full mt-1",
-
             //  셀(칸) 자체의 패딩/레이아웃 영향
-            day: "relative w-full h-full p-0 text-left align-top",
-            week: "flex w-full mt-1 h-30",
+            day: "relative w-full h-full text-left align-top border-b border-border/60",
+            week: "flex w-full h-30",
           }}
           components={{
             DayButton: ({ children, day, modifiers, ...props }) => {

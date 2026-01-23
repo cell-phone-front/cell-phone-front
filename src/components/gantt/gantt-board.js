@@ -30,7 +30,7 @@ export default function GanttBoard({ groups }) {
   // 표 타이틀높이
   const groupHeaderHeight = 50;
   const leftWidth = 235;
-  const headerHeight = 36;
+  const headerHeight = 40;
   const bottomScrollHeight = 16;
 
   // ====== collapse ======
@@ -136,7 +136,7 @@ export default function GanttBoard({ groups }) {
 
   return (
     <div className="h-full w-full min-h-0 overflow-hidden">
-      <Card className="h-full overflow-hidden border-border/60">
+      <Card className="h-full w-full border-border/60">
         {/* <CardHeader className="py-2 px-3 gap-1">
           <div className="flex f-col gap-3">
             <CardTitle className="text-lg tracking-tight">Schedule</CardTitle>
@@ -174,9 +174,9 @@ export default function GanttBoard({ groups }) {
             headerInnerRef={headerInnerRef}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            scrollLeft={scrollLeft}
           />
 
-          {/* 본문 */}
           <div className="flex flex-1 min-h-0 min-w-0">
             <GanttLeftPanel
               groups={groups}
@@ -187,8 +187,9 @@ export default function GanttBoard({ groups }) {
               rowHeight={rowHeight}
               leftScrollRef={leftScrollRef}
               onLeftScrollY={onLeftScrollY}
+              bottomScrollHeight={bottomScrollHeight}
             />
-
+            {/* 본문 */}
             <GanttRightPanel
               groups={groups}
               collapsed={collapsed}
