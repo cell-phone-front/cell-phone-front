@@ -20,7 +20,7 @@ export default function DashboardShell({
   children,
 }) {
   return (
-    <SidebarProvider className="h-screen pt-16">
+    <SidebarProvider className="h-screen pt-14">
       <AppSidebar />
       {/* // 영역 안나가게 큰틀 */}
       <SidebarInset className="h-full min-w-0 flex flex-col bg-muted/50">

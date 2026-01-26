@@ -1,6 +1,37 @@
+import { useRouter } from "next/router";
+import { useState } from "react";
+import { useAccount, useToken } from "@/stores/account-store";
+import { loginCheck } from "@/util/DatabaseUtil";
+
 const CONTAINER = "mx-auto w-full max-w-7xl px-15 ";
 
 export default function Login() {
+  const router = useRouter();
+
+  const [name, setName] = useState("");
+  const [id, setId] = useState("");
+  const [loginError, setLoginError] = useState(false);
+
+  const { setAccount } = useAccount();
+  const { setToken } = useToken();
+
+  function submitHandle(evt) {
+    evt.preventDefault();
+    setLoginError(false);
+
+    loginCheck(name, id).then((obj) => {
+      if (!obj?.token) {
+        setLoginError(true);
+        return;
+      }
+
+      setLoginError(false);
+      setToken(obj.token); // 토큰 저장
+      setAccount(obj.member); // 계정 저장
+      router.push("/dashboard");
+    });
+  }
+
   return (
     <div className="h-screen relative bg-white overflow-x-auto overflow-y-hidden">
       {/* 배경: 왼쪽 1/2 그라데이션 + 오른쪽 1/2 흰색 */}
@@ -36,7 +67,7 @@ export default function Login() {
                   </div>
 
                   {/* 폼 */}
-                  <form className="space-y-8">
+                  <form className="space-y-8" onSubmit={submitHandle}>
                     {/* 이름 */}
                     <div>
                       <label className="block text-xs text-gray-600 mb-2">
@@ -45,6 +76,8 @@ export default function Login() {
                       <input
                         type="text"
                         placeholder="이름을 입력하세요"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         className="w-full border-b border-gray-200 bg-transparent pb-3 text-sm outline-none
                                    focus:border-neutral-500 placeholder:text-gray-300"
                       />
@@ -58,16 +91,23 @@ export default function Login() {
                       <input
                         type="text"
                         placeholder="사원번호를 입력하세요"
+                        value={id}
+                        onChange={(e) => setId(e.target.value)}
                         className="w-full border-b border-gray-200 bg-transparent pb-3 text-sm outline-none
                                      focus:border-neutral-500 placeholder:text-gray-300"
                       />
                     </div>
+                    {loginError && (
+                      <p className="text-xs text-red-500">
+                        이름 또는 사원번호가 올바르지 않습니다.
+                      </p>
+                    )}
 
                     {/* 버튼 */}
                     <button
                       type="submit"
                       className="w-full bg-slate-800/95 py-3 text-sm font-semibold text-white
-                     hover:bg-slate-900 active:scale-[0.99] cursor-pointer"
+                               hover:bg-slate-900 active:scale-[0.99] cursor-pointer"
                     >
                       로그인
                     </button>

@@ -1,5 +1,6 @@
 import Page from "./dashboard";
+import Login from "./login";
 
 export default function Home() {
-  return <Page />;
+  return <Login />;
 }
