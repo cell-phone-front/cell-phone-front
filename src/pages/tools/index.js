@@ -1,4 +1,4 @@
-import { getTools, postTools } from "@/api/tool-api";
+import { getTools, postTools } from "@/api/machine-api";
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useState } from "react";
 

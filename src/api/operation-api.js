@@ -1,6 +1,6 @@
 export async function getJobs() {
   const response = await fetch(
-    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/jobs`,
+    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation`,
   );
   const json = await response.json();
   return json;
@@ -8,7 +8,7 @@ export async function getJobs() {
 
 export async function postJobs(jobs) {
   const response = await fetch(
-    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/jobs`,
+    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/upsert`,
     {
       headers: {
         "Content-type": "application/json",
@@ -28,7 +28,7 @@ export async function parseXLS(file) {
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch(
-    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/jobs/parse/xls`,
+    `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/xls`,
     {
       method: "POST",
       body: formData,

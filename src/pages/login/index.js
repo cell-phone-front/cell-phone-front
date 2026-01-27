@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { useAccount, useToken } from "@/stores/account-store";
-import { loginCheck } from "@/api/member-api";
+import { loginCheck } from "@/api/member/member-api";
 
 const CONTAINER = "mx-auto w-full max-w-7xl px-15 ";
 
