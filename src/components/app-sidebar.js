@@ -9,6 +9,7 @@ import {
   PieChart,
   Settings2,
   SquareTerminal,
+  LayoutDashboard,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -25,9 +26,8 @@ import { NavCommunity } from "./nav-community";
 const data = {
   teams: [{ name: "Acme Inc", logo: SquareTerminal, plan: "Enterprise" }],
   projects: [
-    { name: "대시보드", url: "/", icon: Map },
-    { name: "내 근무", url: "/work", icon: Frame },
-    { name: "라인 일정", url: "/line", icon: PieChart },
+    { name: "대시보드", url: "/dashboard", icon: LayoutDashboard },
+    { name: "내 근무", url: "/work", icon: PieChart },
   ],
 
   navMain: [
@@ -36,6 +36,8 @@ const data = {
       url: "/",
       icon: SquareTerminal,
       items: [
+        { title: "member", url: "/member" },
+        { title: "product", url: "/product" },
         { title: "jobs", url: "/jobs" },
         { title: "tasks", url: "/tasks" },
         { title: "tools", url: "/tools" },
@@ -54,8 +56,9 @@ const data = {
   ],
   community: [
     { name: "공지사항", url: "/notice", icon: Map },
-    { name: "자유게시판", url: "/work", icon: Frame },
+    { name: "자유게시판", url: "/board", icon: Frame },
   ],
+  member: [{ name: "관리", url: "/notice", icon: Map }],
 };
 
 export function AppSidebar({ onNavigate, ...props }) {

@@ -1,7 +1,10 @@
 import React from "react";
 import DashboardShell from "@/components/dashboard-shell";
+import { useRouter } from "next/router";
 
 export default function NoticeWrite() {
+  const router = useRouter();
+
   const [title, setTitle] = React.useState("");
   const [content, setContent] = React.useState("");
   const [pinned, setPinned] = React.useState(false);
@@ -42,16 +45,14 @@ export default function NoticeWrite() {
   };
 
   const onCancel = () => {
-    // ✅ TODO: 뒤로가기/목록 이동 처리
-    // navigate(-1) 또는 router.back()
     if (title || content) {
       const ok = window.confirm("작성 중인 내용이 사라집니다. 취소할까요?");
       if (!ok) return;
     }
-    setTitle("");
-    setContent("");
-    setPinned(false);
+
+    router.push("/notice"); // 공지사항 목록으로 이동
   };
+
   const isValid = title.trim().length > 0 && content.trim().length > 0;
 
   return (
@@ -140,7 +141,7 @@ export default function NoticeWrite() {
     }
   `}
             >
-              {saving ? "저장중..." : "저장"}
+              {saving ? "등록중..." : "등록"}
             </button>
           </div>
         </form>

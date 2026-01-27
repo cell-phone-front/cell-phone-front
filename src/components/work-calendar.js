@@ -32,9 +32,9 @@ export function CalendarCustomDays() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* 상단 툴바 */}
-      <div className="h-12 shrink-0 flex items-center gap-3 border-b px-3">
+      <div className="h-12 shrink-0 flex items-center gap-3 px-3">
         <div className="min-w-0">
-          <div className="ml-1.5 text-[17px] font-semibold truncate">
+          <div className="ml-1.5 text-3xl font-semibold truncate">
             {monthLabel}
           </div>
         </div>
@@ -88,14 +88,14 @@ export function CalendarCustomDays() {
             caption_label: "hidden",
             nav: "hidden",
 
-            // ✅ 요일 줄: 왼쪽 정렬 + 밑줄
+            // 요일 줄: 왼쪽 정렬 + 밑줄
             weekdays: "flex border-b pb-2 mb-2",
             weekday:
               "flex-1 text-left pl-2 text-xs text-muted-foreground font-medium",
 
             //  셀(칸) 자체의 패딩/레이아웃 영향
             day: "relative w-full h-full text-left align-top border-b border-border/60",
-            week: "flex w-full h-30",
+            week: "flex w-full h-27",
           }}
           components={{
             DayButton: ({ children, day, modifiers, ...props }) => {

@@ -16,7 +16,7 @@ const MOCK = [
   {
     id: 101,
     pinned: true,
-    title: "📌 공지: 자유게시판 이용 규칙",
+    title: " 공지: 자유게시판 이용 규칙",
     author: "관리자",
     createdAt: "2026-01-26 09:00",
     views: 1280,
@@ -40,7 +40,7 @@ const MOCK = [
     views: 221,
     comments: 18,
   },
-  { 
+  {
     id: 98,
     pinned: false,
     title: "CNC 공정 세팅 팁 공유",
@@ -107,6 +107,7 @@ export default function Board() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), pageCount);
   const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const rowNoBase = (safePage - 1) * pageSize;
 
   function goWrite() {
     // 글쓰기 페이지를 만들면 연결
@@ -114,19 +115,18 @@ export default function Board() {
   }
 
   function openPost(id) {
-    // 상세 페이지 만들면 연결
     router.push(`/board/${id}`);
   }
 
   return (
     <DashboardShell>
-      <div className="h-full w-full bg-white rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="h-full w-full bg-white rounded-xl overflow-hidden">
         {/* 상단 헤더 */}
-        <div className="px-5 py-4 border-neutral-200 flex items-center justify-between gap-4">
+        <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <MessageSquareText className="w-5 h-5 text-neutral-600" />
-              <h1 className="text-base font-semibold text-neutral-900">
+              <h1 className="text-2xl font-semibold text-neutral-900">
                 자유게시판
               </h1>
             </div>
@@ -136,32 +136,7 @@ export default function Board() {
           </div>
         </div>
 
-        <div className="px-5 py-3 border-b border-neutral-200 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* 검색 */}
-          <button
-            type="button"
-            onClick={goWrite}
-            className="shrink-0 h-7 px-3 rounded-md bg-slate-900 text-white text-sm font-medium
-                     hover:bg-slate-800 active:scale-[0.99] flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            글쓰기
-          </button>
-          {/* <div className="w-full md:max-w-md">
-            <div className="h-9 px-3 border border-neutral-200 rounded-md flex items-center gap-2 bg-white">
-              <Search className="w-4 h-4 text-neutral-400" />
-              <input
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="제목 또는 작성자 검색"
-                className="w-full text-sm outline-none placeholder:text-neutral-400"
-              />
-            </div>
-          </div> */}
-
+        <div className="px-10 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* 정렬 + 카운트 */}
           <div className="flex items-center justify-between md:justify-end gap-3">
             <div className="text-xs text-neutral-500">
@@ -175,74 +150,92 @@ export default function Board() {
                 setSort(e.target.value);
                 setPage(1);
               }}
-              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-sm outline-none"
+              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
             >
               <option value="latest">최신순</option>
-              <option value="views">조회순</option>
               <option value="comments">댓글순</option>
             </select>
           </div>
+          <button
+            type="button"
+            onClick={goWrite}
+            className="shrink-0 h-8 px-3 rounded-md bg-slate-900 text-white text-sm font-medium
+                     hover:bg-slate-800 active:scale-[0.99] flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            글쓰기
+          </button>
         </div>
 
         {/* 리스트 */}
         <div className="min-h-0">
           {/* 데스크탑 테이블 */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-12 px-5 py-2 text-[11px] text-neutral-500 bg-neutral-50 border-b border-neutral-200">
-              <div className="col-span-6">제목</div>
-              <div className="col-span-2">작성자</div>
-              <div className="col-span-2">작성일</div>
-              <div className="col-span-1 text-right">조회</div>
-              <div className="col-span-1 text-right">댓글</div>
-            </div>
-
-            {pageRows.length === 0 ? (
-              <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                검색 결과가 없어요.
+            <div className="px-10">
+              {/* header */}
+              <div className="grid grid-cols-[60px_1fr_110px_100px_60px] px-8 py-2 text-[12px]  font-medium bg-neutral-200">
+                <div className="text-center">번호</div>
+                <div>제목</div>
+                <div>작성자</div>
+                <div>작성일</div>
+                <div className="text-right pr-2">댓글</div>
               </div>
-            ) : (
-              pageRows.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => openPost(r.id)}
-                  className="w-full text-left grid grid-cols-12 px-5 py-3 border-b border-neutral-100
-                           hover:bg-neutral-50 transition"
-                >
-                  <div className="col-span-6 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {r.pinned && (
-                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-[2px] rounded-full border border-amber-200 bg-amber-50 text-amber-700">
-                          <Pin className="w-3 h-3" />
-                          고정
-                        </span>
+
+              {/* rows */}
+              {pageRows.length === 0 ? (
+                <div className="px-5 py-16 text-center text-sm text-neutral-500">
+                  검색 결과가 없어요.
+                </div>
+              ) : (
+                pageRows.map((r, idx) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => openPost(r.id)}
+                    className="w-full text-left grid grid-cols-[60px_1fr_110px_100px_60px] px-8 py-3 border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer"
+                  >
+                    {/* 번호 */}
+                    <div className="flex items-center justify-center text-sm text-neutral-500">
+                      {r.pinned ? (
+                        <span className="text-amber-600 font-semibold">📌</span>
+                      ) : (
+                        rowNoBase + idx + 1
                       )}
-                      <span className="truncate text-sm text-neutral-900 font-medium">
-                        {r.title}
-                      </span>
                     </div>
-                  </div>
 
-                  <div className="col-span-2 text-sm text-neutral-700 truncate">
-                    {r.author}
-                  </div>
+                    {/* 제목 */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {r.pinned && (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-[2px] rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+                            <Pin className="w-3 h-3" />
+                            고정
+                          </span>
+                        )}
+                        <span className="truncate text-sm text-neutral-900 font-medium">
+                          {r.title}
+                        </span>
+                      </div>
+                    </div>
 
-                  <div className="col-span-2 text-sm text-neutral-500 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-neutral-300" />
-                    <span className="truncate">{r.createdAt}</span>
-                  </div>
+                    {/* 작성자 */}
+                    <div className="text-xs text-neutral-700 truncate">
+                      {r.author}
+                    </div>
 
-                  <div className="col-span-1 text-sm text-neutral-600 text-right flex items-center justify-end gap-1">
-                    <Eye className="w-4 h-4 text-neutral-300" />
-                    {r.views}
-                  </div>
+                    {/* 작성일 */}
+                    <div className="text-xs text-neutral-500 flex items-center gap-2 min-w-0">
+                      <span className="truncate">{r.createdAt}</span>
+                    </div>
 
-                  <div className="col-span-1 text-sm text-neutral-600 text-right">
-                    {r.comments}
-                  </div>
-                </button>
-              ))
-            )}
+                    {/* 댓글 */}
+                    <div className="text-xs text-neutral-600 text-right pr-2">
+                      {r.comments}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
 
           {/* 모바일 카드 */}
@@ -273,20 +266,20 @@ export default function Board() {
                             {r.title}
                           </div>
                         </div>
+                        <div className="col-span-6 grid grid-cols-[110px_150px_50px] gap-2 items-center justify-end pr-6">
+                          <div className="text-sm text-neutral-700 truncate">
+                            {r.author}
+                          </div>
 
-                        <div className="mt-2 text-xs text-neutral-500 flex items-center gap-2">
-                          <span className="text-neutral-700">{r.author}</span>
-                          <span>•</span>
-                          <span>{r.createdAt}</span>
-                        </div>
-                      </div>
+                          <div className="text-sm text-neutral-500 flex items-center gap-2 min-w-0">
+                            <Clock className="w-4 h-4 text-neutral-300 shrink-0" />
+                            <span className="truncate">{r.createdAt}</span>
+                          </div>
 
-                      <div className="shrink-0 text-xs text-neutral-500 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Eye className="w-4 h-4 text-neutral-300" />
-                          {r.views}
+                          <div className="text-sm text-neutral-600 text-right">
+                            {r.comments}
+                          </div>
                         </div>
-                        <div className="mt-1">댓글 {r.comments}</div>
                       </div>
                     </div>
                   </button>
@@ -297,33 +290,35 @@ export default function Board() {
         </div>
 
         {/* 하단 페이지네이션 */}
-        <div className="px-5 py-3 border-t border-neutral-200 flex items-center justify-between">
-          <div className="text-xs text-neutral-500">
-            {safePage} / {pageCount} 페이지
-          </div>
+        <div className="px-10 py-3  border-neutral-200 flex items-center">
+          <div className="ml-auto flex items-center gap-6">
+            <div className="text-xs text-neutral-500">
+              {safePage} / {pageCount} 페이지
+            </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              className="h-9 px-3 rounded-md border border-neutral-200 bg-white text-sm
-                       disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              이전
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px]
+                 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                이전
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              disabled={safePage >= pageCount}
-              className="h-9 px-3 rounded-md border border-neutral-200 bg-white text-sm
-                       disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1"
-            >
-              다음
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={safePage >= pageCount}
+                className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px]
+                 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
+              >
+                다음
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,252 +1,159 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { ChevronLeft, ImagePlus, Send, X } from "lucide-react";
+import { Send } from "lucide-react";
 import { useAccount, useToken } from "@/stores/account-store";
+import DashboardShell from "@/components/dashboard-shell";
 
 export default function BoardWrite() {
   const router = useRouter();
-
   const { account } = useAccount();
   const { token } = useToken();
 
-  // (선택) 로그인 안 되어있으면 로그인으로
-  // 필요 없으면 지워도 됨
-  if (!token) {
-    if (typeof window !== "undefined") router.replace("/login");
-    return null;
-  }
+  // ✅ persist 복구 기다리는 용도
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const authorName = useMemo(() => account?.name || "익명", [account]);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [pinned, setPinned] = useState(false); // 나중에 권한(사장/팀장)만 허용해도 됨
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  // 이미지 업로드(프론트 미리보기만)
-  const [images, setImages] = useState([]); // { file, url }
-  function onPickImages(e) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+  // ✅ hydrated 된 다음에만 로그인 체크
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) router.replace("/login");
+  }, [hydrated, token, router]);
 
-    const next = files.slice(0, 6 - images.length).map((f) => ({
-      file: f,
-      url: URL.createObjectURL(f),
-    }));
+  // ✅ 복구중이면 화면 안그림
+  if (!hydrated) return null;
 
-    setImages((prev) => [...prev, ...next]);
-    e.target.value = "";
+  // ✅ 복구 끝났는데 token 없으면 화면 안그림
+  if (!token) return null;
+
+  const isValid = title.trim().length > 0 && content.trim().length > 0;
+
+  function goList() {
+    router.replace("/board");
   }
 
-  function removeImage(idx) {
-    setImages((prev) => {
-      const copy = [...prev];
-      const it = copy[idx];
-      if (it?.url) URL.revokeObjectURL(it.url);
-      copy.splice(idx, 1);
-      return copy;
-    });
-  }
-
-  function goBack() {
-    router.back();
+  function onCancel() {
+    if (title.trim() || content.trim()) {
+      const ok = window.confirm("작성 중인 내용이 사라집니다. 취소할까요?");
+      if (!ok) return;
+    }
+    goList();
   }
 
   async function onSubmit(e) {
     e.preventDefault();
+    setError("");
 
     const t = title.trim();
     const c = content.trim();
 
-    if (!t) return alert("제목을 입력해줘!");
-    if (!c) return alert("내용을 입력해줘!");
+    if (!t) return setError("제목을 입력해주세요.");
+    if (!c) return setError("내용을 입력해주세요.");
+
+    setSaving(true);
 
     try {
-      setSaving(true);
+      // ✅ TODO: 서버 API 붙이는 곳
+      // await fetch("/api/board", { method: "POST", body: JSON.stringify({ title: t, content: c }) })
+      console.log("submit payload:", { title: t, content: c });
 
-      // ✅ 여기서 API 붙이면 됨
-      // 예시 payload
-      const payload = {
-        title: t,
-        content: c,
-        pinned,
-        author: authorName,
-        // images: 실제 서버 업로드 로직 붙일 때 FormData로 처리 추천
-      };
-
-      console.log("POST payload:", payload);
-
-      // TODO: await createBoardPost(payload, token)
-      // 성공 시 목록으로
-      router.replace("/board");
+      // 임시: 저장 성공 처리
+      setTimeout(() => {
+        setSaving(false);
+        goList();
+      }, 600);
     } catch (err) {
-      console.error(err);
-      alert("저장 중 오류가 발생했어.");
-    } finally {
       setSaving(false);
+      setError("저장 중 오류가 발생했습니다.");
     }
   }
 
   return (
-    <div className="h-full w-full bg-white rounded-xl border border-neutral-200 overflow-hidden">
-      {/* 헤더 */}
-      <div className="px-5 py-4 border-b border-neutral-200 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={goBack}
-            className="h-9 px-3 rounded-md border border-neutral-200 bg-white hover:bg-neutral-50 flex items-center gap-2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            뒤로
-          </button>
-
-          <div className="min-w-0">
-            <h1 className="text-base font-semibold text-neutral-900">글쓰기</h1>
-            <p className="mt-1 text-xs text-neutral-500 truncate">
-              작성자: <span className="text-neutral-700">{authorName}</span>
-            </p>
-          </div>
+    <DashboardShell crumbTop="게시판" crumbCurrent="자유게시판 작성">
+      <div className="w-full h-full flex flex-col gap-4">
+        {/* 상단 타이틀 */}
+        <div className="bg-white rounded-xl px-10 py-5">
+          <h1 className="text-xl font-bold">게시글 작성</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            제목과 내용을 작성해주세요.
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            작성자: <span className="text-gray-700">{authorName}</span>
+          </p>
         </div>
 
-        <button
-          type="submit"
-          form="boardWriteForm"
-          disabled={saving}
-          className="h-9 px-3 rounded-md bg-slate-900 text-white text-sm font-medium
-                     hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed
-                     active:scale-[0.99] flex items-center gap-2"
+        {/* 작성 폼 */}
+        <form
+          id="boardWriteForm"
+          onSubmit={onSubmit}
+          className="bg-white rounded-xl px-10 py-10 flex-1 flex flex-col gap-5"
         >
-          <Send className="w-4 h-4" />
-          {saving ? "등록 중..." : "등록"}
-        </button>
-      </div>
-
-      {/* 폼 */}
-      <form id="boardWriteForm" onSubmit={onSubmit} className="p-5 space-y-5">
-        {/* 제목 */}
-        <div className="space-y-2">
-          <label className="text-xs text-neutral-600">제목</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="제목을 입력하세요"
-            className="w-full h-10 px-3 rounded-md border border-neutral-200 outline-none
-                       focus:border-neutral-400 text-sm"
-            maxLength={80}
-          />
-          <div className="text-[11px] text-neutral-400 text-right">
-            {title.length} / 80
-          </div>
-        </div>
-
-        {/* 옵션 */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-neutral-500">
-            ※ 공지 고정은 권한별로 제한할 수도 있어요.
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-neutral-700 select-none cursor-pointer">
+          {/* 제목 */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">제목</label>
             <input
-              type="checkbox"
-              checked={pinned}
-              onChange={(e) => setPinned(e.target.checked)}
-              className="accent-slate-900"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="제목을 입력하세요"
+              className="h-10 px-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-black/20 placeholder:text-[12px]"
+              maxLength={80}
             />
-            공지로 고정
-          </label>
-        </div>
-
-        {/* 내용 */}
-        <div className="space-y-2">
-          <label className="text-xs text-neutral-600">내용</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="내용을 입력하세요"
-            className="w-full min-h-[260px] p-3 rounded-md border border-neutral-200 outline-none
-                       focus:border-neutral-400 text-sm leading-relaxed resize-none"
-          />
-        </div>
-
-        {/* 이미지(선택) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-neutral-600">
-              이미지 첨부 (선택)
-            </label>
-            <label className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-neutral-200 bg-white hover:bg-neutral-50 cursor-pointer text-sm">
-              <ImagePlus className="w-4 h-4" />
-              이미지 추가
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={onPickImages}
-                className="hidden"
-              />
-            </label>
+            <div className="text-xs text-gray-400 text-right">
+              {title.length}/80
+            </div>
           </div>
 
-          {images.length === 0 ? (
-            <div className="h-28 rounded-md border border-dashed border-neutral-200 flex items-center justify-center text-sm text-neutral-400">
-              첨부된 이미지가 없어요 (최대 6장)
+          {/* 내용 */}
+          <div className="flex flex-col gap-2 flex-1">
+            <label className="text-sm font-semibold text-gray-700">내용</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="내용을 입력하세요"
+              className="min-h-60 flex-1 px-3 py-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-black/20 resize-none placeholder:text-[12px]"
+            />
+            <div className="text-xs text-gray-400 text-right">
+              {content.length}자
             </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="relative rounded-md border border-neutral-200 overflow-hidden bg-neutral-50"
-                >
-                  <img
-                    src={img.url}
-                    alt="preview"
-                    className="w-full h-32 object-cover"
-                    draggable={false}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute top-2 right-2 h-8 w-8 rounded-md bg-white/90 border border-neutral-200
-                               hover:bg-white flex items-center justify-center"
-                    title="삭제"
-                  >
-                    <X className="w-4 h-4 text-neutral-600" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="text-[11px] text-neutral-400">
-            * 서버 업로드는 나중에 FormData로 붙이면 돼요.
           </div>
-        </div>
 
-        {/* 하단 버튼 */}
-        <div className="pt-2 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => router.replace("/board")}
-            className="h-9 px-3 rounded-md border border-neutral-200 bg-white hover:bg-neutral-50 text-sm"
-          >
-            취소
-          </button>
+          {/* 에러 */}
+          {error ? <div className="text-sm text-red-500">{error}</div> : null}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="h-9 px-3 rounded-md bg-slate-900 text-white text-sm font-medium
-                       hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed
-                       active:scale-[0.99] flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            {saving ? "등록 중..." : "등록"}
-          </button>
-        </div>
-      </form>
-    </div>
+          {/* 버튼 */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="h-9 px-4 border rounded-md text-sm hover:bg-gray-50"
+            >
+              취소
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving || !isValid}
+              className={`h-9 px-4 rounded-md text-sm transition flex items-center gap-2
+                ${
+                  saving || !isValid
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-black text-white hover:bg-gray-900 cursor-pointer"
+                }`}
+            >
+              {saving ? "등록중..." : "등록"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </DashboardShell>
   );
 }
