@@ -1,4 +1,4 @@
-export async function getTools() {
+export async function getMachine() {
   const response = await fetch(
     `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/machine`,
   );
@@ -6,7 +6,7 @@ export async function getTools() {
   return json;
 }
 
-export async function postTools(tools) {
+export async function postMachine(machine) {
   const response = await fetch(
     `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/machine/upsert`,
     {
@@ -14,7 +14,7 @@ export async function postTools(tools) {
         "Content-type": "application/json",
       },
       method: "POST",
-      body: JSON.stringify({ tools: tools }),
+      body: JSON.stringify({ machine: machine }),
     },
   );
   if (response.status === 204) {

@@ -1,4 +1,4 @@
-export async function getJobs() {
+export async function getProduct() {
   const response = await fetch(
     `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/product`,
   );
@@ -6,7 +6,7 @@ export async function getJobs() {
   return json;
 }
 
-export async function postJobs(jobs) {
+export async function postProduct(product) {
   const response = await fetch(
     `http://${process.env.NEXT_PUBLIC_APS_SERVER}:8080/api/operation/product/upsert`,
     {
