@@ -12,6 +12,20 @@ import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
 import { getCommunities, getCommunityCommentCount } from "@/api/community-api";
 
+function fmtDate(v) {
+  if (!v) return "-";
+
+  let d = String(v);
+
+  if (d.includes("T")) d = d.split("T")[0];
+  else if (d.includes(" ")) d = d.split(" ")[0];
+  else d = d.slice(0, 10);
+
+  // 2026-01-28 -> 2026.1.28
+  const [y, m, day] = d.split("-");
+  return `${y}.${Number(m)}.${Number(day)}`;
+}
+
 export default function Board() {
   const router = useRouter();
   const { token } = useToken();
@@ -206,7 +220,7 @@ export default function Board() {
             >
               <option value="latest">최신순</option>
               <option value="comments">댓글순</option>
-              <option value="views">조회순</option>
+              {/* <option value="views">조회순</option> */}
             </select>
           </div>
 
@@ -279,11 +293,10 @@ export default function Board() {
                     </div>
 
                     <div className="text-xs text-neutral-500 flex items-center gap-2 min-w-0">
-                      <Clock className="w-4 h-4 text-neutral-300 shrink-0" />
-                      <span className="truncate">{r.createdAt}</span>
+                      <span className="truncate">{fmtDate(r.createdAt)}</span>
                     </div>
 
-                    {/* ✅ 댓글 수 이제 서버에서 진짜로 가져온 값 */}
+                    {/*  댓글 수 이제 서버가져온 값 */}
                     <div className="text-xs text-neutral-600 text-right pr-2">
                       {r.comments}
                     </div>

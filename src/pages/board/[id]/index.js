@@ -14,7 +14,7 @@ function normalizeComments(commentJson) {
     commentJson?.data,
     commentJson?.result,
     commentJson?.list,
-    commentJson?.content,
+    commentJson?.content, // page 구조면 content가 배열일 수도
   ];
 
   for (const v of candidates) {
@@ -28,6 +28,25 @@ function normalizeComments(commentJson) {
     }
   }
   return [];
+}
+
+// ✅ "2026-01-28T15:52:28" / "2026-01-28 15:52:28" / "2026-01-28"
+// -> "2026.1.28"
+function formatDateDot(value) {
+  if (!value) return "";
+
+  const s = String(value);
+  let datePart = s;
+
+  if (s.includes("T")) datePart = s.split("T")[0];
+  else if (s.includes(" ")) datePart = s.split(" ")[0];
+  else datePart = s.slice(0, 10);
+
+  // datePart: "YYYY-MM-DD"
+  const [y, m, d] = datePart.split("-");
+  if (!y || !m || !d) return datePart;
+
+  return `${Number(y)}.${Number(m)}.${Number(d)}`;
 }
 
 export default function BoardDetail() {
@@ -110,21 +129,20 @@ export default function BoardDetail() {
   }
 
   async function onRemoveComment(commentId) {
-    const ok = window.confirm("댓글 삭제할까?");
+    const ok = window.confirm("해당 댓글을 삭제하시겠습니까?");
     if (!ok) return;
 
     try {
       await deleteComment(communityId, commentId, token);
-      // 안전하게 다시 로딩(삭제가 soft delete거나, 정렬/중복키 이슈도 같이 정리됨)
       await reloadComments(communityId);
     } catch (e) {
       alert(e?.message || "댓글 삭제 실패");
     }
   }
 
-  // 익명 번호 매기기: memberId(또는 writer 식별값) 기준으로 익명1/2/3...
+  // ✅ 익명 번호: memberId(또는 작성자 식별값) 기준으로 익명 1/2/3...
   const anonMap = useMemo(() => {
-    const map = new Map(); // key: 식별값, value: 번호
+    const map = new Map();
     let seq = 1;
 
     for (const c of comments) {
@@ -134,7 +152,9 @@ export default function BoardDetail() {
         c.member?.id ??
         c.author?.id ??
         c.writerId ??
-        c.writer_id;
+        c.writer_id ??
+        c.member?.memberId ??
+        c.author?.memberId;
 
       if (memberKey == null) continue;
 
@@ -144,25 +164,23 @@ export default function BoardDetail() {
         seq += 1;
       }
     }
-
     return map;
   }, [comments]);
 
   function getDisplayAuthor(c) {
-    // 서버가 name을 내려주면 그걸 우선
     const name =
       c.author?.name || c.member?.name || c.authorName || c.writerName || "";
-
     if (name) return name;
 
-    // 없으면 memberId 기반 익명 번호
     const memberKey =
       c.memberId ??
       c.member_id ??
       c.member?.id ??
       c.author?.id ??
       c.writerId ??
-      c.writer_id;
+      c.writer_id ??
+      c.member?.memberId ??
+      c.author?.memberId;
 
     if (memberKey == null) return "익명";
 
@@ -218,6 +236,7 @@ export default function BoardDetail() {
     post.authorName ||
     "익명";
   const createdAt = post.createdAt || post.created_at || "";
+  const createdDate = formatDateDot(createdAt); // ✅ 점 날짜
 
   return (
     <DashboardShell>
@@ -237,16 +256,14 @@ export default function BoardDetail() {
               </h1>
             </div>
 
-            <div className="mt-2 flex items-center gap-4 text-xs text-neutral-500">
+            <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
+              <span className="text-gray-400">작성자</span>
+              <span className="inline-flex items-center gap-1">{author}</span>
+              <div></div>
+              <span className="text-gray-400">작성일</span>
               <span className="inline-flex items-center gap-1">
-                <MessageSquareText className="w-4 h-4 text-neutral-300" />
-                {author}
+                {createdDate}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <Clock className="w-4 h-4 text-neutral-300" />
-                {createdAt}
-              </span>
-              <span>댓글 {comments.length}</span>
             </div>
           </div>
 
@@ -297,7 +314,7 @@ export default function BoardDetail() {
               </button>
             </div>
 
-            {/* ✅ list: 스크롤 영역 */}
+            {/* list: 스크롤 */}
             <div className="mt-4 min-h-0">
               <div className="divide-y divide-neutral-100 max-h-[45vh] overflow-y-auto pr-2">
                 {comments.length === 0 ? (
@@ -311,29 +328,26 @@ export default function BoardDetail() {
                     .map((c, idx) => {
                       const commentId = c.id ?? c.commentId;
                       const cauthor = getDisplayAuthor(c);
-                      const ctime = c.createdAt || c.created_at || "";
+                      const cdate = formatDateDot(c.createdAt || c.created_at); // ✅ 댓글도 점 날짜
                       const cbody = c.content || c.comment || "";
 
-                      // ✅ key는 유니크하게
                       const key = `${String(commentId ?? "noid")}_${idx}`;
 
                       return (
                         <div key={key} className="py-3">
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center justify-between gap-4">
+                            {/* 작성자 / 댓글 / 날짜 */}
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              {/* 왼쪽: 익명 */}
                               <div className="text-sm font-semibold text-neutral-900 shrink-0">
                                 {cauthor}
                               </div>
 
-                              {/* 가운데: 댓글 (남은 공간 다 먹고, 길면 ... 처리) */}
-                              <div className="text-sm text-neutral-700 truncate min-w-0 flex-1">
+                              <div className="text-sm text-neutral-700 min-w-0 flex-1 truncate">
                                 {cbody}
                               </div>
 
-                              {/* 오른쪽: 시간 */}
                               <div className="text-xs text-neutral-500 shrink-0">
-                                {ctime}
+                                {cdate}
                               </div>
                             </div>
 
@@ -354,7 +368,6 @@ export default function BoardDetail() {
                 )}
               </div>
             </div>
-            {/* ✅ end list */}
           </div>
         </div>
       </div>
