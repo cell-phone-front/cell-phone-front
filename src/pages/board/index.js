@@ -1,99 +1,153 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
-  Search,
   Plus,
   ChevronLeft,
   ChevronRight,
   MessageSquareText,
-  Eye,
   Clock,
   Pin,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
-
-const MOCK = [
-  {
-    id: 101,
-    pinned: true,
-    title: " 공지: 자유게시판 이용 규칙",
-    author: "관리자",
-    createdAt: "2026-01-26 09:00",
-    views: 1280,
-    comments: 12,
-  },
-  {
-    id: 100,
-    pinned: false,
-    title: "라인 점검 일정 공유합니다",
-    author: "totoro",
-    createdAt: "2026-01-26 08:10",
-    views: 83,
-    comments: 4,
-  },
-  {
-    id: 99,
-    pinned: false,
-    title: "오늘 야간 근무 교대 가능하신 분?",
-    author: "김철수",
-    createdAt: "2026-01-25 20:44",
-    views: 221,
-    comments: 18,
-  },
-  {
-    id: 98,
-    pinned: false,
-    title: "CNC 공정 세팅 팁 공유",
-    author: "박영희",
-    createdAt: "2026-01-25 13:02",
-    views: 145,
-    comments: 2,
-  },
-  {
-    id: 97,
-    pinned: false,
-    title: "불량 원인 체크리스트 같이 정리해요",
-    author: "planner01",
-    createdAt: "2026-01-24 17:33",
-    views: 402,
-    comments: 29,
-  },
-];
-
-function fmtRoleBadge(role) {
-  if (role === "사장") return "bg-red-50 text-red-600 border-red-200";
-  if (role === "팀장") return "bg-blue-50 text-blue-600 border-blue-200";
-  return "bg-neutral-50 text-neutral-600 border-neutral-200";
-}
+import { useToken } from "@/stores/account-store";
+import { getCommunities, getCommunityCommentCount } from "@/api/community-api";
 
 export default function Board() {
   const router = useRouter();
+  const { token } = useToken();
 
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState("latest"); // latest | views | comments
+  const [sort, setSort] = useState("latest");
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  //  서버에서 목록 + 댓글 수 불러오기
+  useEffect(() => {
+    if (!token) return;
+
+    let alive = true;
+    setLoading(true);
+    setLoadError("");
+
+    (async () => {
+      try {
+        const json = await getCommunities(token);
+        if (!alive) return;
+
+        const list =
+          json?.communities || json?.communityList || json?.items || json || [];
+        const arr = Array.isArray(list) ? list : [];
+
+        // 댓글 수 병렬 조회 (id 뽑고, 없는건 스킵)
+        const ids = arr
+          .map((r) => r.id ?? r.communityId ?? r.community_id)
+          .filter((v) => v != null);
+
+        const pairs = await Promise.all(
+          ids.map(async (cid) => {
+            try {
+              const res = await getCommunityCommentCount(cid, token);
+              // 반환 방어: {count}, {commentCount}, number 등
+              const cnt =
+                res?.count ??
+                res?.commentCount ??
+                res?.data ??
+                (typeof res === "number" ? res : 0);
+              return [String(cid), Number(cnt) || 0];
+            } catch {
+              return [String(cid), 0];
+            }
+          }),
+        );
+
+        const countMap = Object.fromEntries(pairs);
+
+        // data에 commentCount를 합쳐서 저장
+        const merged = arr.map((r) => {
+          const cid = r.id ?? r.communityId ?? r.community_id;
+          const serverCnt =
+            r.comments ?? r.commentCount ?? r.comment_count ?? r.commentCnt;
+          const apiCnt = countMap[String(cid)] ?? 0;
+
+          return {
+            ...r,
+            // 서버에 이미 count가 있으면 그걸 우선, 없으면 apiCnt
+            __commentCount:
+              typeof serverCnt === "number" ? serverCnt : Number(apiCnt) || 0,
+          };
+        });
+
+        setData(merged);
+        setPage(1);
+      } catch (e) {
+        if (!alive) return;
+        setLoadError(e?.message || "목록을 불러오지 못했어요.");
+        setData([]);
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  // 화면용 row 매핑
   const rows = useMemo(() => {
+    const mapped = (data || []).map((r) => {
+      const id = r.id ?? r.communityId ?? r.community_id;
+      const title = r.title ?? "";
+      const author =
+        r.author?.name ??
+        r.writer?.name ??
+        r.member?.name ??
+        r.authorName ??
+        r.writerName ??
+        "익명";
+      const createdAt =
+        r.createdAt ?? r.created_at ?? r.createdDate ?? r.createdDateTime ?? "";
+      const views = r.views ?? r.viewCount ?? 0;
+
+      //  여기! 댓글 수는 __commentCount를 사용
+      const comments =
+        r.__commentCount ??
+        r.comments ??
+        r.commentCount ??
+        r.comment_count ??
+        r.commentCnt ??
+        0;
+
+      const pinned = r.pinned ?? r.isPinned ?? false;
+
+      return { id, title, author, createdAt, views, comments, pinned };
+    });
+
     const keyword = q.trim().toLowerCase();
 
-    let filtered = MOCK.filter((r) => {
+    let filtered = mapped.filter((r) => {
       if (!keyword) return true;
       return (
-        r.title.toLowerCase().includes(keyword) ||
-        r.author.toLowerCase().includes(keyword)
+        (r.title || "").toLowerCase().includes(keyword) ||
+        (r.author || "").toLowerCase().includes(keyword)
       );
     });
 
-    // 핀 먼저
     const pinned = filtered.filter((r) => r.pinned);
     const normal = filtered.filter((r) => !r.pinned);
 
-    // 정렬
     const sorter = (a, b) => {
       if (sort === "views") return (b.views || 0) - (a.views || 0);
       if (sort === "comments") return (b.comments || 0) - (a.comments || 0);
-      // latest: id 큰 게 최신이라는 가정(임시)
+
+      const at = Date.parse(a.createdAt || "") || 0;
+      const bt = Date.parse(b.createdAt || "") || 0;
+      if (bt !== at) return bt - at;
       return (b.id || 0) - (a.id || 0);
     };
 
@@ -101,7 +155,7 @@ export default function Board() {
     normal.sort(sorter);
 
     return [...pinned, ...normal];
-  }, [q, sort]);
+  }, [data, q, sort]);
 
   const total = rows.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -110,18 +164,17 @@ export default function Board() {
   const rowNoBase = (safePage - 1) * pageSize;
 
   function goWrite() {
-    // 글쓰기 페이지를 만들면 연결
     router.push("/board/write");
   }
 
   function openPost(id) {
+    if (id == null) return;
     router.push(`/board/${id}`);
   }
 
   return (
     <DashboardShell>
       <div className="h-full w-full bg-white rounded-xl overflow-hidden">
-        {/* 상단 헤더 */}
         <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -137,7 +190,6 @@ export default function Board() {
         </div>
 
         <div className="px-10 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* 정렬 + 카운트 */}
           <div className="flex items-center justify-between md:justify-end gap-3">
             <div className="text-xs text-neutral-500">
               총 <span className="font-semibold text-neutral-700">{total}</span>
@@ -154,8 +206,10 @@ export default function Board() {
             >
               <option value="latest">최신순</option>
               <option value="comments">댓글순</option>
+              <option value="views">조회순</option>
             </select>
           </div>
+
           <button
             type="button"
             onClick={goWrite}
@@ -167,13 +221,18 @@ export default function Board() {
           </button>
         </div>
 
-        {/* 리스트 */}
+        {loading ? (
+          <div className="px-10 py-6 text-sm text-neutral-500">
+            불러오는 중...
+          </div>
+        ) : loadError ? (
+          <div className="px-10 py-6 text-sm text-red-500">{loadError}</div>
+        ) : null}
+
         <div className="min-h-0">
-          {/* 데스크탑 테이블 */}
           <div className="hidden md:block">
             <div className="px-10">
-              {/* header */}
-              <div className="grid grid-cols-[60px_1fr_110px_100px_60px] px-8 py-2 text-[12px]  font-medium bg-neutral-200">
+              <div className="grid grid-cols-[60px_1fr_110px_140px_60px] px-8 py-2 text-[12px] font-medium bg-neutral-200">
                 <div className="text-center">번호</div>
                 <div>제목</div>
                 <div>작성자</div>
@@ -181,20 +240,18 @@ export default function Board() {
                 <div className="text-right pr-2">댓글</div>
               </div>
 
-              {/* rows */}
               {pageRows.length === 0 ? (
                 <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                  검색 결과가 없어요.
+                  {loading ? "불러오는 중..." : "게시글이 없어요."}
                 </div>
               ) : (
                 pageRows.map((r, idx) => (
                   <button
-                    key={r.id}
+                    key={String(r.id)}
                     type="button"
                     onClick={() => openPost(r.id)}
-                    className="w-full text-left grid grid-cols-[60px_1fr_110px_100px_60px] px-8 py-3 border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer"
+                    className="w-full text-left grid grid-cols-[60px_1fr_110px_140px_60px] px-8 py-3 border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer"
                   >
-                    {/* 번호 */}
                     <div className="flex items-center justify-center text-sm text-neutral-500">
                       {r.pinned ? (
                         <span className="text-amber-600 font-semibold">📌</span>
@@ -203,7 +260,6 @@ export default function Board() {
                       )}
                     </div>
 
-                    {/* 제목 */}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         {r.pinned && (
@@ -218,17 +274,16 @@ export default function Board() {
                       </div>
                     </div>
 
-                    {/* 작성자 */}
                     <div className="text-xs text-neutral-700 truncate">
                       {r.author}
                     </div>
 
-                    {/* 작성일 */}
                     <div className="text-xs text-neutral-500 flex items-center gap-2 min-w-0">
+                      <Clock className="w-4 h-4 text-neutral-300 shrink-0" />
                       <span className="truncate">{r.createdAt}</span>
                     </div>
 
-                    {/* 댓글 */}
+                    {/* ✅ 댓글 수 이제 서버에서 진짜로 가져온 값 */}
                     <div className="text-xs text-neutral-600 text-right pr-2">
                       {r.comments}
                     </div>
@@ -238,17 +293,17 @@ export default function Board() {
             </div>
           </div>
 
-          {/* 모바일 카드 */}
+          {/* 모바일 */}
           <div className="md:hidden">
             {pageRows.length === 0 ? (
               <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                검색 결과가 없어요.
+                {loading ? "불러오는 중..." : "게시글이 없어요."}
               </div>
             ) : (
               <div className="p-4 space-y-3">
                 {pageRows.map((r) => (
                   <button
-                    key={r.id}
+                    key={String(r.id)}
                     type="button"
                     onClick={() => openPost(r.id)}
                     className="w-full text-left rounded-lg border border-neutral-200 bg-white p-4 hover:bg-neutral-50 transition"
@@ -266,16 +321,15 @@ export default function Board() {
                             {r.title}
                           </div>
                         </div>
-                        <div className="col-span-6 grid grid-cols-[110px_150px_50px] gap-2 items-center justify-end pr-6">
+
+                        <div className="mt-2 grid grid-cols-[110px_1fr_50px] gap-2 items-center pr-1">
                           <div className="text-sm text-neutral-700 truncate">
                             {r.author}
                           </div>
-
                           <div className="text-sm text-neutral-500 flex items-center gap-2 min-w-0">
                             <Clock className="w-4 h-4 text-neutral-300 shrink-0" />
                             <span className="truncate">{r.createdAt}</span>
                           </div>
-
                           <div className="text-sm text-neutral-600 text-right">
                             {r.comments}
                           </div>
@@ -289,8 +343,7 @@ export default function Board() {
           </div>
         </div>
 
-        {/* 하단 페이지네이션 */}
-        <div className="px-10 py-3  border-neutral-200 flex items-center">
+        <div className="px-10 py-3 border-neutral-200 flex items-center">
           <div className="ml-auto flex items-center gap-6">
             <div className="text-xs text-neutral-500">
               {safePage} / {pageCount} 페이지

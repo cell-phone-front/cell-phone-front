@@ -12,6 +12,20 @@ import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
 import { getNotices, getNoticeById } from "@/api/notice-api";
 
+function fmtDate(v) {
+  if (!v) return "-";
+  const s = String(v);
+
+  let d = s;
+
+  if (d.includes("T")) d = d.split("T")[0];
+  else if (d.includes(" ")) d = d.split(" ")[0];
+  else d = d.slice(0, 10);
+
+  //  "-" → "."
+  return d.replaceAll("-", ".");
+}
+
 function NoticeModal({ open, onClose, notice }) {
   React.useEffect(() => {
     if (!open) return;
@@ -35,43 +49,67 @@ function NoticeModal({ open, onClose, notice }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-xl shadow-lg border overflow-hidden"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden p-4
+               max-h-[85vh] flex flex-col"
         onClick={stop}
         role="dialog"
         aria-modal="true"
       >
-        {/* 헤더 */}
-        <div className="px-6 py-5 border-b flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-lg font-bold truncate">
-              {notice?.title || "공지사항"}
-            </div>
-            <div className="text-xs text-gray-500 mt-1 flex gap-3">
-              <span>작성일: {notice?.createdAt || notice?.date || "-"}</span>
-              <span className="flex items-center gap-1">
-                <Eye className="w-4 h-4 text-gray-300" />
-                {notice?.views ?? notice?.viewCount ?? "-"}
-              </span>
+        {/* 헤더 (sticky) */}
+        <div className="sticky top-0 z-10 bg-white px-6 py-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-2xl font-semibold leading-snug wrap-break-words pb-2">
+                {notice?.title || "공지사항"}
+              </div>
+
+              <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1 pb-1">
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-gray-400">작성자</span>
+                  <span className="text-gray-700">
+                    {notice?.memberName ||
+                      notice?.name ||
+                      notice?.author ||
+                      "-"}
+                  </span>
+                </span>
+
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-gray-400">작성일</span>
+                  <span className="text-gray-700">
+                    {fmtDate(notice?.createdAt || notice?.date)}
+                  </span>
+                </span>
+
+                <span className="inline-flex items-center gap-1">
+                  <Eye className="w-4 h-4 text-gray-300" />
+                  <span className="text-gray-700">
+                    {notice?.views ?? notice?.viewCount ?? "-"}
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 내용 */}
-        <div className="px-6 py-5">
-          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-6">
+        {/* 내용 (스크롤 영역) */}
+        <div className="px-6 pt-1 pb-5 overflow-y-auto flex-1 min-h-0">
+          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 break-all wrap-break-words">
             {notice?.description || notice?.content || "내용이 없습니다."}
           </div>
         </div>
 
-        {/* 푸터 */}
-        <div className="px-6 py-4 border-t flex justify-end">
+        {/* 푸터 (sticky) */}
+        <div className="sticky bottom-0 bg-white px-6 py-4  flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="h-8 px-4 rounded-md bg-slate-900 text-white text-xs hover:bg-slate-800 active:scale-[0.99]"
+            className="cursor-pointer h-8 px-4 rounded-md bg-gray-400 text-white text-xs
+                   hover:bg-slate-900 active:scale-[0.99]"
+            type="button"
           >
             닫기
           </button>
@@ -115,9 +153,9 @@ export default function Notice() {
 
   // 첫 진입 시 목록 로드
   React.useEffect(() => {
+    if (!token) return;
     loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   // 모달
   const [open, setOpen] = React.useState(false);
@@ -127,7 +165,7 @@ export default function Notice() {
     setSelected(row);
     setOpen(true);
 
-    // ✅ 상세 재조회 (내용/조회수 최신화)
+    //  상세 재조회 (내용/조회수 최신화)
     try {
       const id = row?.id ?? row?.noticeId;
       if (!id) return;
@@ -238,14 +276,6 @@ export default function Notice() {
               <option value="latest">최신순</option>
               <option value="views">조회순</option>
             </select>
-
-            <button
-              type="button"
-              onClick={loadList}
-              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-[11px] hover:bg-neutral-50"
-            >
-              새로고침
-            </button>
           </div>
 
           {canWriteNotice && (
@@ -311,18 +341,18 @@ export default function Notice() {
 
                     <div className="text-xs text-neutral-700 truncate">
                       {r.memberName ||
+                        r.name ||
                         r.author ||
                         r.writer ||
                         r.memberId ||
                         "-"}
                     </div>
                     <div className="text-xs text-neutral-500 truncate">
-                      {r.createdAt || r.date || "-"}
+                      {fmtDate(r.createdAt || r.date)}
                     </div>
+
                     <div className="text-xs text-neutral-600 text-right pr-2">
-                  {r.views ?? r.viewCount ?? "-"}
-
-
+                      {r.views ?? r.viewCount ?? "-"}
                     </div>
                   </button>
                 ))}
@@ -353,14 +383,16 @@ export default function Notice() {
 
                       <div className="text-xs text-neutral-700 truncate">
                         {r.memberName ||
+                          r.name ||
                           r.author ||
                           r.writer ||
                           r.memberId ||
                           "-"}
                       </div>
                       <div className="text-xs text-neutral-500 truncate">
-                        {r.createdAt || r.date || "-"}
+                        {fmtDate(r.createdAt || r.date)}
                       </div>
+
                       <div className="text-xs text-neutral-600 text-right pr-2">
                         {r.views ?? r.viewCount ?? "-"}
                       </div>

@@ -1,33 +1,30 @@
 const serverAddr = "http://localhost:8080";
 
-
-// (1) 공지 목록 조회 (보통 공개 / 필요하면 토큰 붙이면 됨)
+// (1) 공지 목록 조회
 export async function getNotices(token) {
-  const headers = {};
-  if (token) headers.Authorization = "Bearer " + token;
-
   const response = await fetch(`${serverAddr}/api/notice`, {
     method: "GET",
-    headers,
+    headers: {
+      Authorization: "Bearer " + token,
+    },
   });
 
   return response.json();
 }
 
-// (2) 공지 단건 조회 (상세 모달 열 때)
+// (2) 공지 단건 조회
 export async function getNoticeById(id, token) {
-  const headers = {};
-  if (token) headers.Authorization = "Bearer " + token;
-
   const response = await fetch(`${serverAddr}/api/notice/${id}`, {
     method: "GET",
-    headers,
+    headers: {
+      Authorization: "Bearer " + token,
+    },
   });
 
   return response.json();
 }
 
-// (3) 공지 upsert (등록/수정) - 관리자 페이지 → 토큰 필요
+// (3) 공지 등록/수정
 export async function createNotice(payload, token) {
   const response = await fetch(`${serverAddr}/api/notice`, {
     method: "POST",
@@ -38,16 +35,10 @@ export async function createNotice(payload, token) {
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("createNotice fail:", response.status, text);
-    return null;
-  }
-
-  return response.json();
+  return response.ok;
 }
 
-// (4) 공지 삭제 (선택 삭제 같은 거)
+// (4) 공지 삭제
 export async function deleteNotices(ids, token) {
   const response = await fetch(`${serverAddr}/api/notice/delete`, {
     method: "POST",
@@ -57,11 +48,6 @@ export async function deleteNotices(ids, token) {
     },
     body: JSON.stringify({ ids }),
   });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("deleteNotices fail:", response.status, text);
-  }
 
   return response.ok;
 }
@@ -78,4 +64,6 @@ export async function parseNoticeXLS(file, token) {
     },
     body: formData,
   });
+
+  return response.json();
 }

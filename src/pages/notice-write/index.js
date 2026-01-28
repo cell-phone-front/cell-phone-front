@@ -15,6 +15,7 @@ export default function NoticeWrite() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const MAX_DESC = 255;
 
   const memberId = account?.id;
 
@@ -55,7 +56,7 @@ export default function NoticeWrite() {
       router.push("/notice");
     } catch (err) {
       console.error(err);
-      setError("저장 중 오류가 발생했습니다.");
+      setError(err?.message || "저장 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }
@@ -116,7 +117,11 @@ export default function NoticeWrite() {
               onChange={(e) => setContent(e.target.value)}
               placeholder="공지사항 내용을 입력하세요"
               className="min-h-60 flex-1 px-3 py-3 border rounded-md text-sm outline-none resize-none"
+              maxLength={MAX_DESC}
             />
+            <div className="flex justify-end text-xs text-gray-400">
+              {content.length}/{MAX_DESC}자
+            </div>
           </div>
 
           {error ? <div className="text-sm text-red-500">{error}</div> : null}

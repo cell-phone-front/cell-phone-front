@@ -3,13 +3,14 @@ import { useRouter } from "next/router";
 import { Send } from "lucide-react";
 import { useAccount, useToken } from "@/stores/account-store";
 import DashboardShell from "@/components/dashboard-shell";
+import { postCommunity } from "@/api/community-api";
 
 export default function BoardWrite() {
   const router = useRouter();
   const { account } = useAccount();
   const { token } = useToken();
 
-  // ✅ persist 복구 기다리는 용도
+  // persist 복구 기다리는 용도
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function BoardWrite() {
   const isValid = title.trim().length > 0 && content.trim().length > 0;
 
   function goList() {
-    router.replace("/board");
+    router.replace("/board"); // 필요하면 이렇게
   }
 
   function onCancel() {
@@ -62,18 +63,19 @@ export default function BoardWrite() {
     setSaving(true);
 
     try {
-      // ✅ TODO: 서버 API 붙이는 곳
-      // await fetch("/api/board", { method: "POST", body: JSON.stringify({ title: t, content: c }) })
-      console.log("submit payload:", { title: t, content: c });
+      // content -> description 으로 보내기 (백엔드 스펙)
+      const payload = { title: t, description: c };
 
-      // 임시: 저장 성공 처리
-      setTimeout(() => {
-        setSaving(false);
-        goList();
-      }, 600);
+      const data = await postCommunity(payload, token);
+
+      // 서버가 id를 내려주면 상세로 보내고 싶을 때(옵션)
+      // if (data?.id) return router.replace(`/board/${data.id}`);
+
+      goList();
     } catch (err) {
+      setError(err?.message || "저장 중 오류가 발생했습니다.");
+    } finally {
       setSaving(false);
-      setError("저장 중 오류가 발생했습니다.");
     }
   }
 
