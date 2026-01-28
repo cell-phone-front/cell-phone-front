@@ -36,8 +36,8 @@ export default function NoticeWrite() {
 
       const payload = {
         title: t,
-        description: c, //  백엔드 키
-        memberId: memberId, // member.id
+        description: c, // ✅ 백엔드 키
+        memberId: memberId, // ✅ member.id
         pinned: pinned,
       };
 

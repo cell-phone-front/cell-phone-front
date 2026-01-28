@@ -1,5 +1,6 @@
 const serverAddr = "http://localhost:8080";
 
+
 // (1) 공지 목록 조회 (보통 공개 / 필요하면 토큰 붙이면 됨)
 export async function getNotices(token) {
   const headers = {};
@@ -77,6 +78,4 @@ export async function parseNoticeXLS(file, token) {
     },
     body: formData,
   });
-
-  return response.json();
 }
