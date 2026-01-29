@@ -1,8 +1,10 @@
-import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
+import { getProduct, parseXLS, postProduct } from "@/api/product-api";
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useToken } from "@/stores/account-store";
 
-export default function TasksPage() {
+export default function Product() {
+  const { token } = useToken();
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dirty, setDirty] = useState(false);
@@ -14,21 +16,21 @@ export default function TasksPage() {
   const fileRef = useRef();
 
   useEffect(() => {
-    getTasks().then((json) => {
-      const rows = (json.tasks || []).map((e) => ({
+    if (!token) return; // 토큰 없으면 호출 안 함
+
+    getProduct(token).then((json) => {
+      const rows = (json.productList || []).map((e) => ({
         ...e,
         _rid: e._rid || cryptoId(),
-        flag: "Y", // 기존 데이터
-        jobId: e.job?.id ?? e.jobId ?? "",
-        toolId: e.tool?.id ?? e.toolId ?? "",
+        flag: "Y",
       }));
 
       setData(rows);
       setSelected(new Set());
       setPageIndex(0);
+      setDirty(false);
     });
-  }, []);
-
+  }, [token]);
   const totalRows = data.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
@@ -79,12 +81,8 @@ export default function TasksPage() {
           _rid: cryptoId(),
           flag: "new",
           id: "",
-          jobId: "",
-          seq: "",
-          name: "",
-          description: "",
-          toolId: "",
-          duration: "",
+          brand: "",
+          variety: "",
         },
         ...prev,
       ];
@@ -104,9 +102,9 @@ export default function TasksPage() {
   };
 
   const saveHandle = () => {
-    const payload = data.map(({ _rid, job, tool, ...rest }) => rest);
+    const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
-    postTasks(payload).then((ok) => {
+    postProduct(payload, token).then((ok) => {
       window.alert(ok ? "저장 완료" : "저장 실패");
       if (ok) setDirty(false);
     });
@@ -120,17 +118,14 @@ export default function TasksPage() {
     const file = e?.target?.files?.[0];
     if (!file) return;
 
-    parseTaskXLS(file)
+    parseXLS(file, token)
       .then((json) => {
-        const items = (json.items || []).map((r) => ({
+        const items = (json.productList || []).map((r) => ({
           ...r,
           _rid: cryptoId(),
-          flag: "pre", //  업로드 표시
-          jobId: r.job?.id ?? r.jobId ?? "",
-          toolId: r.tool?.id ?? r.toolId ?? "",
+          flag: "pre",
         }));
 
-        // 업로드도 위로 쌓기
         setData((prev) => [...items, ...prev]);
         setPageIndex(0);
         setSelected(new Set());
@@ -148,20 +143,21 @@ export default function TasksPage() {
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
   return (
-    <DashboardShell crumbTop="테이블" crumbCurrent="tasks">
+    <DashboardShell crumbTop="결과분석" crumbCurrent="product">
       <div className="">
         <div className="">
           {/* 헤더 */}
           <div className="flex items-center justify-between gap-4 px-3 py-3">
             <div className="flex justify-between gap-4 items-center">
-              <h2 className="text-2xl font-bold tracking-tight">Tasks</h2>
+              <h2 className="text-2xl font-bold tracking-tight">Product</h2>
               <p className="mt-1 text-xs text-gray-500">
-                엑셀 업로드/편집 후 저장할 수 있어요.
+                생산 대상 목록을 엑셀 업로드/편집 후 저장할 수 있어요.
               </p>
             </div>
           </div>
+
           <div className="flex items-center justify-between gap-3 px-4">
-            {/* 왼쪽 그룹 */}
+            {/* 왼쪽 */}
             <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
               <span>총 {totalRows.toLocaleString()}건</span>
               <span className="mx-1 h-4 w-px bg-gray-200" />
@@ -184,7 +180,7 @@ export default function TasksPage() {
               </button>
             </div>
 
-            {/*  오른쪽 그룹 */}
+            {/* 오른쪽 */}
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
@@ -193,6 +189,7 @@ export default function TasksPage() {
               >
                 + 행 추가
               </button>
+
               <input
                 ref={fileRef}
                 type="file"
@@ -248,25 +245,13 @@ export default function TasksPage() {
                       </th>
 
                       <th className="min-w-40 border-b px-3 py-3 font-medium">
-                        Task Id
+                        Product Id
                       </th>
                       <th className="min-w-40 border-b px-3 py-3 font-medium">
-                        Job Id
+                        Brand
                       </th>
-                      <th className="min-w-15 border-b px-3 py-3 font-medium">
-                        Seq
-                      </th>
-                      <th className="min-w-40 border-b px-3 py-3 font-medium">
-                        Name
-                      </th>
-                      <th className="min-w-90 border-b px-3 py-3 font-medium">
-                        Description
-                      </th>
-                      <th className="min-w-40 border-b px-3 py-3 font-medium">
-                        Tool Id
-                      </th>
-                      <th className="min-w-10 border-b px-3 py-3 font-medium">
-                        Duration
+                      <th className="min-w-60 border-b px-3 py-3 font-medium">
+                        Variety
                       </th>
 
                       <th className="min-w-25 border-b px-3 py-3 font-medium">
@@ -289,10 +274,8 @@ export default function TasksPage() {
                       return (
                         <tr
                           key={row._rid}
-                          // 호버시
                           className={["hover:bg-slate-200/80", rowBg].join(" ")}
                         >
-                          {/* 체크 */}
                           <td className="border-b px-3 py-2">
                             <div className="flex justify-center">
                               <input
@@ -306,7 +289,6 @@ export default function TasksPage() {
                             </div>
                           </td>
 
-                          {/* Task Id */}
                           <td className="border-b px-3 py-2">
                             <input
                               value={row.id ?? ""}
@@ -314,87 +296,32 @@ export default function TasksPage() {
                                 updateCell(row._rid, "id", e.target.value)
                               }
                               className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Task ID"
+                              placeholder="Product ID"
                             />
                           </td>
 
-                          {/* Job Id */}
                           <td className="border-b px-3 py-2">
                             <input
-                              value={row.jobId ?? ""}
+                              value={row.brand ?? ""}
                               onChange={(e) =>
-                                updateCell(row._rid, "jobId", e.target.value)
+                                updateCell(row._rid, "brand", e.target.value)
                               }
                               className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Job ID"
+                              placeholder="Brand"
                             />
                           </td>
 
-                          {/* Seq */}
                           <td className="border-b px-3 py-2">
                             <input
-                              value={row.seq ?? ""}
+                              value={row.variety ?? ""}
                               onChange={(e) =>
-                                updateCell(row._rid, "seq", e.target.value)
+                                updateCell(row._rid, "variety", e.target.value)
                               }
                               className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Seq"
+                              placeholder="Variety"
                             />
                           </td>
 
-                          {/* Name */}
-                          <td className="border-b px-3 py-2">
-                            <input
-                              value={row.name ?? ""}
-                              onChange={(e) =>
-                                updateCell(row._rid, "name", e.target.value)
-                              }
-                              className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Name"
-                            />
-                          </td>
-
-                          {/* Description */}
-                          <td className="border-b px-3 py-2">
-                            <input
-                              value={row.description ?? ""}
-                              onChange={(e) =>
-                                updateCell(
-                                  row._rid,
-                                  "description",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Description"
-                            />
-                          </td>
-
-                          {/* Tool Id */}
-                          <td className="border-b px-3 py-2">
-                            <input
-                              value={row.toolId ?? ""}
-                              onChange={(e) =>
-                                updateCell(row._rid, "toolId", e.target.value)
-                              }
-                              className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Tool ID"
-                            />
-                          </td>
-
-                          {/* Duration */}
-                          <td className="border-b px-3 py-2">
-                            <input
-                              value={row.duration ?? ""}
-                              onChange={(e) =>
-                                updateCell(row._rid, "duration", e.target.value)
-                              }
-                              className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Duration"
-                            />
-                          </td>
-
-                          {/* 상태 */}
                           <td className="border-b px-3 py-2">
                             <div className="flex items-center gap-2">
                               {isUploaded ? (
@@ -418,7 +345,7 @@ export default function TasksPage() {
 
                     {pageRows.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="p-0">
+                        <td colSpan={5} className="p-0">
                           <button
                             type="button"
                             onClick={addRow}
@@ -435,6 +362,7 @@ export default function TasksPage() {
                   </tbody>
                 </table>
               </div>
+
               <div className="mt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"

@@ -1,4 +1,4 @@
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import {
   Collapsible,
@@ -19,13 +19,14 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/router";
 
-export function NavMain({ items }) {
+export function NavMain({ items = [], label = "결과분석" }) {
   const router = useRouter();
   const currentPath = (router.asPath || "").split("?")[0];
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>결과분석</SidebarGroupLabel>
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+
       <SidebarMenu>
         {items.map((item) => {
           const routeOpen =
@@ -36,7 +37,7 @@ export function NavMain({ items }) {
             <Collapsible
               key={item.title}
               asChild
-              defaultOpen={routeOpen} //  여기!
+              defaultOpen={routeOpen}
               className="group/collapsible"
             >
               <SidebarMenuItem>
@@ -50,17 +51,20 @@ export function NavMain({ items }) {
 
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items?.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild>
-                          <Link href={subItem.url}>
-                            {" "}
-                            {/* ✅ 여기! */}
-                            <span>{subItem.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {item.items?.map((subItem) => {
+                      const active =
+                        subItem.url && currentPath.startsWith(subItem.url);
+
+                      return (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild isActive={active}>
+                            <Link href={subItem.url}>
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

@@ -1,8 +1,8 @@
-import { getTools, postTools } from "@/api/machine-api";
+import { getMachine, postMachine, parseXLS } from "@/api/machine-api";
 import DashboardShell from "@/components/dashboard-shell";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-export default function ToolsPage() {
+export default function MachinePage() {
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dirty, setDirty] = useState(false);
@@ -11,12 +11,14 @@ export default function ToolsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
+  const fileRef = useRef();
+
   useEffect(() => {
-    getTools().then((json) => {
-      const rows = (json.tools || []).map((r) => ({
+    getMachine().then((json) => {
+      const rows = (json.machineList || []).map((r) => ({
         ...r,
-        _rid: r._rid || cryptoId(),
-        flag: r.flag ?? "Y",
+        _rid: cryptoId(),
+        flag: "Y",
       }));
 
       setData(rows);
@@ -75,7 +77,7 @@ export default function ToolsPage() {
         _rid: cryptoId(),
         flag: "new",
         id: "",
-        name: "",
+        koreanName: "",
         description: "",
       },
       ...prev,
@@ -96,32 +98,58 @@ export default function ToolsPage() {
   const saveHandle = () => {
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
-    postTools(payload).then((ok) => {
+    postMachine(payload).then((ok) => {
       window.alert(ok ? "저장 완료" : "저장 실패");
       if (ok) setDirty(false);
     });
+  };
+
+  const uploadHandle = () => {
+    if (fileRef.current) fileRef.current.click();
+  };
+
+  const fileChangeHandle = (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+
+    parseXLS(file)
+      .then((json) => {
+        const items = (json.machineList || []).map((r) => ({
+          ...r,
+          _rid: cryptoId(),
+          flag: "pre",
+        }));
+
+        setData((prev) => [...items, ...prev]);
+        setPageIndex(0);
+        setSelected(new Set());
+        setDirty(true);
+      })
+      .catch((err) => {
+        console.error(err);
+        window.alert("엑셀 파싱 실패: 콘솔 확인");
+      });
+
+    e.target.value = "";
   };
 
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
   return (
-    <DashboardShell crumbTop="결과분석" crumbCurrent="tools">
+    <DashboardShell crumbTop="결과분석" crumbCurrent="machine">
       <div className="">
         <div className="">
-          {/* ✅ 헤더: 제목 + 설명 */}
           <div className="flex items-center justify-between gap-4 px-3 py-3">
             <div className="flex justify-between gap-4 items-center">
-              <h2 className="text-2xl font-bold tracking-tight">Tool</h2>
+              <h2 className="text-2xl font-bold tracking-tight">Machine</h2>
               <p className="mt-1 text-xs text-gray-500">
-                툴 목록을 편집 후 저장할 수 있어요.
+                기계 목록을 편집/업로드 후 저장할 수 있어요.
               </p>
             </div>
           </div>
 
-          {/* ✅ 상단 바: 왼쪽(총/선택/삭제) + 오른쪽(+행추가/저장) */}
           <div className="flex items-center justify-between gap-3 px-4 py-1">
-            {/* 왼쪽 */}
             <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
               <span>총 {totalRows.toLocaleString()}건</span>
               <span className="mx-1 h-4 w-px bg-gray-200" />
@@ -143,7 +171,6 @@ export default function ToolsPage() {
               </button>
             </div>
 
-            {/* 오른쪽 */}
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
@@ -151,6 +178,22 @@ export default function ToolsPage() {
                 className="h-8 rounded-md border transition border-blue-200 text-blue-500 bg-white px-4 text-sm hover:bg-blue-50 cursor-pointer"
               >
                 + 행 추가
+              </button>
+
+              <input
+                ref={fileRef}
+                type="file"
+                className="hidden"
+                accept=".xls,.xlsx"
+                onChange={fileChangeHandle}
+              />
+
+              <button
+                type="button"
+                onClick={uploadHandle}
+                className="h-8 rounded-md border px-3 text-sm bg-white hover:bg-gray-200 cursor-pointer transition"
+              >
+                XLS 업로드
               </button>
 
               <button
@@ -169,7 +212,6 @@ export default function ToolsPage() {
             </div>
           </div>
 
-          {/* ✅ 테이블 */}
           <div className="px-4 pt-4">
             <div className="">
               <div className="h-full overflow-auto bg-white">
@@ -192,10 +234,10 @@ export default function ToolsPage() {
                       </th>
 
                       <th className="min-w-45 border-b px-3 py-3 font-medium">
-                        Tool ID
+                        Machine ID
                       </th>
                       <th className="min-w-45 border-b px-3 py-3 font-medium">
-                        Tool Name
+                        Korean Name
                       </th>
                       <th className="min-w-95 border-b px-3 py-3 font-medium">
                         Description
@@ -209,16 +251,20 @@ export default function ToolsPage() {
 
                   <tbody className="text-sm">
                     {pageRows.map((row) => {
+                      const isUploaded = row.flag === "pre";
                       const isNew = row.flag === "new";
 
-                      const rowBg = isNew ? "bg-blue-100/30" : "";
+                      const rowBg = isUploaded
+                        ? "bg-green-100/10"
+                        : isNew
+                          ? "bg-blue-100/30"
+                          : "";
 
                       return (
                         <tr
                           key={row._rid}
                           className={["hover:bg-slate-200/80", rowBg].join(" ")}
                         >
-                          {/* 체크 */}
                           <td className="border-b px-3 py-2">
                             <div className="flex justify-center">
                               <input
@@ -232,7 +278,6 @@ export default function ToolsPage() {
                             </div>
                           </td>
 
-                          {/* Tool ID */}
                           <td className="border-b px-3 py-2">
                             <input
                               value={row.id ?? ""}
@@ -240,23 +285,25 @@ export default function ToolsPage() {
                                 updateCell(row._rid, "id", e.target.value)
                               }
                               className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Tool ID"
+                              placeholder="Machine ID"
                             />
                           </td>
 
-                          {/* Tool Name */}
                           <td className="border-b px-3 py-2">
                             <input
-                              value={row.name ?? ""}
+                              value={row.koreanName ?? ""}
                               onChange={(e) =>
-                                updateCell(row._rid, "name", e.target.value)
+                                updateCell(
+                                  row._rid,
+                                  "koreanName",
+                                  e.target.value,
+                                )
                               }
                               className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                              placeholder="Tool Name"
+                              placeholder="Korean Name"
                             />
                           </td>
 
-                          {/* Description */}
                           <td className="border-b px-3 py-2">
                             <input
                               value={row.description ?? ""}
@@ -272,10 +319,13 @@ export default function ToolsPage() {
                             />
                           </td>
 
-                          {/* 상태 */}
                           <td className="border-b px-3 py-2">
                             <div className="flex items-center gap-2">
-                              {isNew ? (
+                              {isUploaded ? (
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+                                  XLS
+                                </span>
+                              ) : isNew ? (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                                   NEW
                                 </span>
@@ -300,7 +350,8 @@ export default function ToolsPage() {
                           >
                             <span className="font-medium text-blue-700">
                               클릭해서 행 추가
-                            </span>
+                            </span>{" "}
+                            또는 XLS 업로드 해주세요.
                           </button>
                         </td>
                       </tr>
@@ -309,7 +360,6 @@ export default function ToolsPage() {
                 </table>
               </div>
 
-              {/* ✅ 페이지네이션: 오른쪽 아래 */}
               <div className="mt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"

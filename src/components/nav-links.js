@@ -11,9 +11,11 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavCommunity({ items = [], label = "게시판" }) {
+export function NavLinks({ label, items = [] }) {
   const router = useRouter();
   const currentPath = (router.asPath || "").split("?")[0];
+
+  if (!items.length) return null;
 
   return (
     <SidebarGroup>

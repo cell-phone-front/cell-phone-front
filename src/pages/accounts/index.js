@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardShell from "@/components/dashboard-shell";
+import { getMembers, parseMemberXLS, postMembers } from "@/api/member-api";
 
-import {
-  getMembers,
-  parseMemberXLS,
-  postMembers,
-} from "@/api/member/member-api";
 import { useToken } from "@/stores/account-store";
 
 /** 전화번호 유틸: 하이픈/공백 제거 후 숫자만 11자리 */

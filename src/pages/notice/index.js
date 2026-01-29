@@ -246,7 +246,7 @@ export default function Notice() {
         <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-neutral-600" />
+              <Pin className="w-5 h-5 text-neutral-600" />
               <h1 className="text-2xl font-semibold text-neutral-900">
                 공지사항
               </h1>

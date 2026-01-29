@@ -5,6 +5,7 @@ import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function CalendarCustomDays() {
   const [range, setRange] = React.useState(() => {
@@ -89,9 +90,9 @@ export function CalendarCustomDays() {
             nav: "hidden",
 
             // 요일 줄: 왼쪽 정렬 + 밑줄
-            weekdays: "flex border-b pb-2 mb-2",
+            weekdays: "flex border-b pb-2 mb-1 [&>*:first-child]:!text-red-500",
             weekday:
-              "flex-1 text-left pl-2 text-xs text-muted-foreground font-medium",
+              "flex-1 text-left pl-1.5 text-xs text-muted-foreground font-medium",
 
             //  셀(칸) 자체의 패딩/레이아웃 영향
             day: "relative w-full h-full text-left align-top border-b border-border/60",
@@ -111,12 +112,24 @@ export function CalendarCustomDays() {
                   day={day}
                   modifiers={modifiers}
                   {...props}
-                  className="
-                    focus-visible:ring-0 focus-visible:ring-offset-0
-                    focus:outline-none outline-none
-                    ring-0 ring-offset-0 shadow-none
-                    hover:bg-transparent active:bg-transparent
-                  "
+                  className={cn(
+                    `
+        focus-visible:ring-0 focus-visible:ring-offset-0
+        focus:outline-none outline-none
+        ring-0 ring-offset-0 shadow-none
+        hover:bg-transparent active:bg-transparent
+      `,
+                    // ✅ 일요일 글자 빨강 (선택/범위 스타일보다 우선시키려면 ! 사용)
+                    isSunday && "text-red-500!",
+
+                    // ✅ 선택돼도 일요일 빨강 유지 (selected가 들어오면 흰색으로 덮이는 경우 방지)
+                    (modifiers?.selected ||
+                      modifiers?.range_start ||
+                      modifiers?.range_middle ||
+                      modifiers?.range_end) &&
+                      isSunday &&
+                      "text-red-500!",
+                  )}
                 >
                   <div className="text-left h-full w-full flex flex-col items-start justify-start p-1">
                     <div
