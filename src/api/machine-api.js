@@ -2,35 +2,39 @@
 const serverAddr = "http://localhost:8080";
 
 // (1) 기계 전체 조회
-export async function getMachine() {
-  const response = await fetch(`${serverAddr}/api/operation/machine`);
-  return response.json(); // { machineList: [...] }
+export async function getMachine(token) {
+  return fetch(`${serverAddr}/api/operation/machine`, {
+    headers: {
+      Authorization: "Bearer " + token,
+    },
+  }).then((r) => r.json()); // { machineList: [...] }
 }
 
 // (2) 기계 upsert (추가/수정/삭제)
-export async function postMachine(machineList) {
-  const response = await fetch(`${serverAddr}/api/operation/machine/upsert`, {
+export async function postMachine(machineList, token) {
+  return fetch(`${serverAddr}/api/operation/machine/upsert`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
     },
     body: JSON.stringify({
-      machineList: machineList, 
+      machineList: machineList,
     }),
   });
-
-  return response.ok; // 200 OK
 }
 
 // (3) 기계 엑셀 파싱
-export async function parseXLS(file) {
+export async function parseMachineXLS(file, token) {
   const formData = new FormData();
-  formData.append("operationFile", file); // ✅ 이전 에러 기준 확정
+  // 🔴 중요: 백엔드 에러 기준으로 machineFile이 맞음
+  formData.append("machineFile", file);
 
-  const response = await fetch(`${serverAddr}/api/operation/machine/xls`, {
+  return fetch(`${serverAddr}/api/operation/machine/xls`, {
     method: "POST",
+    headers: {
+      Authorization: "Bearer " + token,
+    },
     body: formData,
-  });
-
-  return response.json(); 
+  }).then((r) => r.json());
 }

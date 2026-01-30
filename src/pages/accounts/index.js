@@ -299,28 +299,28 @@ export default function Accounts() {
                 </th>
 
                 <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  이름
+                  Name
                 </th>
                 <th className="min-w-[210px] border-b px-3 py-3 font-medium">
-                  이메일
+                  Email
                 </th>
                 <th className="min-w-[160px] border-b px-3 py-3 font-medium">
-                  전화
+                  Phone
                 </th>
                 <th className="min-w-[130px] border-b px-3 py-3 font-medium">
-                  부서
+                  Department
                 </th>
                 <th className="min-w-[110px] border-b px-3 py-3 font-medium">
-                  팀
+                  Team
                 </th>
                 <th className="min-w-[135px] border-b px-3 py-3 font-medium">
-                  권한
+                  Role
                 </th>
                 <th className="min-w-[140px] border-b px-3 py-3 font-medium">
-                  입사일
+                  Hire Date
                 </th>
                 <th className="min-w-[100px] border-b px-3 py-3 font-medium">
-                  상태
+                  Status
                 </th>
               </tr>
             </thead>
@@ -480,15 +480,15 @@ export default function Accounts() {
                     <td className="border-b px-3 py-2">
                       {isUploaded ? (
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
-                          XLS
+                          Imported
                         </span>
                       ) : isNew ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                          NEW
+                          New
                         </span>
                       ) : (
                         <span className="text-[11px] px-4 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-                          -
+                          Saved
                         </span>
                       )}
                     </td>

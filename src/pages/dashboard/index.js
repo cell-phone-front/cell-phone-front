@@ -1,5 +1,6 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { DashboardCalendar } from "@/components/dashboard/calendar";
+import DashboardProducts from "@/components/dashboard/products";
 
 export default function Page() {
   return (
@@ -10,7 +11,9 @@ export default function Page() {
             <DashboardCalendar />
           </div>
 
-          <div className="bg-amber-100 aspect-video rounded-xl" />
+          <div className="bg-white aspect-video rounded-xl">
+            <DashboardProducts />
+          </div>
           <div className="bg-amber-200 aspect-video rounded-xl" />
         </div>
 

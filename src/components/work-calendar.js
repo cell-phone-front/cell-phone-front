@@ -23,11 +23,12 @@ export function CalendarCustomDays() {
     setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
   const goToday = () => setMonth(new Date());
 
+  // ✅ SDN휴 로 변경 (라벨 텍스트만 변경, 셀높이/레이아웃 건드리지 않음)
   const shiftMap = {
-    "2026-01-02": { label: "주간", cls: "bg-green-100 text-green-800" }, // D
-    "2026-01-03": { label: "스윙", cls: "bg-blue-100 text-blue-800" }, // S
-    "2026-01-04": { label: "야간", cls: "bg-purple-100 text-purple-800" }, // G
-    "2026-01-05": { label: "휴무", cls: "bg-red-100 text-red-800" }, // OFF
+    "2026-01-02": { label: "D", cls: "bg-green-100 text-green-800" }, // Day
+    "2026-01-03": { label: "S", cls: "bg-blue-100 text-blue-800" }, // Swing
+    "2026-01-04": { label: "N", cls: "bg-purple-100 text-purple-800" }, // Night
+    "2026-01-05": { label: "휴", cls: "bg-red-100 text-red-800" }, // Off
   };
 
   return (
@@ -40,33 +41,33 @@ export function CalendarCustomDays() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 bg-white">
+        <div className="ml-auto flex items-center gap-1">
           <Button
             variant="outline"
             size="sm"
             onClick={goToday}
-            className="h-7 px-2 text-xs"
+            className="h-8 px-5 text-[11px] rounded-full"
           >
             오늘
           </Button>
 
-          <div className="flex items-center overflow-hidden rounded-md border h-7">
+          <div className="flex items-center rounded-full border bg-white overflow-hidden h-8">
             <Button
               variant="ghost"
               size="icon"
               onClick={goPrev}
-              className="h-7 w-7"
+              className="h-15 w-10 rounded-none"
             >
               <ChevronLeftIcon className="size-5" />
             </Button>
 
-            <div className="px-2 text-xs font-medium">{monthLabel}</div>
+            <div className="w-px h-4 bg-border" />
 
             <Button
               variant="ghost"
               size="icon"
               onClick={goNext}
-              className="h-7 w-7"
+              className="h-15 w-10 rounded-none"
             >
               <ChevronRightIcon className="size-5" />
             </Button>
@@ -83,18 +84,15 @@ export function CalendarCustomDays() {
           selected={range}
           onSelect={setRange}
           numberOfMonths={1}
-          //  셀 크기 줄이기 (밑에 짤림 방지)
           classNames={{
             month_caption: "hidden",
             caption_label: "hidden",
             nav: "hidden",
 
-            // 요일 줄: 왼쪽 정렬 + 밑줄
             weekdays: "flex border-b pb-2 mb-1 [&>*:first-child]:!text-red-500",
             weekday:
               "flex-1 text-left pl-1.5 text-xs text-muted-foreground font-medium",
 
-            //  셀(칸) 자체의 패딩/레이아웃 영향
             day: "relative w-full h-full text-left align-top border-b border-border/60",
             week: "flex w-full h-27",
           }}
@@ -106,6 +104,7 @@ export function CalendarCustomDays() {
               const key = d.toISOString().slice(0, 10);
               const isSunday = d.getDay() === 0;
               const shift = shiftMap[key];
+              const isToday = !!modifiers?.today;
 
               return (
                 <CalendarDayButton
@@ -113,16 +112,15 @@ export function CalendarCustomDays() {
                   modifiers={modifiers}
                   {...props}
                   className={cn(
-                    `
-        focus-visible:ring-0 focus-visible:ring-offset-0
-        focus:outline-none outline-none
-        ring-0 ring-offset-0 shadow-none
-        hover:bg-transparent active:bg-transparent
-      `,
-                    // ✅ 일요일 글자 빨강 (선택/범위 스타일보다 우선시키려면 ! 사용)
-                    isSunday && "text-red-500!",
+                    // ✅ 핵심: 버튼을 셀 전체로!
+                    "w-full h-full p-1 relative",
+                    "flex flex-col items-start justify-start",
+                    "focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none",
+                    "ring-0 ring-offset-0 shadow-none",
+                    "hover:bg-transparent active:bg-transparent",
 
-                    // ✅ 선택돼도 일요일 빨강 유지 (selected가 들어오면 흰색으로 덮이는 경우 방지)
+                    // ✅ 일요일 글자 빨강 유지
+                    isSunday && "text-red-500!",
                     (modifiers?.selected ||
                       modifiers?.range_start ||
                       modifiers?.range_middle ||
@@ -131,21 +129,48 @@ export function CalendarCustomDays() {
                       "text-red-500!",
                   )}
                 >
-                  <div className="text-left h-full w-full flex flex-col items-start justify-start p-1">
-                    <div
-                      className={`text-sm font-medium leading-none ${isSunday ? "text-red-500" : ""}`}
-                    >
-                      {children}
-                    </div>
-
-                    {!modifiers?.outside && shift && (
-                      <div
-                        className={`mt-1 w-full rounded px-2 py-1 text-xs font-semibold ${shift.cls}`}
-                      >
-                        {shift.label}
-                      </div>
+                  {/* 날짜 */}
+                  <div
+                    className={cn(
+                      "text-sm font-medium leading-none",
+                      isSunday && "text-red-500",
+                      isToday &&
+                        "underline underline-offset-4 decoration-2 font-bold",
                     )}
+                  >
+                    {children}
                   </div>
+
+                  {/* 바: D/S/N + 시간 (셀 가로 꽉) */}
+                  {!modifiers?.outside && shift && shift.label !== "휴" && (
+                    <div
+                      className={cn(
+                        "absolute left-1 right-1 top-6 h-7",
+                        "flex items-center px-2 gap-2",
+                        "rounded-sm",
+                        shift.cls,
+                      )}
+                    >
+                      {/* D/S/N 크게 */}
+                      <span className="text-[14px] font-semibold leading-none">
+                        {shift.label}
+                      </span>
+
+                      {/* 시간은 작게, 무채색 */}
+                      <span className="text-[10px] font-medium text-neutral-600 leading-none">
+                        {shift.label === "D" && "06–14"}
+                        {shift.label === "S" && "14–22"}
+                        {shift.label === "N" && "22–06"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 휴: 배경 없이 글씨만 */}
+                  {!modifiers?.outside && shift && shift.label === "휴" && (
+                    <div className="absolute left-1 top-7.5 text-[13px] font-semibold text-red-600 leading-none">
+                      휴
+                    </div>
+                  )}
                 </CalendarDayButton>
               );
             },

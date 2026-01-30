@@ -36,7 +36,7 @@ const data = {
 
   // 테이블(단일 링크들)
   tables: [
-    { title: "생산단계", url: "/product", icon: Boxes },
+    { title: "생산대상", url: "/product", icon: Boxes },
     { title: "공정단계", url: "/operation", icon: Factory },
     { title: "매칭작업", url: "/tasks", icon: ListChecks }, // 너 폴더가 tasks라 /tasks
     { title: "기계", url: "/machine", icon: Cpu }, // 너 폴더가 tools라 /tools (기계로 쓸거면 나중에 /machine로 바꿔도 됨)

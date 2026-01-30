@@ -1,38 +1,37 @@
 // src/api/product-api.js
 const serverAddr = "http://localhost:8080";
 
-// (1) 생산 대상 전체 조회
-export async function getProduct() {
-  const response = await fetch(`${serverAddr}/api/operation/product`);
-  const json = await response.json();
-  return json;
+// 생산 대상 전체 조회
+export async function getProducts(token) {
+  return fetch(`${serverAddr}/api/operation/product`, {
+    headers: {
+      Authorization: "Bearer " + token,
+    },
+  }).then((r) => r.json());
 }
 
-// (2) 생산 대상 upsert (추가/수정/삭제)
-export async function postProduct(products) {
-  const response = await fetch(`${serverAddr}/api/operation/product/upsert`, {
+// 생산 대상 upsert
+export async function postProducts(products, token) {
+  return fetch(`${serverAddr}/api/operation/product/upsert`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
     },
-    body: JSON.stringify({
-      productList: products,
-    }),
+    body: JSON.stringify({ productList: products }),
   });
-
-  return response.ok; // 200~299
 }
 
-// (3) 생산 대상 엑셀 파싱
-export async function parseXLS(file) {
+// 생산 대상 엑셀 파싱
+export async function parseProductXLS(file, token) {
   const formData = new FormData();
-  formData.append("file", file); // ⚠️ 백엔드가 operationFile이면 바꿔야 함
+  formData.append("file", file);
 
-  const response = await fetch(`${serverAddr}/api/operation/product/xls`, {
+  return fetch(`${serverAddr}/api/operation/product/xls`, {
     method: "POST",
+    headers: {
+      Authorization: "Bearer " + token,
+    },
     body: formData,
-  });
-
-  const json = await response.json();
-  return json;
+  }).then((r) => r.json());
 }
