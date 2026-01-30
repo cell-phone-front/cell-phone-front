@@ -35,22 +35,17 @@ export default function NoticeWrite() {
     try {
       setSaving(true);
 
+      // ✅ pinned를 0/1로 전송 (백엔드 int/boolean 둘 다 대응 쉬움)
       const payload = {
         title: t,
-        description: c, // ✅ 백엔드 키
-        memberId: memberId, // ✅ member.id
-        pinned: pinned,
+        content: c,
+        memberId,
+        pinned: pinned ? 1 : 0,
       };
 
       console.log("submit payload:", payload);
-      console.log("token head:", String(token).slice(0, 20) + "...");
 
-      const result = await createNotice(payload, token);
-
-      if (!result) {
-        setError("저장 실패! (Network 탭에서 POST /api/notice 응답 확인)");
-        return;
-      }
+      await createNotice(payload, token);
 
       alert("저장 완료!");
       router.push("/notice");

@@ -1,29 +1,109 @@
 import React from "react";
 import { useRouter } from "next/router";
-import {
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Eye,
-  Pin,
-} from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Eye, Pin } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
-import { getNotices, getNoticeById } from "@/api/notice-api";
+import { getNotices, getNoticeById, toggleNoticePin } from "@/api/notice-api";
 
 function fmtDate(v) {
   if (!v) return "-";
   const s = String(v);
-
   let d = s;
 
   if (d.includes("T")) d = d.split("T")[0];
   else if (d.includes(" ")) d = d.split(" ")[0];
   else d = d.slice(0, 10);
 
-  //  "-" → "."
   return d.replaceAll("-", ".");
+}
+
+// ✅ pinned 판별 (가능한 키 다 흡수)
+function isPinned(n) {
+  const v =
+    n?.pinned ??
+    n?.isPinned ??
+    n?.pin ??
+    n?.fixed ??
+    n?.top ??
+    n?.pinnedYn ??
+    n?.pinned_yn ??
+    n?.noticePinned ??
+    n?.notice_pinned;
+
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const s = v.toLowerCase();
+    return s === "y" || s === "1" || s === "true";
+  }
+  return false;
+}
+
+// ✅ id 판별 (목록에서 id undefined 뜨는 문제 해결)
+function getId(n) {
+  return (
+    n?.id ??
+    n?.noticeId ??
+    n?.notice_id ??
+    n?.notice?.id ??
+    n?.data?.id ??
+    n?._id ??
+    null
+  );
+}
+
+// ✅ 목록 응답이 어떤 구조로 와도 배열 뽑기
+function unwrapList(json) {
+  if (Array.isArray(json)) return json;
+
+  const candidate =
+    json?.notices ||
+    json?.noticeList ||
+    json?.data ||
+    json?.result ||
+    json?.items ||
+    json;
+
+  return Array.isArray(candidate) ? candidate : [];
+}
+
+// ✅ row 정규화: id/pinned를 “확정”해버림
+function normalizeRow(n) {
+  return {
+    ...n,
+    id: getId(n),
+    pinned: isPinned(n),
+  };
+}
+
+// 작성자
+function getWriter(n) {
+  return (
+    n?.memberName ||
+    n?.writer ||
+    n?.author ||
+    n?.name ||
+    n?.member?.name ||
+    n?.memberId ||
+    n?.member_id ||
+    n?.member?.id ||
+    "-"
+  );
+}
+
+// 조회수
+function getViews(n) {
+  const v =
+    n?.views ??
+    n?.viewCount ??
+    n?.view ??
+    n?.view_count ??
+    n?.hit ??
+    n?.hits ??
+    n?.readCount ??
+    n?.read_count;
+
+  return v ?? "-";
 }
 
 function NoticeModal({ open, onClose, notice }) {
@@ -53,13 +133,11 @@ function NoticeModal({ open, onClose, notice }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden p-4
-               max-h-[85vh] flex flex-col"
+        className="w-full max-w-2xl bg-white rounded-md shadow-xl overflow-hidden p-4 max-h-[85vh] flex flex-col"
         onClick={stop}
         role="dialog"
         aria-modal="true"
       >
-        {/* 헤더 (sticky) */}
         <div className="sticky top-0 z-10 bg-white px-6 py-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -70,12 +148,7 @@ function NoticeModal({ open, onClose, notice }) {
               <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1 pb-1">
                 <span className="inline-flex items-center gap-1">
                   <span className="text-gray-400">작성자</span>
-                  <span className="text-gray-700">
-                    {notice?.memberName ||
-                      notice?.name ||
-                      notice?.author ||
-                      "-"}
-                  </span>
+                  <span className="text-gray-700">{getWriter(notice)}</span>
                 </span>
 
                 <span className="inline-flex items-center gap-1">
@@ -87,28 +160,23 @@ function NoticeModal({ open, onClose, notice }) {
 
                 <span className="inline-flex items-center gap-1">
                   <Eye className="w-4 h-4 text-gray-300" />
-                  <span className="text-gray-700">
-                    {notice?.views ?? notice?.viewCount ?? "-"}
-                  </span>
+                  <span className="text-gray-700">{getViews(notice)}</span>
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 내용 (스크롤 영역) */}
         <div className="px-6 pt-1 pb-5 overflow-y-auto flex-1 min-h-0">
-          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 break-all wrap-break-words">
-            {notice?.description || notice?.content || "내용이 없습니다."}
+          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 break-all">
+            {notice?.content || notice?.description || "내용이 없습니다."}
           </div>
         </div>
 
-        {/* 푸터 (sticky) */}
-        <div className="sticky bottom-0 bg-white px-6 py-4  flex justify-end gap-2">
+        <div className="sticky bottom-0 bg-white px-6 py-4 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="cursor-pointer h-8 px-4 rounded-md bg-gray-400 text-white text-xs
-                   hover:bg-slate-900 active:scale-[0.99]"
+            className="cursor-pointer h-8 px-4 rounded-md bg-gray-400 text-white text-xs hover:bg-slate-900 active:scale-[0.99]"
             type="button"
           >
             닫기
@@ -127,7 +195,6 @@ export default function Notice() {
   const role = String(account?.role || "").toLowerCase();
   const canWriteNotice = role === "admin" || role === "planner";
 
-  // API로 받은 목록
   const [notices, setNotices] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -135,23 +202,32 @@ export default function Notice() {
   async function loadList() {
     setLoading(true);
     setError("");
+
     try {
       const json = await getNotices(token);
+      const arr = unwrapList(json).map(normalizeRow);
 
-      // 백엔드 응답 키가 뭐든 흡수 (필요하면 여기만 맞추면 됨)
-      const list =
-        json?.notices || json?.noticeList || json?.data || json || [];
-      setNotices(Array.isArray(list) ? list : []);
+      setNotices(arr);
+
+      // ✅ 여기서 pinned/id가 제대로 잡히는지 바로 확인
+      console.log(
+        "PIN CHECK:",
+        arr.slice(0, 30).map((x) => ({
+          id: x.id,
+          title: x.title,
+          pinned: x.pinned,
+          rawPinned: x.pinned ?? x.isPinned ?? x.pinnedYn ?? x.pinned_yn,
+        })),
+      );
     } catch (e) {
       console.error(e);
-      setError("공지사항을 불러오지 못했습니다.");
+      setError(e?.message || "공지사항을 불러오지 못했습니다.");
       setNotices([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // 첫 진입 시 목록 로드
   React.useEffect(() => {
     if (!token) return;
     loadList();
@@ -165,16 +241,14 @@ export default function Notice() {
     setSelected(row);
     setOpen(true);
 
-    //  상세 재조회 (내용/조회수 최신화)
     try {
       const id = row?.id ?? row?.noticeId;
       if (!id) return;
+
       const detail = await getNoticeById(id, token);
       const item = detail?.notice || detail?.data || detail;
-      if (item) setSelected(item);
-    } catch (e) {
-      // 상세 실패해도 모달은 열어둠
-    }
+      if (item) setSelected(normalizeRow(item));
+    } catch (e) {}
   }
 
   function closeModal() {
@@ -182,12 +256,30 @@ export default function Notice() {
     setSelected(null);
   }
 
+  async function onTogglePin(e, noticeId) {
+    e.stopPropagation();
+    if (!token) return;
+
+    try {
+      await toggleNoticePin(noticeId, token);
+      await loadList();
+    } catch (err) {
+      alert(err?.message || "핀 토글 실패");
+    }
+  }
+
   // 정렬
   const [sort, setSort] = React.useState("latest"); // latest | views
 
-  // pinned / normal 분리 (서버 pinned 필드 가정)
+  // ✅ pinned는 무조건 위로 (일단 제한 없음)
   const pinnedNotices = React.useMemo(() => {
-    return (notices || []).filter((n) => !!n.pinned).slice(0, 3);
+    return (notices || [])
+      .filter((n) => n.pinned)
+      .sort((a, b) =>
+        String(b.createdAt || b.date || "").localeCompare(
+          String(a.createdAt || a.date || ""),
+        ),
+      );
   }, [notices]);
 
   const normalNoticesSorted = React.useMemo(() => {
@@ -195,9 +287,11 @@ export default function Notice() {
     const copy = [...normal];
 
     copy.sort((a, b) => {
-      if (sort === "views")
-        return (b.views || b.viewCount || 0) - (a.views || a.viewCount || 0);
-
+      if (sort === "views") {
+        const bv = Number(getViews(b)) || 0;
+        const av = Number(getViews(a)) || 0;
+        return bv - av;
+      }
       const bd = String(b.createdAt || b.date || "");
       const ad = String(a.createdAt || a.date || "");
       return bd.localeCompare(ad);
@@ -206,10 +300,10 @@ export default function Notice() {
     return copy;
   }, [notices, sort]);
 
-  // 페이지네이션: 화면 총 10개 = pinned(최대3) + normal
+  // 페이지네이션 (한 페이지에 pinned 포함해서 10개)
   const [page, setPage] = React.useState(1);
-
   const pageSize = 10;
+
   const pinnedCount = pinnedNotices.length;
   const normalPageSize = Math.max(1, pageSize - pinnedCount);
 
@@ -238,6 +332,14 @@ export default function Notice() {
   function goWrite() {
     router.push("/notice-write");
   }
+
+  // ✅ “핀” 칼럼 아님. 번호 유지!
+  const GRID = "grid grid-cols-[80px_1fr_140px_110px_110px]";
+  const ROW_BASE =
+    "w-full text-left " +
+    GRID +
+    " px-6 h-12 items-center border-b border-neutral-100 " +
+    "hover:bg-neutral-100 transition cursor-pointer";
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="공지사항">
@@ -271,7 +373,7 @@ export default function Notice() {
                 setSort(e.target.value);
                 setPage(1);
               }}
-              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
+              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-sm outline-none"
             >
               <option value="latest">최신순</option>
               <option value="views">조회순</option>
@@ -306,53 +408,67 @@ export default function Notice() {
           <div className="min-h-0">
             <div className="hidden md:block">
               <div className="px-10">
-                <div className="grid grid-cols-[60px_1fr_110px_140px_90px] px-8 py-2 text-[12px] font-medium bg-neutral-200">
-                  <div className="text-center">번호</div>
-                  <div>제목</div>
-                  <div>작성자</div>
-                  <div>작성일</div>
+                <div
+                  className={
+                    GRID +
+                    " px-6 h-12 items-center bg-neutral-200 text-neutral-700 text-sm font-semibold"
+                  }
+                >
+                  <div className="text-center pr-2">번호</div>
+                  <div className="pl-2">제목</div>
+                  <div className="pl-2">작성자</div>
+                  <div className="pl-2">작성일</div>
                   <div className="text-right pr-2">조회</div>
                 </div>
 
-                {/* pinned */}
-                {pinnedNotices.map((r) => (
+                {/* pinned (항상 위) */}
+                {pinnedNotices.map((r, idx) => (
                   <button
-                    key={r.id ?? r.noticeId}
+                    key={r.id ?? `p-${idx}`}
                     type="button"
                     onClick={() => openModal(r)}
-                    className="w-full text-left grid grid-cols-[60px_1fr_110px_140px_90px]
-                             px-8 py-3 border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer"
+                    className={ROW_BASE}
                   >
-                    <div className="flex items-center justify-center text-sm text-neutral-500">
-                      <span className="text-amber-600 font-semibold">📌</span>
+                    {/* 번호 */}
+                    <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
+                      {idx + 1}
                     </div>
 
-                    <div className="min-w-0">
+                    {/* 노란 라운드 + 제목 + 핀 토글 */}
+                    <div className="min-w-0 pl-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-[2px] rounded-full border border-amber-200 bg-amber-50 text-amber-700">
-                          <Pin className="w-3 h-3" />
+                        <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-[2px] rounded-full bg-amber-100 text-amber-800">
                           고정
                         </span>
+
                         <span className="truncate text-sm text-neutral-900 font-medium">
                           {r.title}
                         </span>
+
+                        {/* 핀 토글 */}
+                        <button
+                          type="button"
+                          onClick={(e) => onTogglePin(e, r.id)}
+                          className="ml-1 shrink-0 h-7 w-7 rounded-full border border-amber-200 bg-amber-50
+                                     hover:bg-amber-100 active:scale-[0.98]
+                                     flex items-center justify-center cursor-pointer"
+                          title="상단 고정 해제"
+                        >
+                          <Pin className="w-4 h-4 text-amber-600" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="text-xs text-neutral-700 truncate">
-                      {r.memberName ||
-                        r.name ||
-                        r.author ||
-                        r.writer ||
-                        r.memberId ||
-                        "-"}
+                    <div className="text-sm text-neutral-700 truncate pl-2">
+                      {getWriter(r)}
                     </div>
-                    <div className="text-xs text-neutral-500 truncate">
+
+                    <div className="text-sm text-neutral-500 truncate pl-2">
                       {fmtDate(r.createdAt || r.date)}
                     </div>
 
-                    <div className="text-xs text-neutral-600 text-right pr-2">
-                      {r.views ?? r.viewCount ?? "-"}
+                    <div className="text-sm text-neutral-600 text-right pr-2">
+                      {getViews(r)}
                     </div>
                   </button>
                 ))}
@@ -365,44 +481,38 @@ export default function Notice() {
                 ) : (
                   pageRows.map((r, idx) => (
                     <button
-                      key={r.id ?? r.noticeId}
+                      key={r.id ?? `n-${start}-${idx}`}
                       type="button"
                       onClick={() => openModal(r)}
-                      className="w-full text-left grid grid-cols-[60px_1fr_110px_140px_90px]
-                               px-8 py-3 border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer"
+                      className={ROW_BASE}
                     >
-                      <div className="flex items-center justify-center text-sm text-neutral-500">
+                      {/* 번호: pinned 갯수 포함해서 순번 */}
+                      <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
                         {pinnedNotices.length + start + idx + 1}
                       </div>
 
-                      <div className="min-w-0">
+                      <div className="min-w-0 pl-2">
                         <span className="truncate text-sm text-neutral-900 font-medium block">
                           {r.title}
                         </span>
                       </div>
 
-                      <div className="text-xs text-neutral-700 truncate">
-                        {r.memberName ||
-                          r.name ||
-                          r.author ||
-                          r.writer ||
-                          r.memberId ||
-                          "-"}
+                      <div className="text-sm text-neutral-700 truncate pl-2">
+                        {getWriter(r)}
                       </div>
-                      <div className="text-xs text-neutral-500 truncate">
+
+                      <div className="text-sm text-neutral-500 truncate pl-2">
                         {fmtDate(r.createdAt || r.date)}
                       </div>
 
-                      <div className="text-xs text-neutral-600 text-right pr-2">
-                        {r.views ?? r.viewCount ?? "-"}
+                      <div className="text-sm text-neutral-600 text-right pr-2">
+                        {getViews(r)}
                       </div>
                     </button>
                   ))
                 )}
               </div>
             </div>
-
-            {/* 모바일은 원래 너 코드 유지해도 되고, 동일하게 notices/pageRows로만 바꿔주면 됨 */}
           </div>
         )}
 

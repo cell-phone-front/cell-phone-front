@@ -336,7 +336,7 @@ export default function Accounts() {
                     ? "bg-blue-100/30"
                     : "";
 
-                /** ✅ (추가) 전화번호 입력 중에도 바로 빨간 테두리로 표시 */
+                /** (추가) 전화번호 입력 중에도 바로 빨간 테두리로 표시 */
                 const phoneDigits = normalizePhone(row.phoneNumber);
                 const hasPhone = phoneDigits.length > 0;
                 const phoneInvalid = hasPhone && !isValidPhone(phoneDigits);
@@ -390,7 +390,7 @@ export default function Accounts() {
                         const digits = normalizePhone(row.phoneNumber);
                         const touched = phoneTouched.has(row._rid);
 
-                        // ✅ 포커스 빠진 뒤(touched) + 값이 있는데 11자리 아니면 빨강
+                        // 포커스 빠진 뒤(touched) + 값이 있는데 11자리 아니면 빨강
                         const showRed =
                           touched && digits.length > 0 && digits.length !== 11;
 

@@ -27,7 +27,6 @@ export async function postMachine(machineList, token) {
 // (3) 기계 엑셀 파싱
 export async function parseMachineXLS(file, token) {
   const formData = new FormData();
-  // 🔴 중요: 백엔드 에러 기준으로 machineFile이 맞음
   formData.append("machineFile", file);
 
   return fetch(`${serverAddr}/api/operation/machine/xls`, {

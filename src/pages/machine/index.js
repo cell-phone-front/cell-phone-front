@@ -268,7 +268,7 @@ export default function MachinePage() {
                     Machine ID
                   </th>
                   <th className="min-w-45 border-b px-3 py-3 font-medium">
-                    Korean Name
+                    Name
                   </th>
                   <th className="min-w-95 border-b px-3 py-3 font-medium">
                     Description
@@ -322,12 +322,12 @@ export default function MachinePage() {
 
                       <td className="border-b px-3 py-2">
                         <input
-                          value={row.koreanName ?? ""}
+                          value={row.name ?? ""}
                           onChange={(e) =>
-                            updateCell(row._rid, "koreanName", e.target.value)
+                            updateCell(row._rid, "name", e.target.value)
                           }
                           className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Korean Name"
+                          placeholder="Name"
                         />
                       </td>
 
