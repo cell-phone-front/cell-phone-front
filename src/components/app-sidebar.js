@@ -38,14 +38,14 @@ const data = {
   tables: [
     { title: "생산대상", url: "/product", icon: Boxes },
     { title: "공정단계", url: "/operation", icon: Factory },
-    { title: "매칭작업", url: "/tasks", icon: ListChecks }, // 너 폴더가 tasks라 /tasks
-    { title: "기계", url: "/machine", icon: Cpu }, // 너 폴더가 tools라 /tools (기계로 쓸거면 나중에 /machine로 바꿔도 됨)
+    { title: "매칭작업", url: "/tasks", icon: ListChecks },
+    { title: "기계", url: "/machine", icon: Cpu },
   ],
 
   // 결과분석(접힘/펼침)
   navMain: [
     {
-      title: "시뮬레이션",
+      title: "결과분석",
       icon: ChartColumnStacked,
       items: [
         { title: "시뮬레이션", url: "/simulation", icon: GanttChartSquare },

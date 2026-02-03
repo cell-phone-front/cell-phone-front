@@ -48,6 +48,7 @@ export default function TasksPage() {
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dirty, setDirty] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   // pagination
   const [pageIndex, setPageIndex] = useState(0);
@@ -188,7 +189,7 @@ export default function TasksPage() {
 
       .catch((err) => {
         console.error(err);
-        window.alert(err?.message || "엑셀 파싱 실패");
+        setLoadError(err?.message || "엑셀 파싱 실패");
       });
 
     e.target.value = "";
@@ -220,7 +221,7 @@ export default function TasksPage() {
       })
       .catch((err) => {
         console.error(err);
-        window.alert(err?.message || "저장 실패");
+        setLoadError(err?.message || "저장 실패");
       });
   };
 

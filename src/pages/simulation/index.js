@@ -9,10 +9,23 @@ import {
   createSimulation,
   runSimulation,
   deleteSimulation,
+  getSimulationMetaJson,
 } from "@/api/simulation-api";
 
+import { getProducts } from "@/api/product-api";
+
 import { Spinner } from "@/components/ui/spinner";
-import { Play, Check, Plus, Search } from "lucide-react";
+import { Play, Check, Plus, Search, X } from "lucide-react";
+
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 function fmtDate(v) {
   if (!v) return "-";
@@ -27,35 +40,25 @@ function roleOk(role) {
   return r === "admin" || r === "planner";
 }
 
-function cryptoId() {
-  try {
-    return (
-      globalThis.crypto?.randomUUID?.() || `rid-${Date.now()}-${Math.random()}`
-    );
-  } catch {
-    return `rid-${Date.now()}-${Math.random()}`;
-  }
-}
-
 function StatusPill({ status, clickable, onClick }) {
   const st = String(status || "").toUpperCase();
 
-  if (st === "READY") {
+  if (st === "READY" || st === "대기중") {
     return (
       <button
         type="button"
         onClick={onClick}
         disabled={!clickable}
         className={[
-          "inline-flex items-center gap-1.5 min-w-[72px] justify-center",
+          "inline-flex items-center gap-1.5 min-w-[88px] justify-center",
           "text-[11px] px-2 py-0.5 rounded-full border",
           clickable
             ? "bg-white text-gray-700 border-gray-200 hover:bg-gray-100 cursor-pointer"
             : "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60",
         ].join(" ")}
-        title={clickable ? "클릭해서 실행 요청" : "권한 없음"}
+        title={clickable ? "클릭해서 실행" : "권한 없음"}
       >
-        대기중
+        READY
         <Play className="h-3.5 w-3.5" />
       </button>
     );
@@ -64,7 +67,7 @@ function StatusPill({ status, clickable, onClick }) {
   if (st === "PENDING") {
     return (
       <span className="inline-flex items-center gap-1.5 min-w-[72px] justify-center text-[11px] px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-        Pending
+        PENDING
         <Spinner className="h-3.5 w-3.5" />
       </span>
     );
@@ -100,60 +103,115 @@ export default function SimulationPage() {
   const account = useAccount((s) => s.account);
   const canEdit = roleOk(account?.role);
 
-  // Product처럼 pageIndex/pageSize
+  // products 목록
+  const [products, setProducts] = useState([]);
+  const [prodLoading, setProdLoading] = useState(false);
+  const [prodErr, setProdErr] = useState("");
+
+  // 검색/페이지네이션
   const [q, setQ] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(9);
 
+  // 목록
   const [data, setData] = useState([]);
-  const [selected, setSelected] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
 
-  // 생성 모달
+  // 선택은 id로 (삭제 안되는 문제 해결)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  // 생성 Drawer
   const [openNew, setOpenNew] = useState(false);
+
+  const TITLE_MAX = 60;
+  const DESC_MAX = 255;
+
+  // ✅ newForm: productIds/productNames 복수선택
   const [newForm, setNewForm] = useState({
     title: "",
     description: "",
-    requiredStaff: 1,
-    simulationStartDate: fmtDate(new Date().toISOString()),
+    productIds: [],
+    productNames: [],
+    requiredStaff: "",
+    startDate: fmtDate(new Date().toISOString()),
+    startTime: "09:00",
   });
+
+  // 생성 직후 바로 반영 (커밋 지연 대비 1회 재조회)
+  async function refreshWithRetry() {
+    await refresh();
+    await new Promise((r) => setTimeout(r, 800));
+    await refresh();
+  }
+
+  // row별 json에서 productId / productName 채우기
+  async function enrichRowsWithMeta(baseRows) {
+    const enriched = await Promise.all(
+      (baseRows || []).map(async (row) => {
+        try {
+          const meta = await getSimulationMetaJson(row.id, token);
+
+          const list = meta?.simulation?.simulationProductList || [];
+          const first = list?.[0]?.product || null;
+
+          const metaProductId = first?.id || "";
+          const metaProductName = first?.name || "";
+
+          const metaCount = Array.isArray(list) ? list.length : 0;
+
+          return {
+            ...row,
+            productId: row.productId || metaProductId,
+            productName: row.productName || metaProductName,
+
+            //  "선택된 제품 수"가 백에서 안오면 meta 기반으로 채움
+            productCount:
+              row.productCount == null ||
+              row.productCount === "" ||
+              Number(row.productCount) === 0
+                ? metaCount
+                : Number(row.productCount),
+          };
+        } catch {
+          return row;
+        }
+      }),
+    );
+
+    return enriched;
+  }
 
   async function refresh() {
     if (!token) return;
     setLoading(true);
-    setErr("");
 
     try {
       const json = await getSimulations(token);
-      const list =
-        json?.simulationScheduleList ||
-        json?.simulationList ||
-        json?.items ||
-        json?.data ||
-        [];
+      const list = json?.simulationScheduleList || [];
 
-      const normalized = (list || []).map((r) => ({
-        _rid: cryptoId(), // selection용
+      const baseRows = (list || []).map((r) => ({
         id: r.id,
-        memberName:
-          r.memberName || r.member_name || r.member || r.writer || "-",
+        memberName: r.memberName || "-",
         title: r.title || "-",
         description: r.description || "",
-        productCount: r.productCount ?? r.product_count ?? 0,
-        requiredStaff: r.requiredStaff ?? r.required_staff ?? 0,
+        productId: r.productId || "",
+        productName: r.productName || "",
+        productCount: r.productCount,
+        requiredStaff: r.requiredStaff,
         status: r.status || "-",
-        simulationStartDate: r.simulationStartDate || r.simulation_start_date,
-        workTime: r.workTime ?? r.work_time ?? 0,
+        simulationStartDate: r.simulationStartDate || "",
+        workTime: r.workTime ?? 0,
       }));
 
-      setData(normalized);
-      setSelected(new Set());
+      const enriched = await enrichRowsWithMeta(baseRows);
+
+      setData(enriched);
+      setSelectedIds(new Set());
       setPageIndex(0);
     } catch (e) {
-      setErr(e?.message || "조회 실패");
+      window.alert(e?.message || "조회 실패");
       setData([]);
-      setSelected(new Set());
+      setSelectedIds(new Set());
       setPageIndex(0);
     } finally {
       setLoading(false);
@@ -165,16 +223,63 @@ export default function SimulationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // 검색 필터
+  // 제품 목록 불러오기
+  useEffect(() => {
+    if (!token) return;
+
+    let alive = true;
+    setProdLoading(true);
+    setProdErr("");
+
+    (async () => {
+      try {
+        const json = await getProducts(token);
+        const list = json?.productList || [];
+
+        const normalized = (list || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+        }));
+
+        if (!alive) return;
+        setProducts(normalized.filter((x) => x.id));
+      } catch (e) {
+        if (!alive) return;
+        setProdErr(e?.message || "제품 목록 조회 실패");
+        setProducts([]);
+      } finally {
+        if (!alive) return;
+        setProdLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  // 검색
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw) return data;
 
     return data.filter((r) => {
       return (
-        String(r.title).toLowerCase().includes(kw) ||
-        String(r.memberName).toLowerCase().includes(kw) ||
-        String(r.status).toLowerCase().includes(kw)
+        String(r.title || "")
+          .toLowerCase()
+          .includes(kw) ||
+        String(r.memberName || "")
+          .toLowerCase()
+          .includes(kw) ||
+        String(r.status || "")
+          .toLowerCase()
+          .includes(kw) ||
+        String(r.productId || "")
+          .toLowerCase()
+          .includes(kw) ||
+        String(r.productName || "")
+          .toLowerCase()
+          .includes(kw)
       );
     });
   }, [data, q]);
@@ -187,35 +292,32 @@ export default function SimulationPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, pageIndex, pageSize]);
 
-  //  페이지 바뀌면 선택은 페이지 기준으로 초기화해도 됨 (Product 느낌)
   useEffect(() => {
-    setSelected(new Set());
+    setSelectedIds(new Set());
   }, [pageIndex]);
 
-  // 전체선택/부분선택
-  const selectedCount = selected.size;
-
+  // 페이지 전체선택
   const isAllPageSelected =
-    pageRows.length > 0 && pageRows.every((r) => selected.has(r._rid));
+    pageRows.length > 0 && pageRows.every((r) => selectedIds.has(r.id));
   const isSomePageSelected =
-    pageRows.some((r) => selected.has(r._rid)) && !isAllPageSelected;
+    pageRows.some((r) => selectedIds.has(r.id)) && !isAllPageSelected;
 
   const toggleAllPage = (checked) => {
-    setSelected((prev) => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       pageRows.forEach((r) => {
-        if (checked) next.add(r._rid);
-        else next.delete(r._rid);
+        if (checked) next.add(r.id);
+        else next.delete(r.id);
       });
       return next;
     });
   };
 
-  const toggleOne = (_rid, checked) => {
-    setSelected((prev) => {
+  const toggleOne = (id, checked) => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (checked) next.add(_rid);
-      else next.delete(_rid);
+      if (checked) next.add(id);
+      else next.delete(id);
       return next;
     });
   };
@@ -223,76 +325,177 @@ export default function SimulationPage() {
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
-  // 생성
+  function buildStartDateTime(dateStr, timeStr) {
+    const d = (dateStr || "").trim();
+    const t = (timeStr || "00:00").trim();
+    if (!d) return "";
+    return `${d}T${t}:00`;
+  }
+
+  // ✅ form valid: productIds(복수) 기준 + qty 제거
+  const isFormValid = useMemo(() => {
+    const titleOk = newForm.title.trim().length > 0;
+    const productOk = (newForm.productIds || []).length > 0;
+
+    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(newForm.startDate || ""));
+    const timeOk = /^\d{2}:\d{2}$/.test(String(newForm.startTime || ""));
+
+    const staffOk =
+      newForm.requiredStaff === "" ||
+      (!Number.isNaN(Number(newForm.requiredStaff)) &&
+        Number(newForm.requiredStaff) >= 0);
+
+    return titleOk && productOk && dateOk && timeOk && staffOk;
+  }, [newForm]);
+
+  // ✅ 제품 토글 (복수 선택)
+  const toggleProduct = (p, checked) => {
+    const pid = String(p.id);
+    const pname = String(p.name || "");
+
+    setNewForm((s) => {
+      const ids = new Set((s.productIds || []).map(String));
+      const namesById = new Map(
+        (s.productIds || []).map((id, idx) => [
+          String(id),
+          String(s.productNames?.[idx] || ""),
+        ]),
+      );
+
+      if (checked) {
+        ids.add(pid);
+        namesById.set(pid, pname);
+      } else {
+        ids.delete(pid);
+        namesById.delete(pid);
+      }
+
+      const nextIds = Array.from(ids);
+      const nextNames = nextIds.map((id) => namesById.get(id) || "");
+
+      return { ...s, productIds: nextIds, productNames: nextNames };
+    });
+  };
+
+  const clearAllProducts = () => {
+    setNewForm((s) => ({ ...s, productIds: [], productNames: [] }));
+  };
+
+  const removeOneSelected = (pid) => {
+    setNewForm((s) => {
+      const nextIds = (s.productIds || []).filter(
+        (x) => String(x) !== String(pid),
+      );
+      const nextNames = nextIds.map((id) => {
+        const idx = (s.productIds || []).findIndex(
+          (x) => String(x) === String(id),
+        );
+        return String(s.productNames?.[idx] || "");
+      });
+      return { ...s, productIds: nextIds, productNames: nextNames };
+    });
+  };
+
   async function onCreate() {
     if (!canEdit) return;
+
     if (!newForm.title.trim()) {
-      alert("제목 입력해줘!");
+      window.alert("시뮬레이션 제목을 입력해 주세요.");
       return;
     }
 
+    if ((newForm.productIds || []).length === 0) {
+      window.alert("시뮬레이션에 사용할 생산대상을 선택해 주세요.");
+      return;
+    }
+
+    const startDateTime = buildStartDateTime(
+      newForm.startDate,
+      newForm.startTime,
+    );
+
+    // ✅ 호환용: 첫 번째 선택을 productId/productName에도 넣어줌
+    const firstProductId = String(newForm.productIds?.[0] || "").trim();
+    const firstProductName = String(newForm.productNames?.[0] || "").trim();
+
+    const payload = {
+      title: newForm.title.trim(),
+      description: newForm.description || "",
+
+      // legacy/호환
+      productId: firstProductId,
+      productName: firstProductName,
+
+      // 복수 선택 본 payload
+      productIds: (newForm.productIds || []).map((x) => String(x)),
+      productNames: (newForm.productNames || []).map((x) => String(x || "")),
+      products: (newForm.productIds || []).map((id, i) => ({
+        productId: String(id),
+        productName: String(newForm.productNames?.[i] || ""),
+      })),
+
+      // 추가: 선택된 제품 수를 백에도 같이 저장(백이 받으면 그대로 저장)
+      productCount: (newForm.productIds || []).length,
+
+      requiredStaff:
+        newForm.requiredStaff === ""
+          ? null
+          : Number(newForm.requiredStaff || 0),
+
+      simulationStartDate: newForm.startDate,
+      startDateTime,
+    };
+
     try {
-      await createSimulation(
-        {
-          title: newForm.title.trim(),
-          description: newForm.description || "",
-          requiredStaff: Number(newForm.requiredStaff || 0),
-          simulationStartDate: newForm.simulationStartDate,
-        },
-        token,
-      );
+      await createSimulation(payload, token);
 
       setOpenNew(false);
       setNewForm({
         title: "",
         description: "",
-        requiredStaff: 1,
-        simulationStartDate: fmtDate(new Date().toISOString()),
+        productIds: [],
+        productNames: [],
+        requiredStaff: "",
+        startDate: fmtDate(new Date().toISOString()),
+        startTime: "09:00",
       });
 
-      await refresh();
+      await refreshWithRetry();
     } catch (e) {
-      alert(e?.message || "생성 실패");
+      window.alert(e?.message || "생성 실패");
     }
   }
 
-  // READY 클릭 -> PENDING 즉시 반영
-  async function onRun(simId, rowRid) {
+  async function onRun(simId) {
     if (!canEdit) return;
-    if (!confirm("시뮬레이션 실행 요청 할까?")) return;
+    if (!confirm("해당 시뮬레이션을 실행하시겠습니까?")) return;
 
-    // 즉시 UI 변경
     setData((prev) =>
-      prev.map((r) => (r._rid === rowRid ? { ...r, status: "PENDING" } : r)),
+      prev.map((r) => (r.id === simId ? { ...r, status: "PENDING" } : r)),
     );
 
     try {
       await runSimulation(simId, token);
-      await refresh();
+      await refreshWithRetry();
     } catch (e) {
-      await refresh();
-      alert(e?.message || "실행 실패");
+      await refreshWithRetry();
+      window.alert(e?.message || "실행 실패");
     }
   }
 
-  // 선택 삭제 (상세 옆 쓰레기통 X, Product처럼 상단 버튼)
   async function deleteSelectedHandle() {
     if (!canEdit) return;
-    if (selected.size === 0) return;
+    if (selectedIds.size === 0) return;
 
-    if (!confirm(`선택 ${selected.size}건 삭제할까?`)) return;
-
-    const selectedIds = data
-      .filter((r) => selected.has(r._rid))
-      .map((r) => r.id)
-      .filter(Boolean);
+    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
 
     try {
-      await Promise.all(selectedIds.map((id) => deleteSimulation(id, token)));
-      await refresh();
+      const ids = Array.from(selectedIds);
+      await Promise.all(ids.map((id) => deleteSimulation(id, token)));
+      await refreshWithRetry();
     } catch (e) {
-      alert(e?.message || "삭제 실패");
-      await refresh();
+      window.alert(e?.message || "삭제 실패");
+      await refreshWithRetry();
     }
   }
 
@@ -308,21 +511,21 @@ export default function SimulationPage() {
         </div>
       </div>
 
-      {/* 상단 바 (선택/삭제 + 검색 + 생성) */}
+      {/* 상단 바 */}
       <div className="flex items-center justify-between gap-3 px-4">
         <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
           <span>총 {totalRows.toLocaleString()}건</span>
           <span className="mx-1 h-4 w-px bg-gray-200" />
-          <span>선택 {selectedCount.toLocaleString()}건</span>
+          <span>선택 {selectedIds.size.toLocaleString()}건</span>
           <span className="mx-1 h-4 w-px bg-gray-200" />
 
           <button
             type="button"
             onClick={deleteSelectedHandle}
-            disabled={!canEdit || selectedCount === 0}
+            disabled={!canEdit || selectedIds.size === 0}
             className={[
               "h-8 rounded-md border px-3 text-sm transition",
-              !canEdit || selectedCount === 0
+              !canEdit || selectedIds.size === 0
                 ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                 : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
             ].join(" ")}
@@ -333,7 +536,7 @@ export default function SimulationPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <div className="relative w-[320px]">
+          <div className="relative w-[360px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               value={q}
@@ -359,17 +562,9 @@ export default function SimulationPage() {
         </div>
       </div>
 
-      {/* 에러 */}
-      {err && (
-        <div className="px-4 pt-3">
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {err}
-          </div>
-        </div>
-      )}
       <div className="px-4 pt-4">
-        {/* ✅ 표 박스: 라운드 + border + 흰색 (페이지네이션은 밖으로 뺌) */}
-        <div className="rounded-lg border bg-white overflow-hidden min-h-[520px]">
+        {/* 표 박스 */}
+        <div className="rounded-lg border bg-white overflow-hidden">
           <table className="w-full border-separate border-spacing-0">
             <thead className="bg-slate-200">
               <tr className="text-left text-sm">
@@ -397,20 +592,21 @@ export default function SimulationPage() {
                 <th className="min-w-[140px] border-b px-3 py-3 font-medium">
                   Member
                 </th>
-                <th className="min-w-[90px] border-b px-3 py-3 font-medium text-right">
-                  제품수
+                <th className="min-w-[120px] border-b px-3 py-3 font-medium text-right">
+                  Product Count
                 </th>
+
                 <th className="min-w-[90px] border-b px-3 py-3 font-medium text-right">
-                  필요인원
+                  Staff
                 </th>
                 <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  상태
+                  Status
                 </th>
                 <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  시작일
+                  Start Date
                 </th>
                 <th className="min-w-[90px] border-b px-3 py-3 pr-5 font-medium text-right">
-                  workTime
+                  Work Time
                 </th>
               </tr>
             </thead>
@@ -418,31 +614,29 @@ export default function SimulationPage() {
             <tbody className="text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="border-b px-3 py-10 text-center">
+                  <td colSpan={10} className="border-b px-3 py-10 text-center">
                     <span className="text-gray-500">불러오는 중...</span>
                   </td>
                 </tr>
               ) : pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="border-b px-3 py-10 text-center">
-                    <span className="text-gray-500">데이터 없음</span>
+                  <td colSpan={10} className="border-b px-3 py-10 text-center">
+                    <span className="text-gray-500">데이터가 없습니다.</span>
                   </td>
                 </tr>
               ) : (
                 pageRows.map((r) => {
                   const st = String(r.status || "").toUpperCase();
-                  const isReady = st === "READY";
+                  const isReady = st === "READY" || st === "대기중";
                   const isPending = st === "PENDING";
 
                   const goDetail = () => {
-                    // ✅ 원하는 곳으로 바꿔
                     router.push(`/gantt?simId=${encodeURIComponent(r.id)}`);
-                    // router.push(`/simulation/${r.id}`);
                   };
 
                   return (
                     <tr
-                      key={r._rid}
+                      key={r.id}
                       role="button"
                       tabIndex={0}
                       onClick={goDetail}
@@ -451,7 +645,7 @@ export default function SimulationPage() {
                       }}
                       className={[
                         "cursor-pointer hover:bg-slate-200/80",
-                        selected.has(r._rid) ? "bg-slate-100" : "",
+                        selectedIds.has(r.id) ? "bg-slate-100" : "",
                       ].join(" ")}
                     >
                       <td
@@ -462,10 +656,8 @@ export default function SimulationPage() {
                           <input
                             type="checkbox"
                             className="h-4 w-4 accent-black"
-                            checked={selected.has(r._rid)}
-                            onChange={(e) =>
-                              toggleOne(r._rid, e.target.checked)
-                            }
+                            checked={selectedIds.has(r.id)}
+                            onChange={(e) => toggleOne(r.id, e.target.checked)}
                           />
                         </div>
                       </td>
@@ -474,7 +666,6 @@ export default function SimulationPage() {
                         {r.id}
                       </td>
 
-                      {/* ✅ 제목: 버튼 없애고 그냥 텍스트(Workbench 느낌) */}
                       <td className="border-b px-3 py-3">
                         <div className="font-medium">{r.title}</div>
                         {r.description ? (
@@ -487,14 +678,13 @@ export default function SimulationPage() {
                       <td className="border-b px-3 py-3">{r.memberName}</td>
 
                       <td className="border-b px-3 py-3 text-right tabular-nums">
-                        {Number(r.productCount || 0)}
+                        {Number(r.productCount ?? 0)}
                       </td>
 
                       <td className="border-b px-3 py-3 text-right tabular-nums">
                         {Number(r.requiredStaff || 0)}
                       </td>
 
-                      {/* 상태 pill: 클릭해도 row 이동 안 되게 */}
                       <td
                         className="border-b px-3 py-3"
                         onClick={(e) => e.stopPropagation()}
@@ -502,7 +692,7 @@ export default function SimulationPage() {
                         <StatusPill
                           status={r.status}
                           clickable={canEdit && isReady && !isPending}
-                          onClick={() => onRun(r.id, r._rid)}
+                          onClick={() => onRun(r.id)}
                         />
                       </td>
 
@@ -521,7 +711,7 @@ export default function SimulationPage() {
           </table>
         </div>
 
-        {/* ✅ 페이지네이션: Product처럼 "표 박스 밖" + 배경 없음 */}
+        {/* 페이지네이션 */}
         <div className="mt-2 flex items-center justify-end gap-2 px-1">
           <button
             type="button"
@@ -560,110 +750,250 @@ export default function SimulationPage() {
 
       <div className="h-4" />
 
-      {/* 생성 모달 */}
-      {openNew && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          onClick={() => setOpenNew(false)}
-        >
-          <div
-            className="w-full max-w-xl bg-white rounded-lg border overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b flex items-center justify-between">
-              <div className="font-semibold">시뮬레이션 생성</div>
-              <button
-                type="button"
-                onClick={() => setOpenNew(false)}
-                className="h-8 px-3 text-[12px] rounded-md transition text-gray-700 hover:bg-gray-200 cursor-pointer"
-              >
-                닫기
-              </button>
-            </div>
+      {/* Drawer */}
+      <Drawer open={openNew} onOpenChange={setOpenNew} direction="right">
+        <DrawerContent className="fixed right-0 top-0 h-dvh w-[420px] sm:w-[520px] rounded-none border-l bg-white p-0">
+          <div className="flex h-dvh flex-col">
+            <DrawerHeader>
+              <DrawerTitle>시뮬레이션 생성</DrawerTitle>
+            </DrawerHeader>
 
-            <div className="px-5 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+              {/* Title + count */}
               <div>
-                <div className="text-xs text-gray-500 mb-1">제목</div>
+                <div className="flex items-end justify-between mb-1">
+                  <div className="text-xs text-gray-500">Title</div>
+                  <div className="text-[11px] text-gray-400">
+                    {(newForm.title || "").length}/{TITLE_MAX}
+                  </div>
+                </div>
+
                 <input
                   value={newForm.title}
+                  maxLength={TITLE_MAX}
                   onChange={(e) =>
                     setNewForm((s) => ({ ...s, title: e.target.value }))
                   }
-                  className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
-                  placeholder="예) 테스트 시뮬레이션"
+                  className="h-10 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
+                  placeholder="Title"
                 />
               </div>
 
+              {/* Description + count */}
               <div>
-                <div className="text-xs text-gray-500 mb-1">설명</div>
-                <input
+                <div className="flex items-end justify-between mb-1">
+                  <div className="text-xs text-gray-500">Description</div>
+                  <div className="text-[11px] text-gray-400">
+                    {(newForm.description || "").length}/{DESC_MAX}
+                  </div>
+                </div>
+
+                <textarea
                   value={newForm.description}
+                  maxLength={DESC_MAX}
                   onChange={(e) =>
                     setNewForm((s) => ({ ...s, description: e.target.value }))
                   }
-                  className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
-                  placeholder="설명"
+                  className="h-30 w-full rounded-md border px-2 py-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs resize-none"
+                  placeholder="Description"
+                />
+              </div>
+
+              {/* Product Id - Name */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-gray-500">Product Id - Name</div>
+
+                  {(newForm.productIds || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllProducts}
+                      className="text-[11px] text-gray-500 hover:text-gray-800"
+                    >
+                      선택해제
+                    </button>
+                  )}
+                </div>
+
+                <div className="rounded-md border bg-white">
+                  <div className="max-h-[240px] overflow-y-auto p-2 space-y-2">
+                    {prodLoading ? (
+                      <div className="px-2 py-2 text-xs text-gray-500">
+                        제품 목록 불러오는 중...
+                      </div>
+                    ) : products.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-gray-500">
+                        등록된 제품이 없습니다
+                      </div>
+                    ) : (
+                      products.map((p) => {
+                        const pid = String(p.id);
+                        const pname = String(p.name || "");
+                        const checked = (newForm.productIds || []).some(
+                          (x) => String(x) === pid,
+                        );
+
+                        return (
+                          <label
+                            key={pid}
+                            className={[
+                              "flex items-center gap-2 rounded-md px-2 py-2 cursor-pointer",
+                              "hover:bg-slate-100",
+                              checked ? "bg-slate-100" : "",
+                            ].join(" ")}
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-black"
+                              checked={checked}
+                              onChange={(e) =>
+                                toggleProduct(p, e.target.checked)
+                              }
+                            />
+
+                            {/* 한줄 */}
+                            <div className="min-w-0 flex-1 text-[12px] leading-none">
+                              <span className="font-mono text-gray-900">
+                                {pid}
+                              </span>
+                              <span className="mx-2 text-gray-400">—</span>
+                              <span className="text-gray-700 truncate inline-block align-bottom max-w-[320px]">
+                                {pname || "-"}
+                              </span>
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {prodErr ? (
+                  <div className="mt-2 text-xs text-red-600">{prodErr}</div>
+                ) : null}
+              </div>
+
+              {/* Selected Product (복수 표시) */}
+              <div>
+                <div className="text-xs text-gray-500 mb-2">
+                  Selected Product
+                  <span className="ml-2 text-[11px] text-gray-400">
+                    {(newForm.productIds || []).length}개 선택됨
+                  </span>
+                </div>
+
+                {(newForm.productIds || []).length === 0 ? (
+                  <div className="h-10 w-full rounded-md border bg-gray-50 px-3 flex items-center text-sm text-gray-400">
+                    -
+                  </div>
+                ) : (
+                  <div className="rounded-md border bg-gray-50 p-2 flex flex-wrap gap-2">
+                    {(newForm.productIds || []).map((id, idx) => {
+                      const name = String(newForm.productNames?.[idx] || "");
+                      return (
+                        <div
+                          key={String(id)}
+                          className="inline-flex items-center gap-2 rounded-md border bg-white px-2 py-1"
+                        >
+                          <div className="text-[12px] font-mono text-gray-800">
+                            {String(id)}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeOneSelected(id)}
+                            className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-gray-100"
+                            title="삭제"
+                          >
+                            <X className="h-3.5 w-3.5 text-gray-500" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Staff */}
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Staff</div>
+                <input
+                  type="number"
+                  value={newForm.requiredStaff}
+                  onChange={(e) =>
+                    setNewForm((s) => ({ ...s, requiredStaff: e.target.value }))
+                  }
+                  className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
+                  min={0}
+                  placeholder="Staff"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    필요 인원(requiredStaff)
-                  </div>
+                  <div className="text-xs text-gray-500 mb-1">Start Date</div>
                   <input
-                    type="number"
-                    value={newForm.requiredStaff}
+                    type="date"
+                    value={newForm.startDate || ""}
                     onChange={(e) =>
-                      setNewForm((s) => ({
-                        ...s,
-                        requiredStaff: e.target.value,
-                      }))
+                      setNewForm((s) => ({ ...s, startDate: e.target.value }))
                     }
+                    data-vaul-no-drag
+                    onPointerDownCapture={(e) => e.stopPropagation()}
                     className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
-                    min={0}
                   />
                 </div>
 
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    시작일(simulationStartDate)
-                  </div>
+                  <div className="text-xs text-gray-500 mb-1">Start Time</div>
                   <input
-                    type="date"
-                    value={newForm.simulationStartDate}
+                    type="time"
+                    value={newForm.startTime || ""}
                     onChange={(e) =>
-                      setNewForm((s) => ({
-                        ...s,
-                        simulationStartDate: e.target.value,
-                      }))
+                      setNewForm((s) => ({ ...s, startTime: e.target.value }))
                     }
+                    data-vaul-no-drag
+                    onPointerDownCapture={(e) => e.stopPropagation()}
                     className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setOpenNew(false)}
-                className="h-8 px-3 text-[12px] rounded-md transition text-gray-700 hover:bg-gray-200 cursor-pointer"
-              >
-                취소
-              </button>
-
+            <DrawerFooter>
               <button
                 type="button"
                 onClick={onCreate}
-                className="h-8 rounded-md border transition border-gray-200 bg-white px-4 text-sm hover:bg-gray-100 cursor-pointer"
+                disabled={!canEdit || !isFormValid}
+                className={[
+                  "h-9 rounded-md border px-4 text-sm transition",
+                  !canEdit || !isFormValid
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : "bg-white text-gray-900 border-gray-200 hover:bg-gray-100 cursor-pointer",
+                ].join(" ")}
+                title={
+                  !canEdit
+                    ? "권한 없음"
+                    : !isFormValid
+                      ? "필수 항목을 입력해 주세요"
+                      : ""
+                }
               >
                 생성
               </button>
-            </div>
+
+              <DrawerClose asChild>
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-gray-200 bg-white px-4 text-sm hover:bg-gray-100"
+                >
+                  취소
+                </button>
+              </DrawerClose>
+            </DrawerFooter>
           </div>
-        </div>
-      )}
+        </DrawerContent>
+      </Drawer>
     </DashboardShell>
   );
 }
