@@ -4,6 +4,44 @@ import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
 import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
 
+// description에 숫자("180")가 들어오고 duration이 0인 케이스 보정용
+function isNumericString(v) {
+  return typeof v === "string" && v.trim() !== "" && !isNaN(Number(v));
+}
+
+function normalizeTaskList(payload, flag) {
+  const list =
+    payload?.taskList ||
+    payload?.tasks ||
+    payload?.items ||
+    payload?.data ||
+    [];
+
+  return (list || []).map((t) => {
+    const operationId = t.operationId ?? t.operation?.id ?? "";
+    const machineId = t.machineId ?? t.machine?.id ?? "";
+
+    let duration = t.duration ?? 0;
+    let description = t.description ?? "";
+
+    //  엑셀 파싱 매핑 꼬인 경우: description이 숫자고 duration이 0이면 duration으로 보정
+    if ((!duration || Number(duration) === 0) && isNumericString(description)) {
+      duration = Number(description);
+      description = "";
+    }
+
+    return {
+      ...t,
+      _rid: t._rid || cryptoId(),
+      flag: t.flag ?? flag, // "Y" | "pre" | "new"
+      operationId,
+      machineId,
+      duration: Number(duration) || 0,
+      description,
+    };
+  });
+}
+
 export default function TasksPage() {
   const token = useToken((s) => s.token);
 
@@ -27,14 +65,7 @@ export default function TasksPage() {
       .then((json) => {
         if (!alive) return;
 
-        const list = json?.taskList || json?.tasks || [];
-        const rows = list.map((e) => ({
-          ...e,
-          _rid: e._rid || cryptoId(),
-          flag: "Y",
-          jobId: e.job?.id ?? e.jobId ?? "",
-          toolId: e.tool?.id ?? e.toolId ?? "",
-        }));
+        const rows = normalizeTaskList(json, "Y");
 
         setData(rows);
         setSelected(new Set());
@@ -75,13 +106,13 @@ export default function TasksPage() {
       _rid: cryptoId(),
       flag: "new",
       id: "",
-      jobId: "",
-      seq: "",
+      operationId: "",
+      machineId: "",
       name: "",
+      duration: 0,
       description: "",
-      toolId: "",
-      duration: "",
     };
+
     setData((prev) => [row, ...prev]);
     setSelected(new Set());
     setPageIndex(0);
@@ -143,20 +174,18 @@ export default function TasksPage() {
 
     parseTaskXLS(file, token)
       .then((json) => {
-        const list = json?.taskList || json?.items || json?.tasks || [];
-        const items = list.map((r) => ({
-          ...r,
-          _rid: cryptoId(),
-          flag: "pre",
-          jobId: r.job?.id ?? r.jobId ?? "",
-          toolId: r.tool?.id ?? r.toolId ?? "",
-        }));
+        console.log("[XLS json before normalize]", json);
+
+        const items = normalizeTaskList(json, "pre");
+
+        //console.log("[XLS after normalize]", items);
 
         setData((prev) => [...items, ...prev]);
         setPageIndex(0);
         setSelected(new Set());
         setDirty(true);
       })
+
       .catch((err) => {
         console.error(err);
         window.alert(err?.message || "엑셀 파싱 실패");
@@ -168,8 +197,21 @@ export default function TasksPage() {
   const saveHandle = () => {
     if (!token) return;
 
-    // 서버에 보낼 payload에서 _rid / job / tool 같은 객체 제거
-    const payload = data.map(({ _rid, job, tool, ...rest }) => rest);
+    // 서버로 보낼 payload 정리
+    // - _rid 제거
+    // - operation/machine 객체 제거
+    // - duration 숫자화
+    const payload = data.map((r) => {
+      const { _rid, operation, machine, ...rest } = r;
+
+      // saveHandle payload
+      return {
+        ...rest,
+        operationId: r.operationId,
+        machineId: r.machineId,
+        duration: Number(r.duration) || 0,
+      };
+    });
 
     postTasks(payload, token)
       .then((ok) => {
@@ -284,31 +326,24 @@ export default function TasksPage() {
                     </div>
                   </th>
 
-                  {/* ✅ 폭 재배치 */}
-                  <th className="w-[200px] border-b px-3 py-3 font-medium">
+                  <th className="w-[190px] border-b px-3 py-3 font-medium">
                     Task Id
                   </th>
-                  <th className="w-[140px] border-b px-3 py-3 font-medium">
-                    Job Id
+                  <th className="w-[190px] border-b px-3 py-3 font-medium">
+                    Operation Id
                   </th>
-                  <th className="w-[80px] border-b px-3 py-3 font-medium">
-                    Seq
+                  <th className="w-[220px] border-b px-3 py-3 font-medium">
+                    Machine Id
                   </th>
-                  <th className="w-[200px] border-b px-3 py-3 font-medium">
+                  <th className="w-[190px] border-b px-3 py-3 font-medium">
                     Name
                   </th>
                   <th className="w-[320px] border-b px-3 py-3 font-medium">
                     Description
                   </th>
-                  <th className="w-[140px] border-b px-3 py-3 font-medium">
-                    Tool Id
-                  </th>
-
-                  {/* Duration */}
-                  <th className="w-24 border-b px-3 py-3 font-medium whitespace-nowrap">
+                  <th className="w-21 border-b px-3 py-3 font-medium whitespace-nowrap">
                     Duration
                   </th>
-
                   <th className="w-[90px] border-b px-3 py-3 font-medium">
                     Status
                   </th>
@@ -354,31 +389,31 @@ export default function TasksPage() {
                           }
                           title={row.id ?? ""}
                           className="h-9 w-full rounded-md border px-2 font-medium outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Task ID"
+                          placeholder="Task Id"
                         />
                       </td>
 
-                      {/* Job Id */}
+                      {/* Operation Id */}
                       <td className="border-b px-3 py-2">
                         <input
-                          value={row.jobId ?? ""}
+                          value={row.operationId ?? ""}
                           onChange={(e) =>
-                            updateCell(row._rid, "jobId", e.target.value)
+                            updateCell(row._rid, "operationId", e.target.value)
                           }
                           className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Job ID"
+                          placeholder="Operation Id"
                         />
                       </td>
 
-                      {/* Seq */}
+                      {/* Machine Id */}
                       <td className="border-b px-3 py-2">
                         <input
-                          value={row.seq ?? ""}
+                          value={row.machineId ?? ""}
                           onChange={(e) =>
-                            updateCell(row._rid, "seq", e.target.value)
+                            updateCell(row._rid, "machineId", e.target.value)
                           }
                           className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Seq"
+                          placeholder="Machine Id"
                         />
                       </td>
 
@@ -406,26 +441,14 @@ export default function TasksPage() {
                         />
                       </td>
 
-                      {/* Tool Id */}
+                      {/* Duration */}
                       <td className="border-b px-3 py-2">
                         <input
-                          value={row.toolId ?? ""}
-                          onChange={(e) =>
-                            updateCell(row._rid, "toolId", e.target.value)
-                          }
-                          className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Tool ID"
-                        />
-                      </td>
-
-                      {/* ✅ Duration */}
-                      <td className="border-b px-3 py-2">
-                        <input
-                          value={row.duration ?? ""}
+                          value={row.duration ?? 0}
                           onChange={(e) =>
                             updateCell(row._rid, "duration", e.target.value)
                           }
-                          className="h-9 w-18 rounded-md border px-3 text-right outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
+                          className="h-9 w-full rounded-md border px-3 text-right outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
                           placeholder="min"
                         />
                       </td>
@@ -454,7 +477,7 @@ export default function TasksPage() {
 
                 {pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="p-0">
+                    <td colSpan={8} className="p-0">
                       <button
                         type="button"
                         onClick={addRow}

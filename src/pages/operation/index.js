@@ -257,7 +257,7 @@ export default function Operation() {
                 </th>
 
                 <th className="min-w-[220px] border-b px-3 py-3 font-medium">
-                  ID
+                  Id
                 </th>
                 <th className="min-w-[220px] border-b px-3 py-3 font-medium">
                   Name
@@ -307,7 +307,7 @@ export default function Operation() {
                           updateCell(row._rid, "id", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="예: OP_FINAL_ASSEMBLY"
+                        placeholder="Id"
                       />
                     </td>
 
@@ -318,7 +318,7 @@ export default function Operation() {
                           updateCell(row._rid, "name", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="예: 최종 조립"
+                        placeholder="Name"
                       />
                     </td>
 
@@ -329,7 +329,7 @@ export default function Operation() {
                           updateCell(row._rid, "description", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="설명"
+                        placeholder="Description"
                       />
                     </td>
 

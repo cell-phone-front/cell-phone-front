@@ -263,7 +263,7 @@ export default function Product() {
                 </th>
 
                 <th className="min-w-[160px] border-b px-3 py-3 font-medium">
-                  ID
+                  Id
                 </th>
                 <th className="min-w-[140px] border-b px-3 py-3 font-medium">
                   Brand
@@ -316,7 +316,7 @@ export default function Product() {
                           updateCell(row._rid, "id", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="예: APL_IPH_15"
+                        placeholder="Id"
                       />
                     </td>
 
@@ -327,7 +327,7 @@ export default function Product() {
                           updateCell(row._rid, "brand", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="예: APPLE"
+                        placeholder="Brand"
                       />
                     </td>
 
@@ -338,7 +338,7 @@ export default function Product() {
                           updateCell(row._rid, "name", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="예: iPhone 15"
+                        placeholder="Name"
                       />
                     </td>
 
@@ -349,7 +349,7 @@ export default function Product() {
                           updateCell(row._rid, "description", e.target.value)
                         }
                         className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                        placeholder="설명"
+                        placeholder="Description"
                       />
                     </td>
 

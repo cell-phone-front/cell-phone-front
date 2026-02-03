@@ -48,8 +48,9 @@ const data = {
       title: "시뮬레이션",
       icon: ChartColumnStacked,
       items: [
+        { title: "시뮬레이션", url: "/simulation", icon: GanttChartSquare },
         { title: "간트", url: "/gantt", icon: GanttChartSquare },
-        { title: "차트", url: "/scenarios", icon: BarChart3 }, // 너 폴더가 scenarios라 /scenarios
+        { title: "차트", url: "/chart", icon: BarChart3 },
       ],
     },
   ],

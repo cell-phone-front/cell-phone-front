@@ -265,7 +265,7 @@ export default function MachinePage() {
                   </th>
 
                   <th className="min-w-45 border-b px-3 py-3 font-medium">
-                    Machine ID
+                    Machine Id
                   </th>
                   <th className="min-w-45 border-b px-3 py-3 font-medium">
                     Name
@@ -316,7 +316,7 @@ export default function MachinePage() {
                             updateCell(row._rid, "id", e.target.value)
                           }
                           className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
-                          placeholder="Machine ID"
+                          placeholder="Machine Id"
                         />
                       </td>
 
