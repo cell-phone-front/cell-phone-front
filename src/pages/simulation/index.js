@@ -631,7 +631,7 @@ export default function SimulationPage() {
                   const isPending = st === "PENDING";
 
                   const goDetail = () => {
-                    router.push(`/gantt?simId=${encodeURIComponent(r.id)}`);
+                    router.push(`/simulation/${r.id}/gantt`);
                   };
 
                   return (

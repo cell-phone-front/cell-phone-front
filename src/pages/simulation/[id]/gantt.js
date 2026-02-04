@@ -42,6 +42,8 @@ export default function SimulationGanttPage() {
 
         const list = json?.scheduleList || json?.items || [];
 
+        console.log("RAW LIST:", list);
+        console.log("GROUPS:", groups);
         // 👉 GanttBoard용 row로 변환
         const ganttRows = list.map((r) => ({
           id: r.taskId,

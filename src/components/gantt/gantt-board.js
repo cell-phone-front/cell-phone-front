@@ -21,7 +21,7 @@ import {
   toMs,
 } from "./gantt-utils";
 
-export default function GanttBoard({ groups }) {
+export default function GanttBoard({ groups = [] }) {
   // ====== CONFIG ======
   const stepMinutes = 60;
   const colWidth = 120;
