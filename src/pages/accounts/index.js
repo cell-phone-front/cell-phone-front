@@ -283,7 +283,7 @@ export default function Accounts() {
           <table className="w-full border-separate border-spacing-0">
             <thead className="sticky top-0 z-10 bg-gray-200">
               <tr className="text-left text-sm">
-                <th className="w-[44px] border-b px-3 py-3">
+                <th className="w-11 border-b px-3 py-3">
                   <div className="flex justify-center">
                     <input
                       type="checkbox"
@@ -298,28 +298,28 @@ export default function Accounts() {
                   </div>
                 </th>
 
-                <th className="min-w-[120px] border-b px-3 py-3 font-medium">
+                <th className="min-w-30 border-b px-3 py-3 font-medium">
                   Name
                 </th>
-                <th className="min-w-[210px] border-b px-3 py-3 font-medium">
+                <th className="min-w-52.5 border-b px-3 py-3 font-medium">
                   Email
                 </th>
-                <th className="min-w-[160px] border-b px-3 py-3 font-medium">
+                <th className="min-w-40 border-b px-3 py-3 font-medium">
                   Phone
                 </th>
-                <th className="min-w-[130px] border-b px-3 py-3 font-medium">
+                <th className="min-w-32.5 border-b px-3 py-3 font-medium">
                   Department
                 </th>
-                <th className="min-w-[110px] border-b px-3 py-3 font-medium">
+                <th className="min-w-27.5 border-b px-3 py-3 font-medium">
                   Team
                 </th>
-                <th className="min-w-[135px] border-b px-3 py-3 font-medium">
+                <th className="min-w-33.75 border-b px-3 py-3 font-medium">
                   Role
                 </th>
-                <th className="min-w-[140px] border-b px-3 py-3 font-medium">
+                <th className="min-w-35 border-b px-3 py-3 font-medium">
                   Hire Date
                 </th>
-                <th className="min-w-[100px] border-b px-3 py-3 font-medium">
+                <th className="min-w-25 border-b px-3 py-3 font-medium">
                   Status
                 </th>
               </tr>
