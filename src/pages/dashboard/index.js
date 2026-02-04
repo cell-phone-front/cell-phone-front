@@ -1,6 +1,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { DashboardCalendar } from "@/components/dashboard/calendar";
 import DashboardProducts from "@/components/dashboard/products";
+import DashboardNotice from "@/components/dashboard/notice";
 
 export default function Page() {
   return (
@@ -14,10 +15,12 @@ export default function Page() {
           <div className="bg-white aspect-video rounded-xl">
             <DashboardProducts />
           </div>
-          <div className="bg-amber-200 aspect-video rounded-xl" />
-        </div>
+          <div className="bg-amber-200 aspect-video rounded-xl overflow-hidden min-h-0">
+            <DashboardNotice />
+          </div>
 
-        <div className="bg-gray-200 flex-1 rounded-xl min-h-0" />
+          <div className="bg-gray-200 flex-1 rounded-xl min-h-0" />
+        </div>
       </div>
     </DashboardShell>
   );
