@@ -224,7 +224,7 @@ export default function Board() {
                 setPage(1);
               }}
               placeholder="제목/작성자 검색"
-              className="h-7 w-[220px] px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
+              className="h-7 w-55 px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
             />
 
             <select
@@ -308,7 +308,7 @@ export default function Board() {
                       <div className="min-w-0 pl-2">
                         <div className="flex items-center gap-2 min-w-0">
                           {r.pinned && (
-                            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-[2px] rounded-full bg-amber-100 text-amber-800">
+                            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                               <Pin className="w-3 h-3" />
                               고정
                             </span>
@@ -355,7 +355,7 @@ export default function Board() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             {r.pinned && (
-                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-[2px] rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                                 <Pin className="w-3 h-3" />
                                 고정
                               </span>

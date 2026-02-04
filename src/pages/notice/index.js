@@ -130,7 +130,7 @@ function NoticeModal({ open, onClose, notice }) {
         <div className="sticky top-0 z-10 bg-white px-6 py-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-2xl font-semibold leading-snug break-words pb-2">
+              <div className="text-2xl font-semibold leading-snug wrap-break-word pb-2">
                 {notice?.title || "공지사항"}
               </div>
 
@@ -155,7 +155,7 @@ function NoticeModal({ open, onClose, notice }) {
         </div>
 
         <div className="px-6 pt-1 pb-5 overflow-y-auto flex-1 min-h-0">
-          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 break-words">
+          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 wrap-break-word">
             {notice?.content || notice?.description || "내용이 없습니다."}
           </div>
         </div>
@@ -434,7 +434,7 @@ export default function Notice() {
 
                 <div className="min-w-0 pl-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-[2px] rounded-full bg-amber-100 text-amber-800">
+                    <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                       고정
                     </span>
 

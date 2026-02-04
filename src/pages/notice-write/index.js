@@ -135,13 +135,12 @@ export default function NoticeWrite() {
         await updateNotice(noticeId, payload, token);
         alert("수정 완료!");
       } else {
-        await createNotice(payload, token);
+        const createdNotice = await createNotice(payload, token);
+        targetId = createdNotice?.id;
         alert("등록 완료!");
       }
 
-      const createdNotice = await createNotice(payload, token);
-      const noticeId = createdNotice.id;
-      if (files.length > 0) {
+      if (files.length > 0 && targetId) {
         await uploadNoticeFiles(noticeId, files, token);
       }
 
