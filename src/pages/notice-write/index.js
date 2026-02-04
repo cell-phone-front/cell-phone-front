@@ -32,6 +32,7 @@ export default function NoticeWrite() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState([]);
   const [pinned, setPinned] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -138,6 +139,13 @@ export default function NoticeWrite() {
         alert("등록 완료!");
       }
 
+      const createdNotice = await createNotice(payload, token);
+      const noticeId = createdNotice.id;
+      if (files.length > 0) {
+        await uploadNoticeFiles(noticeId, files, token);
+      }
+
+      alert("저장 완료!");
       router.push("/notice");
     } catch (err) {
       console.error(err);
@@ -205,6 +213,16 @@ export default function NoticeWrite() {
               className="min-h-60 flex-1 px-3 py-3 border rounded-md text-sm outline-none resize-none"
               maxLength={MAX_DESC}
             />
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-gray-700">
+                첨부파일
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => setFiles(Array.from(e.target.files))}
+              />
+            </div>
             <div className="flex justify-end text-xs text-gray-400">
               {content.length}/{MAX_DESC}자
             </div>
