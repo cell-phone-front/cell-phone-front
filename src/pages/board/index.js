@@ -1,5 +1,5 @@
 // pages/board/index.js (자유게시판을 공지사항 틀로 변경한 버전)
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
   Plus,
@@ -8,9 +8,11 @@ import {
   MessageSquareText,
   Clock,
   Pin,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
-import { useToken } from "@/stores/account-store";
+import { useAccount, useToken } from "@/stores/account-store";
 import { getCommunities, getCommunityCommentCount } from "@/api/community-api";
 
 function fmtDate(v) {
@@ -27,7 +29,11 @@ function fmtDate(v) {
 
 export default function Board() {
   const router = useRouter();
+  const { account } = useAccount();
   const { token } = useToken();
+
+  const role = String(account?.role || "").toLowerCase();
+  const canWriteCommunity = role === "planner" || role === "worker";
 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("latest");
@@ -279,6 +285,7 @@ export default function Board() {
                   <div className="pl-2">작성자</div>
                   <div className="pl-2">작성일</div>
                   <div className="text-right pr-2">댓글</div>
+                  <div className="text-center">수정 · 삭제</div>
                 </div>
 
                 {pageRows.length === 0 ? (
@@ -329,6 +336,38 @@ export default function Board() {
 
                       <div className="text-sm text-neutral-600 text-right pr-2">
                         {r.comments}
+                      </div>
+                      {/* ✅ 관리 */}
+                      <div className="flex items-center justify-center gap-2 pr-2">
+                        {canWriteCommunity ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(e, r);
+                              }}
+                              className="h-8 px-2 text-xs text-gray-400 hover:text-black flex items-center cursor-pointer gap-1"
+                              title="수정"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(e, r);
+                              }}
+                              className="h-8 px-2 text-xs text-gray-400 hover:text-red-600 flex items-center cursor-pointer gap-1"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-neutral-400">-</span>
+                        )}
                       </div>
                     </button>
                   ))
