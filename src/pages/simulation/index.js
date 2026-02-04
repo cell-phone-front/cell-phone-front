@@ -21,7 +21,6 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
@@ -36,7 +35,9 @@ function fmtDate(v) {
 }
 
 function roleOk(role) {
-  const r = String(role || "").toLowerCase();
+  const r = String(role || "")
+    .toLowerCase()
+    .trim();
   return r === "admin" || r === "planner";
 }
 
@@ -103,6 +104,12 @@ export default function SimulationPage() {
   const account = useAccount((s) => s.account);
   const canEdit = roleOk(account?.role);
 
+  // ✅ [LOG 0] role / token 상태는 여기서부터 계속 봄
+  useEffect(() => {
+    console.log("[SIM] account.role:", account?.role, "canEdit:", canEdit);
+    console.log("[SIM] token exists?:", !!token);
+  }, [account?.role, canEdit, token]);
+
   // products 목록
   const [products, setProducts] = useState([]);
   const [prodLoading, setProdLoading] = useState(false);
@@ -144,27 +151,39 @@ export default function SimulationPage() {
     await refresh();
   }
 
-  // row별 json에서 productId / productName 채우기
+  // row별 json에서 productId / productName / productCount 채우기
   async function enrichRowsWithMeta(baseRows) {
     const enriched = await Promise.all(
       (baseRows || []).map(async (row) => {
         try {
           const meta = await getSimulationMetaJson(row.id, token);
 
+          // ✅ [LOG 1] meta 구조가 바뀌었는지 확인 (필요할 때만 찍자)
+          // productCount가 0/빈값인 row만 메타 찍어보기
+          const needMetaLog =
+            row.productCount == null || Number(row.productCount) === 0;
+
           const list = meta?.simulation?.simulationProductList || [];
           const first = list?.[0]?.product || null;
 
           const metaProductId = first?.id || "";
           const metaProductName = first?.name || "";
-
           const metaCount = Array.isArray(list) ? list.length : 0;
+
+          if (needMetaLog) {
+            console.log("[SIM][META] rowId:", row.id);
+            console.log("[SIM][META] metaCount:", metaCount);
+            console.log(
+              "[SIM][META] meta.simulation keys:",
+              Object.keys(meta?.simulation || {}),
+            );
+            console.log("[SIM][META] sample list[0]:", list?.[0] || null);
+          }
 
           return {
             ...row,
             productId: row.productId || metaProductId,
             productName: row.productName || metaProductName,
-
-            //  "선택된 제품 수"가 백에서 안오면 meta 기반으로 채움
             productCount:
               row.productCount == null ||
               row.productCount === "" ||
@@ -172,7 +191,8 @@ export default function SimulationPage() {
                 ? metaCount
                 : Number(row.productCount),
           };
-        } catch {
+        } catch (e) {
+          console.warn("[SIM][META] meta fetch failed rowId:", row.id, e);
           return row;
         }
       }),
@@ -188,6 +208,16 @@ export default function SimulationPage() {
     try {
       const json = await getSimulations(token);
       const list = json?.simulationScheduleList || [];
+
+      // ✅ [LOG 2] list 응답이 오늘 바뀌었는지 확인
+      console.log("[SIM][LIST] raw keys:", Object.keys(json || {}));
+      console.log(
+        "[SIM][LIST] count:",
+        Array.isArray(list) ? list.length : "not-array",
+      );
+      if (Array.isArray(list) && list.length > 0) {
+        console.log("[SIM][LIST] first row sample:", list[0]);
+      }
 
       const baseRows = (list || []).map((r) => ({
         id: r.id,
@@ -205,10 +235,23 @@ export default function SimulationPage() {
 
       const enriched = await enrichRowsWithMeta(baseRows);
 
+      // ✅ [LOG 3] 최종 화면에 들어갈 값 확인 (productCount 찍어보기)
+      console.table(
+        enriched.slice(0, 10).map((r) => ({
+          id: r.id,
+          title: r.title,
+          status: r.status,
+          productCount: r.productCount,
+          productId: r.productId,
+          productName: r.productName,
+        })),
+      );
+
       setData(enriched);
       setSelectedIds(new Set());
       setPageIndex(0);
     } catch (e) {
+      console.error("[SIM][LIST] refresh failed:", e);
       window.alert(e?.message || "조회 실패");
       setData([]);
       setSelectedIds(new Set());
@@ -434,7 +477,7 @@ export default function SimulationPage() {
         productName: String(newForm.productNames?.[i] || ""),
       })),
 
-      // 추가: 선택된 제품 수를 백에도 같이 저장(백이 받으면 그대로 저장)
+      // 추가: 선택된 제품 수
       productCount: (newForm.productIds || []).length,
 
       requiredStaff:
@@ -445,6 +488,9 @@ export default function SimulationPage() {
       simulationStartDate: newForm.startDate,
       startDateTime,
     };
+
+    // ✅ [LOG 4] 저장 payload 확인 (productCount/ids 들어가는지)
+    console.log("[SIM][CREATE] payload:", payload);
 
     try {
       await createSimulation(payload, token);
@@ -462,6 +508,7 @@ export default function SimulationPage() {
 
       await refreshWithRetry();
     } catch (e) {
+      console.error("[SIM][CREATE] failed:", e);
       window.alert(e?.message || "생성 실패");
     }
   }
@@ -478,22 +525,47 @@ export default function SimulationPage() {
       await runSimulation(simId, token);
       await refreshWithRetry();
     } catch (e) {
+      console.error("[SIM][RUN] failed:", e);
       await refreshWithRetry();
       window.alert(e?.message || "실행 실패");
     }
   }
 
+  // ✅ 삭제: Promise.allSettled로 "어떤 id가 왜 실패했는지" 찍기
   async function deleteSelectedHandle() {
     if (!canEdit) return;
     if (selectedIds.size === 0) return;
 
-    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
+    const ids = Array.from(selectedIds);
+    console.log("[SIM][DELETE] selected ids:", ids);
+
+    if (!confirm(`선택한 ${ids.length}건을 삭제하시겠습니까?`)) return;
 
     try {
-      const ids = Array.from(selectedIds);
-      await Promise.all(ids.map((id) => deleteSimulation(id, token)));
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          // 각 delete 호출 결과를 개별 로그로 확인
+          console.log("[SIM][DELETE] try id:", id);
+          const res = await deleteSimulation(id, token);
+          console.log("[SIM][DELETE] success id:", id, "res:", res);
+          return res;
+        }),
+      );
+
+      const failed = results
+        .map((r, i) => ({ r, id: ids[i] }))
+        .filter((x) => x.r.status === "rejected");
+
+      if (failed.length) {
+        console.error("[SIM][DELETE] failed items:", failed);
+        window.alert(`삭제 실패 ${failed.length}건 (콘솔 확인)`);
+      } else {
+        window.alert("삭제 완료");
+      }
+
       await refreshWithRetry();
     } catch (e) {
+      console.error("[SIM][DELETE] unexpected error:", e);
       window.alert(e?.message || "삭제 실패");
       await refreshWithRetry();
     }
