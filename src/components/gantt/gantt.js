@@ -79,7 +79,7 @@ export default function Gantt() {
             className={[
               "text-lg font-semibold leading-none",
               "bg-transparent hover:bg-transparent",
-              "underline-offset-[10px] decoration-2",
+              "underline-offset-10 decoration-2",
               activeTab === "work"
                 ? "text-gray-900 underline decoration-gray-900"
                 : "text-gray-400 hover:text-gray-700 hover:underline hover:decoration-gray-300",
@@ -94,7 +94,7 @@ export default function Gantt() {
             className={[
               "text-lg font-semibold leading-none",
               "bg-transparent hover:bg-transparent",
-              "underline-offset-[10px] decoration-2",
+              "underline-offset-10 decoration-2",
               activeTab === "tool"
                 ? "text-gray-900 underline decoration-gray-900"
                 : "text-gray-400 hover:text-gray-700 hover:underline hover:decoration-gray-300",

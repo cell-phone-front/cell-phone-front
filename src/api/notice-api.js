@@ -1,4 +1,5 @@
 // src/api/notice-api.js
+import axios from "axios";
 const serverAddr = "http://localhost:8080";
 
 async function safeJson(res) {
@@ -109,3 +110,20 @@ export async function toggleNoticePin(noticeId, token) {
   const json = await safeJson(res);
   return json ?? true;
 }
+
+// (7) 공지사항 파일 첨부
+export const uploadNoticeFiles = async (noticeId, files, token) => {
+  const formData = new FormData();
+
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+
+  const res = await axios.post(`/api/notice/${noticeId}/attachment`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data;
+};
