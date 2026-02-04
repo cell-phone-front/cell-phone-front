@@ -98,4 +98,3 @@ export async function getCommunityCommentCount(communityId, token) {
 
   return response.json();
 }
-
