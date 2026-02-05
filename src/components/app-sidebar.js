@@ -28,13 +28,13 @@ import { Sidebar, SidebarContent, SidebarRail } from "@/components/ui/sidebar";
 const data = {
   teams: [{ name: "PhoneFlow", logo: SquareTerminal, plan: "Enterprise" }],
 
-  // 스케줄(상단)
-  projects: [
-    { name: "대시보드", url: "/dashboard", icon: LayoutDashboard },
-    { name: "내 근무", url: "/work", icon: CalendarDays },
-  ],
+  // 메인
+  main: [{ name: "대시보드", url: "/dashboard", icon: LayoutDashboard }],
 
-  // 테이블(단일 링크들)
+  // 스케줄
+  schedule: [{ name: "내 근무", url: "/work", icon: CalendarDays }],
+
+  // 테이블
   tables: [
     { title: "생산대상", url: "/product", icon: Boxes },
     { title: "공정단계", url: "/operation", icon: Factory },
@@ -42,7 +42,7 @@ const data = {
     { title: "기계", url: "/machine", icon: Cpu },
   ],
 
-  // 결과분석(접힘/펼침)
+  // 결과분석
   navMain: [
     {
       title: "결과분석",
@@ -50,7 +50,6 @@ const data = {
       items: [
         { title: "시뮬레이션", url: "/simulation", icon: GanttChartSquare },
         { title: "간트", url: "/gantt", icon: GanttChartSquare },
-        { title: "차트", url: "/chart", icon: BarChart3 },
       ],
     },
   ],
@@ -69,13 +68,24 @@ export function AppSidebar({ onNavigate, ...props }) {
   return (
     <Sidebar className="w-64" {...props}>
       <SidebarContent>
+        {/* 메인 */}
+        <NavProjects
+          label="메인"
+          projects={data.main}
+          onNavigate={onNavigate}
+        />
+
         {/* 스케줄 */}
-        <NavProjects projects={data.projects} onNavigate={onNavigate} />
+        <NavProjects
+          label="스케줄"
+          projects={data.schedule}
+          onNavigate={onNavigate}
+        />
 
         {/* 테이블 */}
         <NavLinks label="테이블" items={data.tables} />
 
-        {/* 결과분석 (Collapsible) */}
+        {/* 결과분석 */}
         <NavMain label="결과분석" items={data.navMain} />
 
         {/* 게시판 */}

@@ -230,7 +230,7 @@ function Sidebar({
     </div>
   );
 }
-
+// 접히는 아이콘 줄이기!!! 사이즈7에서 6으로
 function SidebarTrigger({ className, onClick, ...props }) {
   const { toggleSidebar } = useSidebar();
 
@@ -240,7 +240,7 @@ function SidebarTrigger({ className, onClick, ...props }) {
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn("size-6", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -430,14 +430,30 @@ function SidebarMenuItem({ className, ...props }) {
   );
 }
 
+// 메뉴 호버클릭선택
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] " +
+    // ✅ Hover
+    "hover:bg-gray-100 hover:text-indigo-500 " +
+    // ✅ Active (클릭 중)
+    "active:bg-gray-100 active:text-indigo-700 " + 
+    // ✅ Selected (현재 페이지)
+    "data-[active=true]:bg-gray-100 data-[active=true]:font-medium data-[active=true]:text-indigo-700 " +
+    // ✅ Open 상태 hover
+    "data-[state=open]:hover:bg-gray-100 data-[state=open]:hover:text-indigo-500 " +
+    // 기타 유지
+    "focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 " +
+    "group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 " +
+    "group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! " +
+    "[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        // ✅ 중복 hover가 섞이지 않게: 비워두거나 동일하게
+        default: "",
         outline:
-          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] " +
+          "hover:bg-gray-100 hover:text-indigo-500",
       },
       size: {
         default: "h-8 text-sm",
@@ -601,7 +617,7 @@ function SidebarMenuSubItem({ className, ...props }) {
     />
   );
 }
-
+// 접히는 메뉴
 function SidebarMenuSubButton({
   asChild = false,
   size = "md",
@@ -618,8 +634,15 @@ function SidebarMenuSubButton({
       data-size={size}
       data-active={isActive}
       className={cn(
-        "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>svg]:text-sidebar-accent-foreground flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 outline-hidden focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
-        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+        // ✅ 기본 + Hover/Active (1뎁스와 동일 톤)
+        "text-sidebar-foreground ring-sidebar-ring " +
+          "hover:bg-gray-100 hover:text-indigo-500 " +
+          "active:bg-gray-100 active:text-indigo-700 " +
+          "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 outline-hidden focus-visible:ring-2 " +
+          "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 " +
+          "[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+        // ✅ 선택(현재 페이지)
+        "data-[active=true]:bg-gray-100 data-[active=true]:text-indigo-700",
         size === "sm" && "text-xs",
         size === "md" && "text-sm",
         "group-data-[collapsible=icon]:hidden",

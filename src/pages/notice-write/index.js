@@ -21,7 +21,7 @@ export default function NoticeWrite() {
   );
   const allowed = canEdit(role);
 
-  // ✅ query id (수정 모드)
+  //  query id (수정 모드)
   const noticeId = router.query?.id ? String(router.query.id) : null;
   const isEdit = Boolean(noticeId);
 

@@ -330,7 +330,7 @@ export default function TasksPage() {
                   <th className="w-[190px] border-b px-3 py-3 font-medium">
                     Task Id
                   </th>
-                  <th className="w-[190px] border-b px-3 py-3 font-medium">
+                  <th className="w-[220px] border-b px-3 py-3 font-medium">
                     Operation Id
                   </th>
                   <th className="w-[220px] border-b px-3 py-3 font-medium">
@@ -339,13 +339,13 @@ export default function TasksPage() {
                   <th className="w-[190px] border-b px-3 py-3 font-medium">
                     Name
                   </th>
-                  <th className="w-[320px] border-b px-3 py-3 font-medium">
+                  <th className="w-[300px] border-b px-3 py-3 font-medium">
                     Description
                   </th>
-                  <th className="w-21 border-b px-3 py-3 font-medium whitespace-nowrap">
+                  <th className="w-20 border-b px-3 py-3 font-medium whitespace-nowrap">
                     Duration
                   </th>
-                  <th className="w-[90px] border-b px-3 py-3 font-medium">
+                  <th className="w-[80px] border-b px-3 py-3 font-medium">
                     Status
                   </th>
                 </tr>

@@ -27,7 +27,10 @@ export default function DashboardProducts() {
         console.error(err);
         setLoadError(err?.message || "생산 대상 불러오기 실패");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!alive) return;
+        setLoading(false);
+      });
 
     return () => {
       alive = false;
@@ -37,100 +40,115 @@ export default function DashboardProducts() {
   const rows = useMemo(() => {
     return (products || []).slice(0, 6).map((p) => {
       const desc = p.description ?? p.desc ?? p.productDesc ?? "";
-
       return {
         id: p.id ?? p.productId ?? "",
         name: p.name ?? p.productName ?? "",
-        // 👇 여기!
-        description: desc.length > 18 ? desc.slice(0, 18) + "…" : desc,
+        model: p.model ?? p.productModel ?? "",
+        rawDesc: desc,
+        description: desc.length > 28 ? desc.slice(0, 28) + "…" : desc,
       };
     });
   }, [products]);
 
   return (
-    <div className="h-full flex flex-col px-2">
-      <div className="px-4 py-3 border-b flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-sm font-semibold">생산 대상</div>
-          <div className="text-[11px] text-gray-500">
-            {products.length.toLocaleString()}건
+    <div className="h-full min-h-0 flex flex-col">
+      {/* 헤더 */}
+      {/* 패딩탑2 */}
+      <div className="px-3 pt-2 pb-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            {/* <div className="text-sm font-semibold tracking-tight text-slate-900">
+              생산 대상
+            </div> */}
+            <div className="mt-0.5 text-[11px] text-slate-500">
+              최신 6개 항목을 표시합니다.
+            </div>
           </div>
-        </div>
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => (window.location.href = "/product")}
-            className="text-[10px] text-gray-600 hover:underline"
-          >
-            전체 보기 →
-          </button>
+          {/* <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
+            {products.length.toLocaleString()}건
+          </span> */}
+
+          <div className="flex items-center gap-2">
+            <a
+              href="/product"
+              className="rounded-full bg-white px-3 py-1.5 text-[10px] font-medium text-slate-700 shadow-sm ring-1 ring-black/5 hover:bg-gray-50 active:bg-gray-100"
+            >
+              전체 보기 →
+            </a>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      {/* 리스트 */}
+      <div className="flex-1 min-h-0 overflow-auto pb-3">
         {loading ? (
-          <div className="p-4 text-sm text-gray-500">불러오는 중…</div>
+          <div className="mt-3 rounded-2xl bg-white p-4 text-sm text-slate-500 shadow-sm ring-1 ring-black/5">
+            불러오는 중…
+          </div>
         ) : loadError ? (
-          <div className="p-4 text-sm text-red-600">{loadError}</div>
+          <div className="mt-3 rounded-2xl bg-white p-4 text-sm text-rose-700 shadow-sm ring-1 ring-black/5">
+            {loadError}
+          </div>
         ) : rows.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500">
-            표시할 생산 대상이 없어요.
+          <div className="mt-3 rounded-2xl bg-white p-4 text-sm text-slate-500 shadow-sm ring-1 ring-black/5">
+            표시할 생산 대상이 없습니다.
           </div>
         ) : (
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 bg-gray-50 text-[10px] text-gray-500">
-              <tr className="text-left">
-                <th className="px-2 py-1.5 border-b w-[80px]">ID</th>
-                <th className="px-2 py-1.5 border-b w-[110px]">Brand</th>
-                <th className="px-2 py-1.5 border-b w-[120px]">Description</th>
-              </tr>
-            </thead>
+          <div className="overflow-hidden">
+            <table className="w-full text-[10px]">
+              {/* sticky header */}
+              <thead className="sticky top-0 z-10  bg-white/75 backdrop-blur text-[10.5px] text-slate-500">
+                <tr className="text-left">
+                  <th className="px-5 py-2 font-medium">ID</th>
+                  <th className="px-4 py-2 font-medium">Brand</th>
+                  <th className="px-4 py-2 font-medium">Description</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {rows.map((r, idx) => {
-                const isLast = idx === rows.length - 1;
-
-                return (
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r, idx) => (
                   <tr
                     key={`${r.id}-${idx}`}
-                    className="hover:bg-gray-100 transition-colors"
+                    className="group hover:bg-gray-200/70 transition-colors"
                   >
-                    <td
-                      className={[
-                        "px-2 py-1.5",
-                        !isLast && "border-b",
-                        "font-medium",
-                      ].join(" ")}
-                    >
-                      {r.id || "-"}
+                    {/* ID */}
+                    <td className="px-4 py-2 align-top">
+                      {r.id ? (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                          {r.id}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
 
-                    <td
-                      className={["px-2 py-1.5", !isLast && "border-b"].join(
-                        " ",
-                      )}
-                    >
-                      <div className="font-medium leading-tight">
+                    {/* Brand */}
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-semibold text-slate-900 leading-tight">
                         {r.name || "-"}
                       </div>
-                      <div className="text-[10px] text-gray-400 leading-tight">
-                        {r.model || ""}
-                      </div>
+                      {r.model ? (
+                        <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                          {r.model}
+                        </div>
+                      ) : null}
                     </td>
 
-                    <td
-                      className={[
-                        "px-2 py-1.5 text-gray-700 truncate",
-                        !isLast && "border-b",
-                      ].join(" ")}
-                    >
-                      {r.description || "-"}
+                    {/* Description */}
+                    <td className="px-4 py-3 align-top">
+                      <div
+                        className="text-slate-700 line-clamp-1"
+                        title={r.rawDesc || ""}
+                      >
+                        {r.description || "-"}
+                      </div>
+                      {/* 포인트: hover 시 작은 힌트 */}
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
