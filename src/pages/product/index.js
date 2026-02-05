@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
+import { ArrowDownToLine } from "lucide-react";
+import { FileUp } from "lucide-react";
 
 import { getProducts, parseProductXLS, postProducts } from "@/api/product-api";
 
@@ -189,31 +191,70 @@ export default function Product() {
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
   return (
-    <DashboardShell crumbTop="결과분석" crumbCurrent="product">
+    <DashboardShell crumbTop="테이블" crumbCurrent="product">
       {/* 헤더 */}
-      <div className="flex items-center justify-between gap-4 px-3 py-3">
-        <div className="flex justify-between gap-4 items-center">
+      <div className="flex items-start justify-between gap-4 px-3 py-3">
+        {/* 왼쪽: 타이틀/설명 */}
+        <div className="flex gap-4 items-center">
           <h2 className="text-2xl font-bold tracking-tight">Product</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            엑셀 업로드/편집 후 저장할 수 있어요.
+          <p className="mt-1 text-sm text-gray-500">
+            행 추가/ 파일 업로드 후 저장됩니다.
           </p>
+        </div>
+
+        {/* 오른쪽: ✅ 검색창 (위로 올림) */}
+        <div className="relative mr-[10px]">
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPageIndex(0);
+            }}
+            placeholder="검색 (ID/Brand/Name/Description)"
+            className="
+              h-9 w-[300px] rounded-md border bg-white
+              px-3 pr-8 text-[12px] outline-none transition
+
+              hover:border-slate-300
+              focus:ring-2 focus:ring-gray-200
+
+              placeholder:text-[11px]
+              placeholder:text-gray-400
+            "
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setPageIndex(0);
+              }}
+              className="
+          absolute right-2 top-1/2 -translate-y-1/2
+          text-gray-400 transition
+          hover:text-indigo-500 active:text-indigo-700
+        "
+              aria-label="clear"
+            >
+              ✕
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {/* 상단 바 + ✅ 검색 */}
-      <div className="flex items-center justify-between gap-3 px-4">
-        <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
+      <div className="flex items-center justify-between gap-3 px-6">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
           <span>총 {totalRows.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px bg-gray-200" />
+          <span className="mx-1 h-3 w-px bg-gray-400" />
           <span>선택 {selectedCount.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px bg-gray-200" />
+          <span className="mx-1 h-4 w-px" />
 
           <button
             type="button"
             onClick={deleteSelected}
             disabled={selectedCount === 0}
             className={[
-              "h-8 rounded-md border px-3 text-sm transition",
+              "h-9.5 rounded-md border px-5 text-sm transition",
               selectedCount === 0
                 ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                 : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
@@ -224,49 +265,34 @@ export default function Product() {
         </div>
 
         {/* ✅ 오른쪽: 검색 + 버튼들 */}
-        <div className="ml-auto flex items-center gap-2">
-          {/* ✅ 검색창 */}
-          <div className="relative">
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPageIndex(0);
-              }}
-              placeholder="검색 (ID/Brand/Name/Description)"
-              className="h-8 w-[260px] rounded-md border bg-white px-3 pr-8 text-[12px] outline-none transition
-        hover:border-slate-300
-        focus:ring-2 focus:ring-indigo-200"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("");
-                  setPageIndex(0);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 transition
-          hover:text-indigo-500 active:text-indigo-700"
-                aria-label="clear"
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
+        <div className="ml-auto flex items-center gap-4">
+          {/* XLS 업로드 → 기존 유지 */}
+          <button
+            type="button"
+            onClick={uploadHandle}
+            className="
+            flex items-center justify-center gap-2
+            text-slate-700 text-sm font-medium 
+            cursor-pointer
+          "
+          >
+            {/* 아이콘 */}
+            <FileUp size={15} className="" />
 
+            {/* 텍스트 */}
+            <span>XLS 파일</span>
+          </button>
           {/* ✅ 행 추가 → Indigo 포인트 */}
           <button
             type="button"
             onClick={addRow}
-            className="h-8 rounded-md border border-indigo-200 bg-white px-4 text-sm text-indigo-600
+            className="h-9.5 rounded-md border border-gray-200 bg-white px-5 text-sm text-gray-600
       transition cursor-pointer
-      hover:bg-indigo-100 hover:text-indigo-700 font-medium
-      active:bg-gray-100 active:text-indigo-700
-      focus:outline-none focus:ring-1 focus:ring-indigo-500"
+      hover:bg-gray-600 hover:text-white font-medium
+      focus:outline-none focus:ring-1 focus:ring-gray-500"
           >
             + 행 추가
           </button>
-
           <input
             ref={fileRef}
             type="file"
@@ -275,42 +301,40 @@ export default function Product() {
             onChange={fileChangeHandle}
           />
 
-          {/* XLS 업로드 → 기존 유지 */}
-          <button
-            type="button"
-            onClick={uploadHandle}
-            className="h-8 rounded-md border px-3 text-sm bg-white text-gray-700
-      transition cursor-pointer
-      hover:bg-green-700"
-          >
-            XLS 업로드
-          </button>
-
           {/* ✅ 저장 → Indigo 메인 버튼 */}
           <button
             type="button"
             onClick={saveHandle}
             disabled={!dirty}
             className={`
-    h-8 rounded-md border px-7 text-sm font-medium transition
+    h-9 px-5 rounded-md border
+    flex items-center gap-2 justify-center
+
+    text-sm font-semibold
+    transition-all duration-200
     focus:outline-none
+
     ${
       dirty
         ? `
-        bg-indigo-600 text-white border-indigo-600
-        hover:bg-indigo-500 active:bg-indigo-700
-        cursor-pointer
-        focus:ring-2 focus:ring-indigo-200
-        shadow-sm
-      `
+          bg-indigo-600 text-white border-indigo-600
+          hover:bg-indigo-500
+          active:bg-indigo-700
+          active:scale-[0.97]
+
+          cursor-pointer
+          shadow-sm
+          focus:ring-2 focus:ring-indigo-200
+        `
         : `
-        bg-slate-200 text-slate-400 border-slate-200
-        cursor-not-allowed
-      `
+          bg-indigo-50 text-indigo-300 border-indigo-100
+          cursor-not-allowed
+        `
     }
   `}
           >
-            저장
+            <ArrowDownToLine size={16} className="shrink-0" />
+            <span>저장</span>
           </button>
         </div>
       </div>
@@ -319,10 +343,11 @@ export default function Product() {
       <div className="px-4 pt-4">
         {/* ✅ 바깥 카드 */}
         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
-          {/* ✅ 스크롤 영역 */}
+          {/*  */}
           <div className="h-full overflow-auto">
             <table className="w-full border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10 bg-indigo-700 text-white">
+              {/* 표 헤더 */}
+              <thead className="sticky top-0 z-10 bg-gray-600 text-white">
                 <tr className="text-left text-sm">
                   <th className="w-[44px] border-b border-slate-200 px-3 py-3">
                     <div className="flex justify-center">
@@ -365,7 +390,7 @@ export default function Product() {
                   return (
                     <tr
                       key={row._rid}
-                      className="transition-colors hover:bg-slate-200"
+                      className="transition-colors hover:bg-gray-200"
                     >
                       {/* 체크박스 */}
                       <td className="border-b border-slate-100 px-3 py-2">
@@ -389,10 +414,10 @@ export default function Product() {
                             updateCell(row._rid, "id", e.target.value)
                           }
                           className="
-       h-9 w-full rounded-md border px-3
+              h-9 w-full rounded-md border px-3
               bg-white text-sm outline-none transition
-              hover:border-indigo-500
-              focus:ring-1 focus:ring-indigo-500
+              hover:border-gray-300
+              focus:ring-2 focus:ring-gray-400
             "
                           placeholder="Id"
                         />
@@ -406,10 +431,10 @@ export default function Product() {
                             updateCell(row._rid, "brand", e.target.value)
                           }
                           className="
-               h-9 w-full rounded-md border px-3
+                h-9 w-full rounded-md border px-3
               bg-white text-sm outline-none transition
-              hover:border-indigo-500
-              focus:ring-1 focus:ring-indigo-500
+              hover:border-gray-300
+              focus:ring-2 focus:ring-gray-400
             "
                           placeholder="Brand"
                         />
@@ -423,10 +448,10 @@ export default function Product() {
                             updateCell(row._rid, "name", e.target.value)
                           }
                           className="
-              h-9 w-full rounded-md border px-3
+                 h-9 w-full rounded-md border px-3
               bg-white text-sm outline-none transition
-              hover:border-indigo-500
-              focus:ring-1 focus:ring-indigo-500
+              hover:border-gray-300
+              focus:ring-2 focus:ring-gray-400
             "
                           placeholder="Name"
                         />
@@ -440,10 +465,10 @@ export default function Product() {
                             updateCell(row._rid, "description", e.target.value)
                           }
                           className="
-               h-9 w-full rounded-md border px-3
+                 h-9 w-full rounded-md border px-3
               bg-white text-sm outline-none transition
-              hover:border-indigo-500
-              focus:ring-1 focus:ring-indigo-500
+              hover:border-gray-300
+              focus:ring-2 focus:ring-gray-400
             "
                           placeholder="Description"
                         />
@@ -453,35 +478,41 @@ export default function Product() {
                       <td className="border-b border-slate-100 px-3 py-2">
                         <div className="flex items-center">
                           {isUploaded ? (
+                            // ✅ Success (연두 + 초록)
                             <span
                               className="
-                  inline-flex justify-center min-w-[64px]
-                  text-[11px] px-2 py-0.5 rounded-full
-                 bg-emerald-500 text-white
-                  border border-emerald-200
-                "
+          inline-flex justify-center min-w-[64px]
+          text-[11px] px-2 py-0.5 rounded-full
+          bg-green-50 text-green-600
+          border border-green-200
+          font-medium
+        "
                             >
                               Imported
                             </span>
                           ) : isNew ? (
+                            // ✅ Processing (연파랑 + 파랑)
                             <span
                               className="
-                  inline-flex justify-center min-w-[64px]
-                  text-[11px] px-2 py-0.5 rounded-full
-                  bg-indigo-500 text-white
-                  border border-indigo-200
-                "
+          inline-flex justify-center min-w-[64px]
+          text-[11px] px-2 py-0.5 rounded-full
+          bg-indigo-50 text-indigo-600
+          border border-indigo-200
+          font-medium
+        "
                             >
                               New
                             </span>
                           ) : (
+                            // ✅ Default (연회색)
                             <span
                               className="
-                  inline-flex justify-center min-w-[64px]
-                  text-[11px] px-2 py-0.5 rounded-full
-                  bg-gray-100 text-gray-700
-                  border border-gray-200
-                "
+          inline-flex justify-center min-w-[64px]
+          text-[11px] px-2 py-0.5 rounded-full
+          bg-slate-50 text-slate-500
+          border border-slate-200
+          font-medium
+        "
                             >
                               Saved
                             </span>

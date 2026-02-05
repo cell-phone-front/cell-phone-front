@@ -6,28 +6,34 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquareText,
-  Clock,
-  Pin,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
-import { useToken } from "@/stores/account-store";
-import { getCommunities, getCommunityCommentCount } from "@/api/community-api";
+import { useAccount, useToken } from "@/stores/account-store";
+import {
+  getCommunities,
+  getCommunityCommentCount,
+  deleteCommunity,
+} from "@/api/community-api";
 
 function fmtDate(v) {
   if (!v) return "-";
-
   let d = String(v);
   if (d.includes("T")) d = d.split("T")[0];
   else if (d.includes(" ")) d = d.split(" ")[0];
   else d = d.slice(0, 10);
-
   const [y, m, day] = d.split("-");
   return `${y}.${Number(m)}.${Number(day)}`;
 }
 
 export default function Board() {
   const router = useRouter();
+  const { account } = useAccount();
   const { token } = useToken();
+
+  const role = String(account?.role || "").toLowerCase();
+  const canWriteCommunity = role === "planner" || role === "worker";
 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("latest");
@@ -38,20 +44,21 @@ export default function Board() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  // ✅ 공지사항 틀에 맞춘 grid/row 스타일 상수들
-  const GRID = "grid grid-cols-[70px_1fr_120px_140px_80px]"; // 번호/제목/작성자/작성일/댓글
+  // ✅ grid/row 스타일 상수 (중복 제거)
+  const GRID = "grid grid-cols-[80px_1fr_100px_110px_40px_130px]";
   const ROW_BASE =
+    "w-full text-left " +
     GRID +
-    " px-6 h-12 items-center border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer text-sm";
+    " px-6 h-12 items-center border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer";
 
   // 글쓰기
   function goWrite() {
-    router.push("/board/write");
+    router.push("/board-write");
   }
 
   function openPost(id) {
     if (id == null) return;
-    router.push(`/board/${id}`);
+    router.push(`/board-view?id=${id}`);
   }
 
   // 서버 목록 + 댓글 수
@@ -71,7 +78,6 @@ export default function Board() {
           json?.communities || json?.communityList || json?.items || json || [];
         const arr = Array.isArray(list) ? list : [];
 
-        // 댓글 수 병렬 조회
         const ids = arr
           .map((r) => r.id ?? r.communityId ?? r.community_id)
           .filter((v) => v != null);
@@ -138,8 +144,6 @@ export default function Board() {
         "익명";
       const createdAt =
         r.createdAt ?? r.created_at ?? r.createdDate ?? r.createdDateTime ?? "";
-      const views = r.views ?? r.viewCount ?? 0;
-
       const comments =
         r.__commentCount ??
         r.comments ??
@@ -147,10 +151,9 @@ export default function Board() {
         r.comment_count ??
         r.commentCnt ??
         0;
-
       const pinned = r.pinned ?? r.isPinned ?? false;
 
-      return { id, title, author, createdAt, views, comments, pinned };
+      return { id, title, author, createdAt, comments, pinned };
     });
 
     const keyword = q.trim().toLowerCase();
@@ -166,9 +169,7 @@ export default function Board() {
     const normal = filtered.filter((r) => !r.pinned);
 
     const sorter = (a, b) => {
-      if (sort === "views") return (b.views || 0) - (a.views || 0);
       if (sort === "comments") return (b.comments || 0) - (a.comments || 0);
-
       const at = Date.parse(a.createdAt || "") || 0;
       const bt = Date.parse(b.createdAt || "") || 0;
       if (bt !== at) return bt - at;
@@ -187,13 +188,35 @@ export default function Board() {
   const start = (safePage - 1) * pageSize;
   const pageRows = rows.slice(start, start + pageSize);
 
-  // pinned는 항상 상단, normal만 페이지네이션 하고 싶으면 아래 방식으로 바꾸면 됨
-  // (지금은 "전체 정렬 후" 페이지네이션이라 pinned도 페이지 영향받음)
+  function onEdit(e, row) {
+    e.stopPropagation();
+    if (row?.id == null) {
+      alert("id가 없어서 수정 페이지로 이동할 수 없어요.");
+      return;
+    }
+    router.push(`/board-write?id=${row.id}`);
+  }
+
+  async function onDelete(e, row) {
+    e.stopPropagation();
+    if (row?.id == null) {
+      alert("id가 없어서 삭제할 수 없어요.");
+      return;
+    }
+    const ok = window.confirm("정말 삭제할까요?");
+    if (!ok) return;
+
+    try {
+      await deleteCommunity(row.id, token);
+    } catch (err) {
+      console.error("[DELETE API ERROR]", err);
+      alert(err?.message || "삭제 실패");
+    }
+  }
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="자유게시판">
       <div className="h-full w-full bg-white rounded-xl overflow-hidden">
-        {/* ✅ 상단 헤더 (공지사항 틀) */}
         <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -208,7 +231,6 @@ export default function Board() {
           </div>
         </div>
 
-        {/* ✅ 툴바 (공지사항 틀) */}
         <div className="px-10 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center justify-between md:justify-end gap-3">
             <div className="text-xs text-neutral-500">
@@ -216,7 +238,6 @@ export default function Board() {
               건
             </div>
 
-            {/* ✅ 검색 input 추가 (공지사항 틀에 자연스럽게 붙임) */}
             <input
               value={q}
               onChange={(e) => {
@@ -237,7 +258,6 @@ export default function Board() {
             >
               <option value="latest">최신순</option>
               <option value="comments">댓글순</option>
-              {/* <option value="views">조회순</option> */}
             </select>
           </div>
 
@@ -252,175 +272,77 @@ export default function Board() {
           </button>
         </div>
 
-        {/* 상태 */}
-        {loading && (
-          <div className="px-10 py-10 text-sm text-neutral-500">
-            불러오는 중...
-          </div>
-        )}
-        {!loading && loadError && (
-          <div className="px-10 py-10 text-sm text-red-600">{loadError}</div>
-        )}
-
-        {/* ✅ 리스트 (공지사항 틀) */}
-        {!loading && !loadError && (
-          <div className="min-h-0">
-            <div className="hidden md:block">
-              <div className="px-10">
-                {/* 헤더 row */}
-                <div
-                  className={
-                    GRID +
-                    " px-6 h-12 items-center bg-neutral-200 text-neutral-700 text-sm font-semibold"
-                  }
-                >
-                  <div className="text-center pr-2">번호</div>
-                  <div className="pl-2">제목</div>
-                  <div className="pl-2">작성자</div>
-                  <div className="pl-2">작성일</div>
-                  <div className="text-right pr-2">댓글</div>
-                </div>
-
-                {pageRows.length === 0 ? (
-                  <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                    게시글이 없어요.
-                  </div>
-                ) : (
-                  pageRows.map((r, idx) => (
-                    <button
-                      key={String(r.id)}
-                      type="button"
-                      onClick={() => openPost(r.id)}
-                      className={ROW_BASE}
-                    >
-                      {/* 번호 */}
-                      <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
-                        {r.pinned ? (
-                          <span className="text-amber-600 font-semibold">
-                            📌
-                          </span>
-                        ) : (
-                          start + idx + 1
-                        )}
-                      </div>
-
-                      {/* 제목 + pinned 뱃지 */}
-                      <div className="min-w-0 pl-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {r.pinned && (
-                            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                              <Pin className="w-3 h-3" />
-                              고정
-                            </span>
-                          )}
-                          <span className="truncate text-sm text-neutral-900 font-medium">
-                            {r.title}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-neutral-700 truncate pl-2">
-                        {r.author}
-                      </div>
-
-                      <div className="text-sm text-neutral-500 truncate pl-2">
-                        {fmtDate(r.createdAt)}
-                      </div>
-
-                      <div className="text-sm text-neutral-600 text-right pr-2">
-                        {r.comments}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* 모바일 (기존 카드 유지, 폰트만 살짝 공지사항 톤으로) */}
-            <div className="md:hidden">
-              {pageRows.length === 0 ? (
-                <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                  게시글이 없어요.
-                </div>
-              ) : (
-                <div className="p-4 space-y-3">
-                  {pageRows.map((r) => (
-                    <button
-                      key={String(r.id)}
-                      type="button"
-                      onClick={() => openPost(r.id)}
-                      className="w-full text-left rounded-lg border border-neutral-200 bg-white p-4 hover:bg-neutral-50 transition"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            {r.pinned && (
-                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
-                                <Pin className="w-3 h-3" />
-                                고정
-                              </span>
-                            )}
-                            <div className="text-sm font-semibold text-neutral-900 truncate">
-                              {r.title}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 grid grid-cols-[110px_1fr_50px] gap-2 items-center pr-1">
-                            <div className="text-sm text-neutral-700 truncate">
-                              {r.author}
-                            </div>
-                            <div className="text-sm text-neutral-500 flex items-center gap-2 min-w-0">
-                              <Clock className="w-4 h-4 text-neutral-300 shrink-0" />
-                              <span className="truncate">
-                                {fmtDate(r.createdAt)}
-                              </span>
-                            </div>
-                            <div className="text-sm text-neutral-600 text-right">
-                              {r.comments}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+        {!loading && pageRows.length === 0 && (
+          <div className="px-5 py-16 text-center text-sm text-neutral-500">
+            게시글이 없어요.
           </div>
         )}
 
-        {/* ✅ 페이지네이션 (공지사항 틀) */}
-        <div className="px-10 py-3 border-neutral-200 flex items-center">
-          <div className="ml-auto flex items-center gap-6">
-            <div className="text-xs text-neutral-500">
-              {safePage} / {pageCount} 페이지
+        {!loading && pageRows.length > 0 && (
+          <div className="px-10">
+            <div
+              className={
+                GRID +
+                " px-6 h-12 items-center bg-neutral-200 text-neutral-700 text-sm font-semibold"
+              }
+            >
+              <div className="text-center pr-2">번호</div>
+              <div className="pl-2">제목</div>
+              <div className="pl-2">작성자</div>
+              <div className="pl-2">작성일</div>
+              <div className="text-right pr-2">댓글</div>
+              <div className="text-center">수정 · 삭제</div>
             </div>
-
-            <div className="flex items-center gap-2">
+            {pageRows.map((r, idx) => (
               <button
+                key={r.id}
                 type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1}
-                className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px]
-                  disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
+                className={ROW_BASE}
+                onClick={() => openPost(r.id)}
               >
-                <ChevronLeft className="w-4 h-4" />
-                이전
+                <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
+                  {start + idx + 1}
+                </div>
+                <div className="min-w-0 pl-2">
+                  <span className="truncate text-sm text-neutral-900 font-medium">
+                    {r.title}
+                  </span>
+                </div>
+                <div className="text-sm text-neutral-700 truncate pl-2">
+                  {r.author}
+                </div>
+                <div className="text-sm text-neutral-500 truncate pl-2">
+                  {fmtDate(r.createdAt)}
+                </div>
+                <div className="text-sm text-neutral-600 text-right pr-2">
+                  {r.comments}
+                </div>
+                <div className="flex items-center justify-center gap-2 pr-2">
+                  {canWriteCommunity ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => onEdit(e, r)}
+                        className="h-8 px-2 text-xs text-gray-400 hover:text-black flex items-center cursor-pointer gap-1"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => onDelete(e, r)}
+                        className="h-8 px-2 text-xs text-gray-400 hover:text-red-600 flex items-center cursor-pointer gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-neutral-400">-</span>
+                  )}
+                </div>
               </button>
-
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={safePage >= pageCount}
-                className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px]
-                  disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
-              >
-                다음
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </DashboardShell>
   );

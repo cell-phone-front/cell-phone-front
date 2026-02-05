@@ -1,14 +1,20 @@
 // src/api/product-api.js
-const serverAddr = "http://192.168.0.30:8080";
+const serverAddr = "http://localhost:8080";
 
 // 생산 대상 전체 조회
-export async function getProducts(token) {
-  return fetch(`${serverAddr}/api/operation/product`, {
+// 생산 대상 전체 조회 + 검색
+export async function getProducts(token, keyword = "") {
+  const url = keyword
+    ? `${serverAddr}/api/operation/product?keyword=${keyword}`
+    : `${serverAddr}/api/operation/product`;
+
+  return fetch(url, {
     headers: {
       Authorization: "Bearer " + token,
     },
   }).then((r) => r.json());
 }
+
 
 // 생산 대상 upsert
 export async function postProducts(products, token) {

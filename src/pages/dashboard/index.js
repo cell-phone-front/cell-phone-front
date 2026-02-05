@@ -1,6 +1,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { DashboardCalendar } from "@/components/dashboard/calendar";
 import DashboardProducts from "@/components/dashboard/products";
+import DashboardNotice from "@/components/dashboard/notice";
 
 export default function Page() {
   return (

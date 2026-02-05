@@ -3,7 +3,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useRouter } from "next/router";
 import { useAccount, useToken } from "@/stores/account-store";
-import { createNotice, getNoticeById, updateNotice } from "@/api/notice-api";
+import {
+  createNotice,
+  getNoticeById,
+  updateNotice,
+  uploadNoticeFiles,
+} from "@/api/notice-api";
+import { ta } from "date-fns/locale";
 
 function canEdit(role) {
   const r = String(role || "").toLowerCase();
@@ -128,23 +134,35 @@ export default function NoticeWrite() {
         content: c,
         // 백이 memberId를 수정에서도 요구하면 isEdit이어도 넣어줘
         memberId: memberId,
-        pinned: pinned ? 1 : 0,
+        isPinned: pinned,
       };
+
+      let targetId = null;
 
       if (isEdit) {
         await updateNotice(noticeId, payload, token);
+        targetId = noticeId;
         alert("수정 완료!");
       } else {
         const createdNotice = await createNotice(payload, token);
-        targetId = createdNotice?.id;
+        targetId = createdNotice?.id ?? null;
         alert("등록 완료!");
       }
 
       if (files.length > 0 && targetId) {
-        await uploadNoticeFiles(noticeId, files, token);
+        try {
+          // debug: 로그 추가
+          // eslint-disable-next-line no-console
+          console.log("[NOTICE WRITE] uploading files", {
+            targetId,
+            filesCount: files.length,
+          });
+          await uploadNoticeFiles(targetId, files, token);
+        } catch (upErr) {
+          console.error("[파일 업로드 중 에러가 발생했습니다.]", upErr);
+        }
       }
 
-      alert("저장 완료!");
       router.push("/notice");
     } catch (err) {
       console.error(err);
