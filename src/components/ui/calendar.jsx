@@ -25,7 +25,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "bg-background group/calendar p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
+        "bg-background group/calendar p-3 overflow-hidden [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className,
@@ -92,7 +92,7 @@ function Calendar({
         ),
         // 추가 week
         week: cn(
-          "flex w-full mt-2 [&>*:first-child_[data-day]]:text-red-500",
+          "flex w-full mt-1 [&>*:first-child_[data-day]]:text-red-500",
           defaultClassNames.week,
         ),
         week_number_header: cn(
@@ -206,6 +206,5 @@ function CalendarDayButton({ className, day, modifiers, children, ...props }) {
     </Button>
   );
 }
-
 
 export { Calendar, CalendarDayButton };

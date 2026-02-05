@@ -15,43 +15,52 @@ import {
 } from "@/components/ui/sidebar";
 
 export default function DashboardShell({
-  crumbTop = "스케쥴",
+  crumbTop = "스케줄",
   crumbCurrent = "",
   children,
 }) {
   return (
     <SidebarProvider className="h-screen pt-14">
       <AppSidebar />
-      {/* // 영역 안나가게 큰틀 */}
-      <SidebarInset className="h-full min-w-0 flex flex-col bg-muted/50">
-        <header className="h-16 shrink-0 flex items-center gap-2 px-4">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
 
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">{crumbTop}</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{crumbCurrent}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+      {/* 전체 배경 + 공통 여백/폭 */}
+      <SidebarInset className="h-full min-w-0 flex flex-col bg-gray-100">
+        {/* 상단 breadcrumb */}
+        <header className="shrink-0 px-6 pt-6">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex items-center gap-2">
+              {/* 트리거: 작게 + 호버 제거 */}
+              <SidebarTrigger className="h-6 w-6 hover:bg-transparent active:bg-transparent" />
+              <Separator
+                orientation="vertical"
+                className="mx-2 data-[orientation=vertical]:h-4"
+              />
+
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="#" className="text-slate-600 text-xs">
+                      {crumbTop}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="text-slate-900 font-medium text-xs">
+                      {crumbCurrent}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
           </div>
         </header>
 
-        {/* 컨텐츠 영역(공통 카드) */}
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-h-0">
-          <div className="h-full w-full rounded-xl overflow-hidden min-h-0">
+        {/* 컨텐츠 공통 영역(대시보드와 동일 여백/폭) */}
+        <main className="flex-1 min-h-0 px-6 pb-6 pt-4">
+          <div className="mx-auto max-w-7xl w-full h-full min-h-0">
             {children}
           </div>
-        </div>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

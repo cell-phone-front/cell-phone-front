@@ -35,3 +35,4 @@ export async function parseOperationXLS(file, token) {
     body: formData,
   }).then((r) => r.json());
 }
+

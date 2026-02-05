@@ -19,6 +19,13 @@ export default function SimulationGanttPage() {
   const [scheduleList, setScheduleList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [raw, setRaw] = useState([]);
+
+  const [tab, setTab] = useState("MACHINE"); // MACHINE | PRODUCT
+
+  // 선택 상태
+  const [pickedKey, setPickedKey] = useState("");
+  const [picked, setPicked] = useState(null); // {machineId, taskId} or {productName, operationName, taskName}
 
   useEffect(() => {
     if (!token || !id) return;

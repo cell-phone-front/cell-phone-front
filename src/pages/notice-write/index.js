@@ -3,7 +3,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useRouter } from "next/router";
 import { useAccount, useToken } from "@/stores/account-store";
-import { createNotice, getNoticeById, updateNotice } from "@/api/notice-api";
+import {
+  createNotice,
+  getNoticeById,
+  updateNotice,
+  uploadNoticeFiles,
+} from "@/api/notice-api";
+import { ta } from "date-fns/locale";
 
 function canEdit(role) {
   const r = String(role || "").toLowerCase();
@@ -21,7 +27,7 @@ export default function NoticeWrite() {
   );
   const allowed = canEdit(role);
 
-  // ✅ query id (수정 모드)
+  //  query id (수정 모드)
   const noticeId = router.query?.id ? String(router.query.id) : null;
   const isEdit = Boolean(noticeId);
 
@@ -33,6 +39,8 @@ export default function NoticeWrite() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState([]);
+  const [existingFiles, setExistingFiles] = useState([]); // 기존 업로드된 파일 표시
+  const [removedAttachments, setRemovedAttachments] = useState([]); // 화면에서 제거된 기존 파일 id/url
   const [pinned, setPinned] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -75,6 +83,38 @@ export default function NoticeWrite() {
           item?.pinnedYn ??
           item?.pinned_yn;
         setPinned(p === true || p === 1 || String(p).toLowerCase() === "y");
+        const rawFiles =
+          item?.attachments ||
+          item?.files ||
+          item?.attachedFiles ||
+          item?.attachmentsList ||
+          [];
+
+        if (Array.isArray(rawFiles) && rawFiles.length > 0) {
+          const norm = rawFiles
+            .map((f) => {
+              if (!f) return null;
+              if (typeof f === "string") {
+                // 그냥 URL만 있는 경우
+                return { id: null, name: f.split("/").pop(), url: f };
+              }
+              // 객체 형태
+              return {
+                id: f.id ?? f.fileId ?? f._id ?? null,
+                name:
+                  f.name ??
+                  f.filename ??
+                  f.originalName ??
+                  f.fileName ??
+                  (f.url ? f.url.split("/").pop() : "파일"),
+                url: f.url ?? f.path ?? f.fileUrl ?? null,
+              };
+            })
+            .filter(Boolean);
+          setExistingFiles(norm);
+        } else {
+          setExistingFiles([]);
+        }
       } catch (e) {
         console.error(e);
         if (alive) setError(e?.message || "공지 상세를 불러오지 못했습니다.");
@@ -128,23 +168,35 @@ export default function NoticeWrite() {
         content: c,
         // 백이 memberId를 수정에서도 요구하면 isEdit이어도 넣어줘
         memberId: memberId,
-        pinned: pinned ? 1 : 0,
+        isPinned: pinned,
       };
+
+      let targetId = null;
 
       if (isEdit) {
         await updateNotice(noticeId, payload, token);
+        targetId = noticeId;
         alert("수정 완료!");
       } else {
         const createdNotice = await createNotice(payload, token);
-        targetId = createdNotice?.id;
+        targetId = createdNotice?.id ?? null;
         alert("등록 완료!");
       }
 
       if (files.length > 0 && targetId) {
-        await uploadNoticeFiles(noticeId, files, token);
+        try {
+          // debug: 로그 추가
+          // eslint-disable-next-line no-console
+          console.log("[NOTICE WRITE] uploading files", {
+            targetId,
+            filesCount: files.length,
+          });
+          await uploadNoticeFiles(targetId, files, token);
+        } catch (upErr) {
+          console.error("[파일 업로드 중 에러가 발생했습니다.]", upErr);
+        }
       }
 
-      alert("저장 완료!");
       router.push("/notice");
     } catch (err) {
       console.error(err);
@@ -213,14 +265,59 @@ export default function NoticeWrite() {
               maxLength={MAX_DESC}
             />
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-700">
-                첨부파일
-              </label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setFiles(Array.from(e.target.files))}
-              />
+              {" "}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  첨부파일
+                </label>
+
+                {existingFiles.length > 0 && (
+                  <div className="mb-2">
+                    <div className="text-xs text-neutral-500 mb-1">
+                      기존 첨부파일
+                    </div>
+                    <ul className="text-sm space-y-1">
+                      {existingFiles.map((f) => (
+                        <li
+                          key={f.id ?? f.url}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <a
+                            href={f.url ?? "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 underline truncate"
+                          >
+                            {f.name}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExistingFiles((prev) =>
+                                prev.filter(
+                                  (x) => (x.id ?? x.url) !== (f.id ?? f.url),
+                                ),
+                              );
+                              setRemovedAttachments((prev) =>
+                                prev.concat(f.id ?? f.url),
+                              );
+                            }}
+                            className="text-xs text-red-500 hover:underline"
+                          >
+                            제거
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setFiles(Array.from(e.target.files))}
+                />
+              </div>
             </div>
             <div className="flex justify-end text-xs text-gray-400">
               {content.length}/{MAX_DESC}자

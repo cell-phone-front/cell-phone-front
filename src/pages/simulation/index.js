@@ -104,12 +104,6 @@ export default function SimulationPage() {
   const account = useAccount((s) => s.account);
   const canEdit = roleOk(account?.role);
 
-  // ✅ [LOG 0] role / token 상태는 여기서부터 계속 봄
-  useEffect(() => {
-    console.log("[SIM] account.role:", account?.role, "canEdit:", canEdit);
-    console.log("[SIM] token exists?:", !!token);
-  }, [account?.role, canEdit, token]);
-
   // products 목록
   const [products, setProducts] = useState([]);
   const [prodLoading, setProdLoading] = useState(false);
@@ -124,7 +118,7 @@ export default function SimulationPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 선택은 id로 (삭제 안되는 문제 해결)
+  // 선택은 id로
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   // 생성 Drawer
@@ -133,7 +127,6 @@ export default function SimulationPage() {
   const TITLE_MAX = 60;
   const DESC_MAX = 255;
 
-  // ✅ newForm: productIds/productNames 복수선택
   const [newForm, setNewForm] = useState({
     title: "",
     description: "",
@@ -144,46 +137,54 @@ export default function SimulationPage() {
     startTime: "09:00",
   });
 
-  // 생성 직후 바로 반영 (커밋 지연 대비 1회 재조회)
   async function refreshWithRetry() {
     await refresh();
     await new Promise((r) => setTimeout(r, 800));
     await refresh();
   }
 
-  // row별 json에서 productId / productName / productCount 채우기
+  function buildStartDateTime(dateStr, timeStr) {
+    const d = (dateStr || "").trim();
+    const t = (timeStr || "00:00").trim();
+    if (!d) return "";
+    return `${d}T${t}:00`;
+  }
+
+  // meta에서 productList 길이를 productCount로 반영
   async function enrichRowsWithMeta(baseRows) {
     const enriched = await Promise.all(
       (baseRows || []).map(async (row) => {
         try {
           const meta = await getSimulationMetaJson(row.id, token);
 
-          // ✅ [LOG 1] meta 구조가 바뀌었는지 확인 (필요할 때만 찍자)
-          // productCount가 0/빈값인 row만 메타 찍어보기
-          const needMetaLog =
-            row.productCount == null || Number(row.productCount) === 0;
+          // ✅ 백 상세 응답 구조가
+          // { simulation: { productList: ["APL..", ...] } }
+          // 또는 { simulation: { simulationProductList: [{product:{id}}...] } }
+          // 둘 다 커버
+          const pList =
+            meta?.simulation?.productList ||
+            meta?.simulation?.productIds ||
+            null;
 
-          const list = meta?.simulation?.simulationProductList || [];
-          const first = list?.[0]?.product || null;
+          const spl = meta?.simulation?.simulationProductList || [];
 
-          const metaProductId = first?.id || "";
-          const metaProductName = first?.name || "";
-          const metaCount = Array.isArray(list) ? list.length : 0;
+          const metaCount = Array.isArray(pList)
+            ? pList.length
+            : Array.isArray(spl)
+              ? spl.length
+              : 0;
 
-          if (needMetaLog) {
-            console.log("[SIM][META] rowId:", row.id);
-            console.log("[SIM][META] metaCount:", metaCount);
-            console.log(
-              "[SIM][META] meta.simulation keys:",
-              Object.keys(meta?.simulation || {}),
-            );
-            console.log("[SIM][META] sample list[0]:", list?.[0] || null);
-          }
+          const firstIdFromSPL = spl?.[0]?.product?.id || "";
+          const firstNameFromSPL = spl?.[0]?.product?.name || "";
 
           return {
             ...row,
-            productId: row.productId || metaProductId,
-            productName: row.productName || metaProductName,
+            productId: row.productId || firstIdFromSPL,
+            productName: row.productName || firstNameFromSPL,
+
+            // ✅ 화면에서 쓰는 productCount는
+            // (1) 목록 응답에 있으면 그거 우선
+            // (2) 없거나 0이면 metaCount로 채움
             productCount:
               row.productCount == null ||
               row.productCount === "" ||
@@ -192,7 +193,7 @@ export default function SimulationPage() {
                 : Number(row.productCount),
           };
         } catch (e) {
-          console.warn("[SIM][META] meta fetch failed rowId:", row.id, e);
+          console.warn("[SIM][META] failed row:", row.id, e);
           return row;
         }
       }),
@@ -209,16 +210,6 @@ export default function SimulationPage() {
       const json = await getSimulations(token);
       const list = json?.simulationScheduleList || [];
 
-      // ✅ [LOG 2] list 응답이 오늘 바뀌었는지 확인
-      console.log("[SIM][LIST] raw keys:", Object.keys(json || {}));
-      console.log(
-        "[SIM][LIST] count:",
-        Array.isArray(list) ? list.length : "not-array",
-      );
-      if (Array.isArray(list) && list.length > 0) {
-        console.log("[SIM][LIST] first row sample:", list[0]);
-      }
-
       const baseRows = (list || []).map((r) => ({
         id: r.id,
         memberName: r.memberName || "-",
@@ -226,7 +217,7 @@ export default function SimulationPage() {
         description: r.description || "",
         productId: r.productId || "",
         productName: r.productName || "",
-        productCount: r.productCount,
+        productCount: r.productCount, // 백이 줄 수도 있고 아닐 수도
         requiredStaff: r.requiredStaff,
         status: r.status || "-",
         simulationStartDate: r.simulationStartDate || "",
@@ -234,18 +225,6 @@ export default function SimulationPage() {
       }));
 
       const enriched = await enrichRowsWithMeta(baseRows);
-
-      // ✅ [LOG 3] 최종 화면에 들어갈 값 확인 (productCount 찍어보기)
-      console.table(
-        enriched.slice(0, 10).map((r) => ({
-          id: r.id,
-          title: r.title,
-          status: r.status,
-          productCount: r.productCount,
-          productId: r.productId,
-          productName: r.productName,
-        })),
-      );
 
       setData(enriched);
       setSelectedIds(new Set());
@@ -278,12 +257,10 @@ export default function SimulationPage() {
       try {
         const json = await getProducts(token);
         const list = json?.productList || [];
-
         const normalized = (list || []).map((p) => ({
           id: p.id,
           name: p.name,
         }));
-
         if (!alive) return;
         setProducts(normalized.filter((x) => x.id));
       } catch (e) {
@@ -368,14 +345,7 @@ export default function SimulationPage() {
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
-  function buildStartDateTime(dateStr, timeStr) {
-    const d = (dateStr || "").trim();
-    const t = (timeStr || "00:00").trim();
-    if (!d) return "";
-    return `${d}T${t}:00`;
-  }
-
-  // ✅ form valid: productIds(복수) 기준 + qty 제거
+  // 폼 valid
   const isFormValid = useMemo(() => {
     const titleOk = newForm.title.trim().length > 0;
     const productOk = (newForm.productIds || []).length > 0;
@@ -391,7 +361,7 @@ export default function SimulationPage() {
     return titleOk && productOk && dateOk && timeOk && staffOk;
   }, [newForm]);
 
-  // ✅ 제품 토글 (복수 선택)
+  // 제품 토글
   const toggleProduct = (p, checked) => {
     const pid = String(p.id);
     const pname = String(p.name || "");
@@ -447,7 +417,8 @@ export default function SimulationPage() {
       return;
     }
 
-    if ((newForm.productIds || []).length === 0) {
+    const selected = (newForm.productIds || []).map(String);
+    if (selected.length === 0) {
       window.alert("시뮬레이션에 사용할 생산대상을 선택해 주세요.");
       return;
     }
@@ -457,39 +428,23 @@ export default function SimulationPage() {
       newForm.startTime,
     );
 
-    // ✅ 호환용: 첫 번째 선택을 productId/productName에도 넣어줌
-    const firstProductId = String(newForm.productIds?.[0] || "").trim();
-    const firstProductName = String(newForm.productNames?.[0] || "").trim();
+    // ✅ requiredStaff null 금지
+    const requiredStaffNum =
+      newForm.requiredStaff === "" ? 0 : Number(newForm.requiredStaff || 0);
 
+    // ✅ 백이 받는 진짜 키: productList
     const payload = {
       title: newForm.title.trim(),
       description: newForm.description || "",
-
-      // legacy/호환
-      productId: firstProductId,
-      productName: firstProductName,
-
-      // 복수 선택 본 payload
-      productIds: (newForm.productIds || []).map((x) => String(x)),
-      productNames: (newForm.productNames || []).map((x) => String(x || "")),
-      products: (newForm.productIds || []).map((id, i) => ({
-        productId: String(id),
-        productName: String(newForm.productNames?.[i] || ""),
-      })),
-
-      // 추가: 선택된 제품 수
-      productCount: (newForm.productIds || []).length,
-
-      requiredStaff:
-        newForm.requiredStaff === ""
-          ? null
-          : Number(newForm.requiredStaff || 0),
-
+      productList: selected, // ✅ 핵심
+      requiredStaff: Number.isNaN(requiredStaffNum) ? 0 : requiredStaffNum,
       simulationStartDate: newForm.startDate,
-      startDateTime,
+      workTime: 0,
+      startDateTime, // 백이 안 받으면 무시될 뿐이라 OK
     };
 
-    // ✅ [LOG 4] 저장 payload 확인 (productCount/ids 들어가는지)
+    console.log("[SIM][CREATE] productList:", payload.productList);
+    console.log("[SIM][CREATE] productCount:", payload.productList.length);
     console.log("[SIM][CREATE] payload:", payload);
 
     try {
@@ -531,7 +486,6 @@ export default function SimulationPage() {
     }
   }
 
-  // ✅ 삭제: Promise.allSettled로 "어떤 id가 왜 실패했는지" 찍기
   async function deleteSelectedHandle() {
     if (!canEdit) return;
     if (selectedIds.size === 0) return;
@@ -541,34 +495,27 @@ export default function SimulationPage() {
 
     if (!confirm(`선택한 ${ids.length}건을 삭제하시겠습니까?`)) return;
 
-    try {
-      const results = await Promise.allSettled(
-        ids.map(async (id) => {
-          // 각 delete 호출 결과를 개별 로그로 확인
-          console.log("[SIM][DELETE] try id:", id);
-          const res = await deleteSimulation(id, token);
-          console.log("[SIM][DELETE] success id:", id, "res:", res);
-          return res;
-        }),
-      );
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        console.log("[SIM][DELETE] try id:", id);
+        const res = await deleteSimulation(id, token);
+        console.log("[SIM][DELETE] success id:", id, "res:", res);
+        return res;
+      }),
+    );
 
-      const failed = results
-        .map((r, i) => ({ r, id: ids[i] }))
-        .filter((x) => x.r.status === "rejected");
+    const failed = results
+      .map((r, i) => ({ r, id: ids[i] }))
+      .filter((x) => x.r.status === "rejected");
 
-      if (failed.length) {
-        console.error("[SIM][DELETE] failed items:", failed);
-        window.alert(`삭제 실패 ${failed.length}건 (콘솔 확인)`);
-      } else {
-        window.alert("삭제 완료");
-      }
-
-      await refreshWithRetry();
-    } catch (e) {
-      console.error("[SIM][DELETE] unexpected error:", e);
-      window.alert(e?.message || "삭제 실패");
-      await refreshWithRetry();
+    if (failed.length) {
+      console.error("[SIM][DELETE] failed items:", failed);
+      window.alert(`삭제 실패 ${failed.length}건 (콘솔 확인)`);
+    } else {
+      window.alert("삭제 완료");
     }
+
+    await refreshWithRetry();
   }
 
   return (
@@ -831,7 +778,7 @@ export default function SimulationPage() {
             </DrawerHeader>
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-              {/* Title + count */}
+              {/* Title */}
               <div>
                 <div className="flex items-end justify-between mb-1">
                   <div className="text-xs text-gray-500">Title</div>
@@ -851,7 +798,7 @@ export default function SimulationPage() {
                 />
               </div>
 
-              {/* Description + count */}
+              {/* Description */}
               <div>
                 <div className="flex items-end justify-between mb-1">
                   <div className="text-xs text-gray-500">Description</div>
@@ -871,10 +818,10 @@ export default function SimulationPage() {
                 />
               </div>
 
-              {/* Product Id - Name */}
+              {/* Product list */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-gray-500">Product Id - Name</div>
+                  <div className="text-xs text-gray-500">Product List</div>
 
                   {(newForm.productIds || []).length > 0 && (
                     <button
@@ -923,7 +870,6 @@ export default function SimulationPage() {
                               }
                             />
 
-                            {/* 한줄 */}
                             <div className="min-w-0 flex-1 text-[12px] leading-none">
                               <span className="font-mono text-gray-900">
                                 {pid}
@@ -945,7 +891,7 @@ export default function SimulationPage() {
                 ) : null}
               </div>
 
-              {/* Selected Product (복수 표시) */}
+              {/* Selected */}
               <div>
                 <div className="text-xs text-gray-500 mb-2">
                   Selected Product
@@ -960,28 +906,25 @@ export default function SimulationPage() {
                   </div>
                 ) : (
                   <div className="rounded-md border bg-gray-50 p-2 flex flex-wrap gap-2">
-                    {(newForm.productIds || []).map((id, idx) => {
-                      const name = String(newForm.productNames?.[idx] || "");
-                      return (
-                        <div
-                          key={String(id)}
-                          className="inline-flex items-center gap-2 rounded-md border bg-white px-2 py-1"
-                        >
-                          <div className="text-[12px] font-mono text-gray-800">
-                            {String(id)}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => removeOneSelected(id)}
-                            className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-gray-100"
-                            title="삭제"
-                          >
-                            <X className="h-3.5 w-3.5 text-gray-500" />
-                          </button>
+                    {(newForm.productIds || []).map((id) => (
+                      <div
+                        key={String(id)}
+                        className="inline-flex items-center gap-2 rounded-md border bg-white px-2 py-1"
+                      >
+                        <div className="text-[12px] font-mono text-gray-800">
+                          {String(id)}
                         </div>
-                      );
-                    })}
+
+                        <button
+                          type="button"
+                          onClick={() => removeOneSelected(id)}
+                          className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-gray-100"
+                          title="삭제"
+                        >
+                          <X className="h-3.5 w-3.5 text-gray-500" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
