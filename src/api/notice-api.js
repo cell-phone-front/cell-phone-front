@@ -99,62 +99,26 @@ export async function parseNoticeXLS(file, token) {
 }
 
 // (7) 공지사항 파일 첨부
+// (7) 공지사항 파일 첨부
 export const uploadNoticeFiles = async (noticeId, files = [], token) => {
-  if (!noticeId) throw new Error("noticeId is required for upload");
+  if (!noticeId) throw new Error("noticeId is required");
+  if (!files || files.length === 0) return;
 
-  // 후보 엔드포인트들: 백 구현에 따라 attachment(s) 등으로 갈릴 수 있으니 순차 시도
-  const endpoints = [
+  const formData = new FormData();
+
+  files.forEach((file) => {
+    formData.append("files", file); // 🔥 반드시 "files"
+  });
+
+  const res = await axios.post(
     `${serverAddr}/api/notice/${noticeId}/attachment`,
-    `${serverAddr}/api/notice/${noticeId}/attachments`,
-    `${serverAddr}/api/notice/attachment/${noticeId}`,
-  ];
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
 
-  const fieldNames = ["files", "file", "attachments", "attachment"];
-
-  let lastErr = null;
-
-  // 시도 루프: 각 엔드포인트마다 여러 필드 이름으로 FormData를 만들어서 전송 시도
-  for (const url of endpoints) {
-    for (const field of fieldNames) {
-      try {
-        const fd = new FormData();
-        // 여러 파일일 수도 있으니 배열로 append
-        files.forEach((file) => fd.append(field, file));
-
-        // axios will set proper multipart headers automatically when FormData is passed
-        const res = await axios.post(url, fd, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        // 성공 시 리턴
-        return res.data;
-      } catch (err) {
-        lastErr = err;
-        const status = err?.response?.status;
-        // 404이면 경로가 없다는 의미 -> 다음 엔드포인트로
-        if (status === 404) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[uploadNoticeFiles] 404 for ${url} (field=${field}), trying next candidate`,
-          );
-          // break inner loop to try next endpoint? No, try other field names first
-          continue;
-        }
-        // 400 등은 필드명 문제일 수 있으므로 다음 field로 계속 시도
-        if (status >= 400 && status < 500) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[uploadNoticeFiles] ${status} for ${url} (field=${field}), trying next field`,
-          );
-          continue;
-        }
-        // 그 외(서버 에러 등)은 바로 throw
-        throw err;
-      }
-    }
-  }
-
-  // 모든 후보 실패
-  throw lastErr || new Error("file upload failed");
+  return res.data;
 };
