@@ -56,8 +56,8 @@ export async function getSimulationMetaJson(simulationId, token) {
 }
 
 // (6) 작업 지시(스케줄) 조회
-export async function getSimulationSchedule(simulationScheduleId, token) {
-  return fetch(`${serverAddr}/api/simulation/${simulationScheduleId}`, {
+export async function getSimulationSchedule(simulationId, token) {
+  return fetch(`${serverAddr}/api/simulation/${simulationId}`, {
     method: "GET",
     headers: {
       Authorization: "Bearer " + token,

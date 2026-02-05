@@ -1,4 +1,4 @@
-// src/components/gantt-test/gantt-utils.js
+// src/components/gantt/gantt-utils.js
 
 export const pad2 = (n) => String(n).padStart(2, "0");
 

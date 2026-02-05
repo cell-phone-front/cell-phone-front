@@ -1,5 +1,5 @@
 // src/api/product-api.js
-const serverAddr = "http://192.168.0.30:8080";
+const serverAddr = "http://localhost:8080";
 
 // 생산 대상 전체 조회
 export async function getProducts(token) {
