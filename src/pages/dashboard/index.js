@@ -7,8 +7,8 @@ export default function Page() {
   return (
     <DashboardShell crumbTop="스케줄" crumbCurrent="대시보드">
       {/* 전체 배경: 밝은 회색 + 여백 */}
-      <div className="h-full min-h-0 px-6 py-6">
-        <div className="mx-auto flex h-full min-h-0 max-w-7xl flex-col gap-6">
+      <div className="h-full min-h-0 px-6 py-3">
+        <div className="mx-auto flex h-full min-h-0 max-w-8xl flex-col gap-6">
           {/* 헤더 */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

@@ -2,7 +2,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp } from "lucide-react";
+import { ArrowDownToLine, FileUp, Search } from "lucide-react";
 import { getMachine, postMachine, parseMachineXLS } from "@/api/machine-api";
 
 /* ===============================
@@ -30,7 +30,7 @@ export default function MachinePage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(10);
 
-  // ✅ Operation 스타일처럼 검색창
+  //  검색창
   const [query, setQuery] = useState("");
 
   const fileRef = useRef(null);
@@ -40,7 +40,7 @@ export default function MachinePage() {
 
     let alive = true;
 
-    getMachine(token, query) // ✅ 여기!
+    getMachine(token, query) //
       .then((json) => {
         if (!alive) return;
 
@@ -195,32 +195,41 @@ export default function MachinePage() {
 
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="machine">
-      {/* ✅ 헤더 (Operation 스타일) */}
-      <div className="flex items-start justify-between gap-4 px-3 py-3">
-        <div className="flex gap-4 items-center">
-          <h2 className="text-2xl font-bold tracking-tight">Machine</h2>
-          <p className="mt-1 text-sm text-gray-500">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between px-4 py-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-3xl font-bold tracking-tight">Machine</h2>
+          <p className="text-sm text-gray-500">
             행 추가/ 파일 업로드 후 저장됩니다.
           </p>
         </div>
 
-        {/* ✅ 검색창 (Operation과 동일 스타일) */}
-        <div className="relative mr-[10px]">
+        {/*  검색창  */}
+        <div className="relative">
+          {/* 돋보기 */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+          {/* 입력창 */}
           <input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setPageIndex(0);
             }}
-            placeholder="검색 (Machine/Name/Description)"
+            placeholder="검색 (ID/Name/Description)"
             className="
-              h-9 w-[300px] rounded-md border bg-white
-              px-3 pr-8 text-[12px] outline-none transition
-              hover:border-slate-300
-              focus:ring-2 focus:ring-gray-200
-              placeholder:text-[11px]
-              placeholder:text-gray-400
-            "
+      h-10 w-[400px] rounded-md border bg-white
+
+      pl-9 pr-3  
+      text-[12px]
+
+      outline-none transition
+      hover:border-slate-300
+      focus:ring-2 focus:ring-gray-200
+
+      placeholder:text-[11px]
+      placeholder:text-gray-400
+    "
           />
           {query ? (
             <button
@@ -242,20 +251,21 @@ export default function MachinePage() {
         </div>
       </div>
 
-      {/* ✅ 상단 바 (Operation 스타일) */}
-      <div className="flex items-center justify-between gap-3 px-6">
+      {/* ✅ 상단 바 */}
+      <div className="flex items-center justify-between px-4">
+        {/* 왼쪽 */}
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
           <span>총 {totalRows.toLocaleString()}건</span>
           <span className="mx-1 h-3 w-px bg-gray-400" />
           <span>선택 {selectedCount.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px" />
+          <span className="mx-1 h-3 w-px bg-gray-300" />
 
           <button
             type="button"
             onClick={deleteSelected}
             disabled={selectedCount === 0}
             className={[
-              "h-9.5 rounded-md border px-5 text-sm transition",
+              "h-9 rounded-md border px-5 text-sm transition",
               selectedCount === 0
                 ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                 : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
@@ -269,16 +279,12 @@ export default function MachinePage() {
           ) : null}
         </div>
 
-        {/* ✅ 오른쪽 버튼들 (Operation 스타일) */}
-        <div className="ml-auto flex items-center gap-4">
+        {/* 오른쪽 버튼들 */}
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={uploadHandle}
-            className="
-              flex items-center justify-center gap-2
-              text-slate-700 text-sm font-medium
-              cursor-pointer
-            "
+            className="flex items-center justify-center gap-2 text-slate-700 text-sm font-medium cursor-pointer"
           >
             <FileUp size={15} />
             <span>XLS 파일</span>
@@ -296,11 +302,11 @@ export default function MachinePage() {
             type="button"
             onClick={addRow}
             className="
-              h-9.5 rounded-md border border-gray-200 bg-white px-5 text-sm text-gray-600
-              transition cursor-pointer font-medium
-              hover:bg-gray-600 hover:text-white
-              focus:outline-none focus:ring-1 focus:ring-gray-500
-            "
+        h-9 rounded-md border border-indigo-200 bg-white px-5 text-sm text-indigo-600
+        transition cursor-pointer font-medium
+        hover:bg-indigo-800 hover:text-white
+        focus:outline-none focus:ring-1 focus:ring-indigo-800
+      "
           >
             + 행 추가
           </button>
@@ -310,26 +316,27 @@ export default function MachinePage() {
             onClick={saveHandle}
             disabled={!dirty}
             className={`
-              h-9 px-5 rounded-md border
-              flex items-center gap-2 justify-center
-              text-sm font-semibold
-              transition-all duration-200
-              focus:outline-none
-              ${
-                dirty
-                  ? `
-                    bg-indigo-600 text-white border-indigo-600
-                    hover:bg-indigo-500 active:bg-indigo-700
-                    active:scale-[0.97]
-                    cursor-pointer shadow-sm
-                    focus:ring-2 focus:ring-indigo-200
-                  `
-                  : `
-                    bg-indigo-50 text-indigo-300 border-indigo-100
-                    cursor-not-allowed
-                  `
-              }
-            `}
+        h-9 px-5 rounded-md border
+        flex items-center gap-2 justify-center
+        text-sm font-semibold
+        transition-all duration-200
+        focus:outline-none
+        ${
+          dirty
+            ? `
+              bg-indigo-900 text-white border-indigo-800
+              hover:bg-indigo-700
+              active:bg-indigo-950
+              active:scale-[0.96]
+              cursor-pointer shadow-md
+              focus:ring-2 focus:ring-indigo-300
+            `
+            : `
+              bg-indigo-50 text-indigo-300 border-indigo-100
+              cursor-not-allowed
+            `
+        }
+      `}
           >
             <ArrowDownToLine size={16} className="shrink-0" />
             <span>저장</span>
@@ -337,13 +344,13 @@ export default function MachinePage() {
         </div>
       </div>
 
-      {/* ✅ 테이블 카드 (Operation 스타일) */}
-      <div className="px-4 pt-4">
+      {/* ✅ 테이블 카드 */}
+      <div className="px-3 pt-3">
         {/* 표라운드 */}
         <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
           <div className="h-full overflow-auto">
             <table className="w-full border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10 bg-gray-600 text-white">
+              <thead className="sticky top-0 z-10 bg-indigo-900 text-white">
                 <tr className="text-left text-sm">
                   <th className="w-[44px] border-b border-slate-200 px-3 py-3">
                     <div className="flex justify-center">
@@ -466,7 +473,7 @@ export default function MachinePage() {
                               Imported
                             </span>
                           ) : isNew ? (
-                            <span className="inline-flex justify-center min-w-[64px] text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 font-medium">
+                            <span className="inline-flex justify-center min-w-[64px] text-[11px] px-2 py-0.5 rounded-full bg-indigo-600 text-white border border-indigo-200 font-medium">
                               New
                             </span>
                           ) : (
@@ -505,7 +512,7 @@ export default function MachinePage() {
           </div>
         </div>
 
-        {/* ✅ 페이지네이션 (Operation 스타일) */}
+        {/* 페이지네이션 */}
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
           <button
             type="button"

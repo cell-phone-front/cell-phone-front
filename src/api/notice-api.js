@@ -5,12 +5,16 @@ const serverAddr = "http://localhost:8080";
 /* =========================
  * (1) 공지 목록 조회
  * ========================= */
-export async function getNotices(token) {
-  const res = await fetch(`${serverAddr}/api/notice`, {
-    method: "GET",
-    headers: { Authorization: "Bearer " + token },
-  });
-  return res.json();
+export async function getNotices(token, keyword = "") {
+  const url = keyword
+    ? `${serverAddr}/api/notice?keyword=${encodeURIComponent(keyword)}`
+    : `${serverAddr}/api/notice`;
+
+  return fetch(url, {
+    headers: {
+      Authorization: "Bearer " + token,
+    },
+  }).then((r) => r.json());
 }
 
 /* =========================

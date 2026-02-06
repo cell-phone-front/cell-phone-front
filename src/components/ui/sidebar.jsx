@@ -240,14 +240,16 @@ function SidebarTrigger({ className, onClick, ...props }) {
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-6", className)}
+      className={cn("size-6", className)} // ✅ 버튼 크기
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      {/* ✅ 아이콘 크기도 같이 줄임 */}
+      <PanelLeftIcon className="w-3 h-3" />
+
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
@@ -436,7 +438,7 @@ const sidebarMenuButtonVariants = cva(
     // ✅ Hover
     "hover:bg-gray-100 hover:text-indigo-500 " +
     // ✅ Active (클릭 중)
-    "active:bg-gray-100 active:text-indigo-700 " + 
+    "active:bg-gray-100 active:text-indigo-700 " +
     // ✅ Selected (현재 페이지)
     "data-[active=true]:bg-gray-100 data-[active=true]:font-medium data-[active=true]:text-indigo-700 " +
     // ✅ Open 상태 hover

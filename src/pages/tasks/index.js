@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp, X } from "lucide-react";
+import { ArrowDownToLine, FileUp, Search, X } from "lucide-react";
 import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
 
 /* ===============================
@@ -441,21 +441,30 @@ export default function TasksPage() {
         </div>
 
         <div className="relative mr-[10px]">
+          {/* 돋보기 */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+          {/* 입력창 */}
           <input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setPageIndex(0);
             }}
-            placeholder="검색 (Task/Operation/Machine/Name/Desc)"
+            placeholder="검색 (ID/Name/Description)"
             className="
-              h-9 w-[300px] rounded-md border bg-white
-              px-3 pr-8 text-[12px] outline-none transition
-              hover:border-slate-300
-              focus:ring-2 focus:ring-gray-200
-              placeholder:text-[11px]
-              placeholder:text-gray-400
-            "
+      h-9 w-[300px] rounded-md border bg-white
+
+      pl-9 pr-3   /* ✅ 왼쪽 패딩 늘림 */
+      text-[12px]
+
+      outline-none transition
+      hover:border-slate-300
+      focus:ring-2 focus:ring-gray-200
+
+      placeholder:text-[11px]
+      placeholder:text-gray-400
+    "
           />
           {query ? (
             <button
@@ -571,9 +580,9 @@ export default function TasksPage() {
       <div className="px-4 pt-4">
         {/* 전체표 라운드 */}
         <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
-          {/* ✅ 스크롤은 세로만(가로 스크롤 최소화) */}
+          {/*  스크롤은 세로만(가로 스크롤 최소화) */}
           <div className="relative overflow-x-hidden">
-            {/* ✅ 모달처럼 겹쳐서 뜨는 1줄 상세 */}
+            {/*  모달처럼 겹쳐서 뜨는 1줄 상세 */}
             <RowDetailModalLine
               open={!!openRid}
               onClose={() => setOpenRid(null)}

@@ -1,5 +1,5 @@
 // pages/notice/index.js
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/router";
 import {
   Plus,
@@ -9,6 +9,7 @@ import {
   Pin,
   Pencil,
   Trash2,
+  Search,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
@@ -16,7 +17,7 @@ import {
   getNotices,
   getNoticeById,
   setNoticePin,
-  deleteNotice, // ✅ 추가
+  deleteNotice,
 } from "@/api/notice-api";
 
 function fmtDate(v) {
@@ -70,8 +71,6 @@ function getRowKey(n, idx) {
   return `notice-x-${n?.createdAt ?? "noDate"}-${n?.title ?? "noTitle"}-${idx}`;
 }
 
-// 추가 또는 교체할 내용 (파일 상단 helper 함수 섹션에 넣으세요)
-
 function normalizeFiles(n) {
   const raw =
     n?.attachments ||
@@ -108,7 +107,7 @@ function normalizeRow(n) {
     ...n,
     id: getId(n),
     pinned: isPinned(n),
-    files: normalizeFiles(n), // <-- 항상 files 배열을 포함
+    files: normalizeFiles(n),
   };
 }
 
@@ -154,7 +153,6 @@ function NoticeModal({ open, onClose, notice }) {
   if (!open) return null;
   const stop = (e) => e.stopPropagation();
 
-  // 안전한 파일 정규화(모달에서 직접 사용)
   const normalizeFilesForModal = (n) => {
     const raw =
       n?.files ??
@@ -234,7 +232,6 @@ function NoticeModal({ open, onClose, notice }) {
             {notice?.content || notice?.description || "내용이 없습니다."}
           </div>
 
-          {/* 첨부파일 표시 */}
           {files.length > 0 && (
             <div className="mt-6">
               <div className="text-sm text-neutral-500 mb-2">첨부파일</div>
@@ -314,6 +311,8 @@ function NoticeModal({ open, onClose, notice }) {
 }
 
 export default function Notice() {
+  const [query, setQuery] = useState("");
+
   const router = useRouter();
   const { account } = useAccount();
   const { token } = useToken();
@@ -351,10 +350,9 @@ export default function Notice() {
   const [selected, setSelected] = React.useState(null);
 
   async function openModal(row) {
-    // ✅ 리스트에서 조회수 먼저 +1
     setNotices((prev) =>
       prev.map((n) =>
-        n.id === row.id ? { ...n, views: (getViews(n) || 0) + 1 } : n,
+        n.id === row.id ? { ...n, views: (Number(getViews(n)) || 0) + 1 } : n,
       ),
     );
 
@@ -365,17 +363,12 @@ export default function Notice() {
 
     try {
       const detail = await getNoticeById(row.id, token);
-      console.log("[NOTICE DETAIL RAW]", detail); // 디버그: 서버 응답 전체
       const item = detail?.notice || detail?.data || detail;
-      // 정규화된 항목
       const normalized = normalizeRow(item || {});
-      console.log("[NORMALIZED ITEM]", normalized); // 디버그: 정규화 결과
 
-      // 만약 상세(item)가 파일 정보를 안주면(빈 배열) 기존 row의 files를 보존
       const merged = {
         ...row,
         ...normalized,
-        // prefer normalized.files if present and non-empty, otherwise keep row.files
         files:
           Array.isArray(normalized.files) && normalized.files.length > 0
             ? normalized.files
@@ -397,9 +390,7 @@ export default function Notice() {
     e.stopPropagation();
 
     if (row?.id == null) {
-      alert(
-        "현재 목록에 id가 없어서 핀 고정이 불가능해요. (백엔드에서 id 내려줘야 함)",
-      );
+      alert("현재 목록에 id가 없어서 핀 고정이 불가능합니다.");
       return;
     }
 
@@ -414,25 +405,19 @@ export default function Notice() {
     }
   }
 
-  // ✅ 수정
   function onEdit(e, row) {
     e.stopPropagation();
     if (row?.id == null) {
-      alert("id가 없어서 수정 페이지로 이동할 수 없어요.");
+      alert("id가 없어서 수정 페이지로 이동할 수 없습니다.");
       return;
     }
-    // 추천: pages/notice/[id].js 만들어서 수정/상세 겸용
     router.push(`/notice-write?id=${row.id}`);
-
-    // 만약 write 페이지로만 처리하고 싶으면:
-    // router.push(`/notice-write?id=${row.id}`);
   }
 
-  // ✅ 삭제
   async function onDelete(e, row) {
     e.stopPropagation();
     if (row?.id == null) {
-      alert("id가 없어서 삭제할 수 없어요.");
+      alert("id가 없어서 삭제할 수 없습니다.");
       return;
     }
 
@@ -498,29 +483,77 @@ export default function Notice() {
     router.push("/notice-write");
   }
 
-  // ✅ 관리(수정/삭제) 컬럼 추가
-  const GRID = "grid grid-cols-[80px_1fr_100px_110px_40px_130px]";
+  const GRID = "grid grid-cols-[80px_1fr_100px_120px_50px_120px]";
+
+  const TABLE_WRAP =
+    "w-full bg-white border-t-2 border-b-2 border-indigo-500 overflow-hidden";
+
   const ROW_BASE =
     "w-full text-left " +
     GRID +
-    " px-6 h-12 items-center border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer";
+    " px-6 h-12 items-center " +
+    "border-b border-slate-100 " +
+    "hover:bg-slate-50 transition cursor-pointer group";
+
+  const ROW_PINNED = "bg-indigo-50/30";
+
+  const CELL_TITLE =
+    "min-w-0 truncate text-[14px] font-semibold text-slate-700 " +
+    "group-hover:text-indigo-600 transition-colors";
+
+  const CELL_TEXT = "truncate text-[12px] text-slate-700 whitespace-nowrap";
+  const CELL_DATE = "truncate text-[12px] text-slate-600 whitespace-nowrap";
+
+  // 조회(눈+숫자) 칸: 항상 같은 사이즈/정렬
+  const VIEW_CELL =
+    "flex items-center justify-start gap-1 pl-2 text-[12px] text-slate-700 whitespace-nowrap";
+
+  // 관리(수정/삭제) 칸: 오른쪽 끝까지 붙이기
+  const ACTION_CELL = "flex items-center justify-end gap-2 pr-2";
 
   const total = pinnedNotices.length + normalNotices.length;
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="공지사항">
-      <div className="h-full w-full bg-white rounded-xl overflow-hidden">
+      {/* */}
+      <div className="h-full w-full overflow-hidden">
         <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
+          {/* 왼쪽: 제목 */}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Pin className="w-5 h-5 text-neutral-600" />
-              <h1 className="text-2xl font-semibold text-neutral-900">
+              <Pin className="w-5 h-5 text-indigo-600" />
+              <div className="text-2xl font-semibold tracking-tight text-slate-900">
                 공지사항
-              </h1>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-sm text-slate-500">
               최신 공지/중요 공지를 확인하세요.
             </p>
+          </div>
+
+          {/* 오른쪽: 검색창 */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+                placeholder="제목 검색"
+                className="
+      h-9 w-[300px] rounded-md border border-slate-200
+      pl-9 pr-3 text-sm
+      outline-none
+      transition
+      focus:border-indigo-500
+      focus:ring-2 focus:ring-indigo-100 placeholder:text-[12px]
+    "
+              />
+            </div>
           </div>
         </div>
 
@@ -533,7 +566,21 @@ export default function Notice() {
             <button
               type="button"
               onClick={goWrite}
-              className="h-8 px-3 rounded-md bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 active:scale-[0.99] flex items-center gap-2 cursor-pointer"
+              className={`
+    h-9 px-5 rounded-md border
+    flex items-center gap-2 justify-center
+    text-sm font-semibold
+    transition-all duration-200
+    focus:outline-none
+
+    bg-indigo-600 text-white border-indigo-600
+    hover:bg-indigo-500
+    active:bg-indigo-700
+    active:scale-[0.97]
+    cursor-pointer
+    shadow-sm
+    focus:ring-2 focus:ring-indigo-200
+  `}
             >
               <Plus className="w-4 h-4" />
               공지 작성
@@ -552,132 +599,61 @@ export default function Notice() {
 
         {!loading && !error && (
           <div className="px-10">
-            <div
-              className={
-                GRID +
-                " px-6 h-12 items-center bg-neutral-200 text-neutral-700 text-sm font-medium"
-              }
-            >
-              <div className="text-center pr-2">번호</div>
-              <div className="pl-2">제목</div>
-              <div className="pl-2">작성자</div>
-              <div className="pl-2">작성일</div>
-              <div className="text-right pr-2">조회</div>
-              <div className="text-center">수정 · 삭제</div>
-            </div>
-
-            {/* pinned */}
-            {pinnedNotices.map((r, idx) => (
-              <button
-                key={getRowKey(r, idx)}
-                type="button"
-                onClick={() => openModal(r)}
-                className={ROW_BASE}
-              >
-                <div className="flex items-center justify-center pr-2">
-                  {r.id != null && (
-                    <button
-                      type="button"
-                      onClick={(e) => onTogglePin(e, r)}
-                      className="h-7 w-7 "
-                      title="상단 고정 해제"
-                    >
-                      📌
-                    </button>
-                  )}
-                </div>
-
-                <div className="min-w-0 pl-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      고정
-                    </span>
-
-                    <span className="truncate text-sm text-neutral-900 font-medium">
-                      {r.title}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-sm text-neutral-700 truncate pl-2">
-                  {getWriter(r)}
-                </div>
-                <div className="text-sm text-neutral-500 truncate pl-2">
-                  {fmtDate(r.createdAt || r.date)}
-                </div>
-                <div className="text-sm text-neutral-600 text-right pr-2">
-                  {getViews(r)}
-                </div>
-
-                {/* ✅ 관리 */}
-                <div className="flex items-center justify-center gap-2">
-                  {canWriteNotice ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(e) => onEdit(e, r)}
-                        className="h-8 px-2  border-neutral-200 text-xs  text-gray-400 hover:text-black flex items-center cursor-pointer gap-1"
-                        title="수정"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => onDelete(e, r)}
-                        className="h-8 px-2 text-xs text-gray-400 hover:text-red-600 flex items-center cursor-pointer gap-1"
-                        title="삭제"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-xs text-neutral-400">-</span>
-                  )}
-                </div>
-              </button>
-            ))}
-
-            {/* normal */}
-            {pageRows.length === 0 ? (
-              <div className="px-5 py-16 text-center text-sm text-neutral-500">
-                공지사항이 없습니다.
-              </div>
-            ) : (
-              pageRows.map((r, idx) => (
+            <div className={TABLE_WRAP}>
+              {/* pinned */}
+              {pinnedNotices.map((r, idx) => (
                 <button
-                  key={getRowKey(r, pinnedNotices.length + start + idx)}
+                  key={getRowKey(r, idx)}
                   type="button"
                   onClick={() => openModal(r)}
-                  className={ROW_BASE}
+                  className={[ROW_BASE, ROW_PINNED].join(" ")}
                 >
-                  <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
-                    {pinnedNotices.length + start + idx + 1}
+                  {/* 1) 번호/핀 */}
+                  <div className="flex items-center justify-center">
+                    {r.id != null ? (
+                      <button
+                        type="button"
+                        onClick={(e) => onTogglePin(e, r)}
+                        className="h-7 w-7 grid place-items-center"
+                        title="상단 고정 해제"
+                      >
+                        📌
+                      </button>
+                    ) : null}
                   </div>
 
+                  {/* 2) 제목 */}
                   <div className="min-w-0 pl-2">
-                    <span className="truncate text-sm text-neutral-900 font-medium block">
-                      {r.title}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                        고정
+                      </span>
+                      <span className={CELL_TITLE}>{r.title}</span>
+                    </div>
                   </div>
 
-                  <div className="text-sm text-neutral-700 truncate pl-2">
-                    {getWriter(r)}
-                  </div>
-                  <div className="text-sm text-neutral-500 truncate pl-2">
+                  {/* 3) 작성자 */}
+                  <div className={"pl-2 " + CELL_TEXT}>{getWriter(r)}</div>
+
+                  {/* 4) 작성일 */}
+                  <div className={"pl-2 " + CELL_DATE}>
                     {fmtDate(r.createdAt || r.date)}
                   </div>
-                  <div className="text-sm text-neutral-600 text-right pr-2">
-                    {getViews(r)}
+
+                  {/* 5) 조회 */}
+                  <div className={VIEW_CELL}>
+                    <Eye className="w-4 h-4 shrink-0 text-slate-400" />
+                    <span className="tabular-nums">{getViews(r)}</span>
                   </div>
 
-                  {/* ✅ 관리 */}
-                  <div className="flex items-center justify-center gap-2">
+                  {/* 6) 수정/삭제 */}
+                  <div className={ACTION_CELL}>
                     {canWriteNotice ? (
                       <>
                         <button
                           type="button"
                           onClick={(e) => onEdit(e, r)}
-                          className="h-8 px-2  border-neutral-200 text-xs  text-gray-400 hover:text-black flex items-center cursor-pointer gap-1"
+                          className="h-8 w-8 grid place-items-center text-gray-400 hover:text-black"
                           title="수정"
                         >
                           <Pencil className="w-4 h-4" />
@@ -685,7 +661,7 @@ export default function Notice() {
                         <button
                           type="button"
                           onClick={(e) => onDelete(e, r)}
-                          className="h-8 px-2 text-xs text-gray-400 hover:text-red-600 flex items-center cursor-pointer gap-1"
+                          className="h-8 w-8 grid place-items-center text-gray-400 hover:text-red-600"
                           title="삭제"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -696,8 +672,74 @@ export default function Notice() {
                     )}
                   </div>
                 </button>
-              ))
-            )}
+              ))}
+
+              {/* normal */}
+              {pageRows.length === 0 ? (
+                <div className="px-6 py-14 text-center text-sm text-slate-500">
+                  공지사항이 없습니다.
+                </div>
+              ) : (
+                pageRows.map((r, idx) => (
+                  <button
+                    key={getRowKey(r, pinnedNotices.length + start + idx)}
+                    type="button"
+                    onClick={() => openModal(r)}
+                    className={ROW_BASE}
+                  >
+                    {/* 1) 번호 */}
+                    <div className="flex items-center justify-center text-[13px] text-slate-500">
+                      {pinnedNotices.length + start + idx + 1}
+                    </div>
+
+                    {/* 2) 제목 */}
+                    <div className="min-w-0 pl-2">
+                      <span className={CELL_TITLE}>{r.title}</span>
+                    </div>
+
+                    {/* 3) 작성자 */}
+                    <div className={"pl-2 " + CELL_TEXT}>{getWriter(r)}</div>
+
+                    {/* 4) 작성일 */}
+                    <div className={"pl-2 " + CELL_DATE}>
+                      {fmtDate(r.createdAt || r.date)}
+                    </div>
+
+                    {/* 5) 조회 */}
+                    <div className={VIEW_CELL}>
+                      <Eye className="w-4 h-4 shrink-0 text-slate-400" />
+                      <span className="tabular-nums">{getViews(r)}</span>
+                    </div>
+
+                    {/* 6) 수정/삭제 */}
+                    <div className={ACTION_CELL}>
+                      {canWriteNotice ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => onEdit(e, r)}
+                            className="h-8 w-8 grid place-items-center text-gray-400 hover:text-black"
+                            title="수정"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => onDelete(e, r)}
+                            className="h-8 w-8 grid place-items-center text-gray-400 hover:text-red-600"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-neutral-400">-</span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
 
             {/* 페이지네이션 */}
             <div className="py-3 flex items-center">

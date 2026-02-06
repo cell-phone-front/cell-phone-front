@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp } from "lucide-react";
+import { ArrowDownToLine, FileUp, Search } from "lucide-react";
 
 import {
   getOperations,
@@ -195,6 +195,10 @@ export default function Operation() {
 
         {/* 오른쪽: ✅ 검색창 (Product와 동일) */}
         <div className="relative mr-[10px]">
+          {/* 돋보기 */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+          {/* 입력창 */}
           <input
             value={query}
             onChange={(e) => {
@@ -203,13 +207,18 @@ export default function Operation() {
             }}
             placeholder="검색 (ID/Name/Description)"
             className="
-              h-9 w-[300px] rounded-md border bg-white
-              px-3 pr-8 text-[12px] outline-none transition
-              hover:border-slate-300
-              focus:ring-2 focus:ring-gray-200
-              placeholder:text-[11px]
-              placeholder:text-gray-400
-            "
+      h-9 w-[300px] rounded-md border bg-white
+
+      pl-9 pr-3   /* ✅ 왼쪽 패딩 늘림 */
+      text-[12px]
+
+      outline-none transition
+      hover:border-slate-300
+      focus:ring-2 focus:ring-gray-200
+
+      placeholder:text-[11px]
+      placeholder:text-gray-400
+    "
           />
           {query ? (
             <button
