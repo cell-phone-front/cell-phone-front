@@ -20,35 +20,22 @@ export default function GanttBoard({ groups = [] }) {
   const headerHeight = 44;
   const bottomScrollHeight = 16;
 
-  // ====== collapse(product) ======
   const [collapsed, setCollapsed] = useState({});
+  const [opCollapsed, setOpCollapsed] = useState({});
 
   useEffect(() => {
     setCollapsed((prev) => {
       const next = { ...prev };
       (groups || []).forEach((g) => {
-        if (next[g.id] === undefined) next[g.id] = false; // ✅ 기본 펼침
+        if (next[g.id] === undefined) next[g.id] = false;
       });
       return next;
     });
-  }, [groups]);
 
-  const toggleGroup = (id) =>
-    setCollapsed((p) => ({
-      ...p,
-      [id]: !(p[id] ?? false),
-    }));
-
-  // ====== collapse(operation) ======
-  const [opCollapsed, setOpCollapsed] = useState({});
-
-  // ✅ groups가 API로 나중에 들어와도 opCollapsed 키가 생기게
-  useEffect(() => {
     setOpCollapsed((prev) => {
       const next = { ...prev };
       (groups || []).forEach((g) => {
         (g.operations || []).forEach((op) => {
-          // ✅ 기본 펼침(false) -> 바가 처음부터 보이게
           if (next[op.id] === undefined) next[op.id] = false;
         });
       });
@@ -56,36 +43,47 @@ export default function GanttBoard({ groups = [] }) {
     });
   }, [groups]);
 
+  const toggleGroup = (id) =>
+    setCollapsed((p) => ({ ...p, [id]: !(p[id] ?? false) }));
   const toggleOperation = (opKey) =>
-    setOpCollapsed((p) => ({
-      ...p,
-      // ✅ undefined도 기본 펼침(false) 기준으로 토글
-      [opKey]: !(p[opKey] ?? false),
-    }));
+    setOpCollapsed((p) => ({ ...p, [opKey]: !(p[opKey] ?? false) }));
 
   // ====== scrollX ======
   const [scrollLeft, setScrollLeft] = useState(0);
 
   // ====== refs ======
-  const leftScrollRef = useRef(null);
-  const rightScrollYRef = useRef(null);
-  const rightScrollXRef = useRef(null);
+  const leftScrollRef = useRef(null); // 왼쪽은 스크롤바는 숨기되, scrollTop 동기화용으로만 씀
+  const rightScrollYRef = useRef(null); // 오른쪽 세로 스크롤(유일)
+  const rightScrollXRef = useRef(null); // 오른쪽 가로 스크롤(실제 내용)
+  const bottomXRef = useRef(null); // ✅ 하단 고정 가로 스크롤바
   const syncingRef = useRef(false);
 
-  const onRightScrollX = (e) => {
-    setScrollLeft(e.currentTarget.scrollLeft);
+  // ✅ X 스크롤 싱크: 오른쪽 내용 <-> 하단 고정바
+  const syncX = (x) => {
+    if (rightScrollXRef.current && rightScrollXRef.current.scrollLeft !== x) {
+      rightScrollXRef.current.scrollLeft = x;
+    }
+    if (bottomXRef.current && bottomXRef.current.scrollLeft !== x) {
+      bottomXRef.current.scrollLeft = x;
+    }
+    setScrollLeft(x); // 헤더 translateX 용
   };
 
-  const onLeftScrollY = (e) => {
+  const onRightScrollX = (e) => {
     if (syncingRef.current) return;
     syncingRef.current = true;
-
-    if (rightScrollYRef.current) {
-      rightScrollYRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
+    syncX(e.currentTarget.scrollLeft);
     syncingRef.current = false;
   };
 
+  const onBottomScrollX = (e) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    syncX(e.currentTarget.scrollLeft);
+    syncingRef.current = false;
+  };
+
+  // ✅ Y 스크롤: 오른쪽만 스크롤, 왼쪽은 따라가기
   const onRightScrollY = (e) => {
     if (syncingRef.current) return;
     syncingRef.current = true;
@@ -93,45 +91,48 @@ export default function GanttBoard({ groups = [] }) {
     if (leftScrollRef.current) {
       leftScrollRef.current.scrollTop = e.currentTarget.scrollTop;
     }
+
     syncingRef.current = false;
   };
 
-  // ✅ range: groups -> operations -> tasks 기준으로 계산
+  // ✅ range (항상 09:00부터 시작)
   const { rangeStart, rangeEnd, ticks } = useMemo(() => {
     const allTasks = (groups || []).flatMap((g) =>
       (g.operations || []).flatMap((op) => op.tasks || []),
     );
 
-    let min = Infinity;
     let max = -Infinity;
 
     for (const t of allTasks) {
-      min = Math.min(min, toMs(t.startAt));
       max = Math.max(max, toMs(t.endAt));
     }
 
-    // 데이터 없을 때 안전장치
-    if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      const now = new Date();
-      const start = floorToStep(now, stepMinutes);
-      const end = ceilToStep(
-        new Date(now.getTime() + 6 * 60 * 60 * 1000),
-        stepMinutes,
-      );
-      return {
-        rangeStart: start,
-        rangeEnd: end,
-        ticks: buildTicks(start, end, stepMinutes),
-      };
+    // ✅ 1) 시작은 무조건 "오늘 09:00"
+    const start = new Date();
+    start.setHours(9, 0, 0, 0);
+
+    // ✅ 2) 끝은 데이터 max 기준(없으면 18:00 정도로)
+    let end;
+    if (!Number.isFinite(max)) {
+      end = new Date(start.getTime() + 9 * 60 * 60 * 1000); // 09:00 ~ 18:00
+    } else {
+      // 데이터가 오늘이 아닐 수도 있어서, end는 데이터 기준으로 올림
+      end = ceilToStep(new Date(max), stepMinutes);
+
+      // end가 start보다 작으면 최소 9시간은 보여주기
+      if (end.getTime() <= start.getTime()) {
+        end = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+      }
     }
 
-    const start = floorToStep(new Date(min), stepMinutes);
-    const end = ceilToStep(new Date(max), stepMinutes);
+    // ✅ stepMinutes 기준으로 깔끔하게 맞춤
+    const startAligned = floorToStep(start, stepMinutes);
+    const endAligned = ceilToStep(end, stepMinutes);
 
     return {
-      rangeStart: start,
-      rangeEnd: end,
-      ticks: buildTicks(start, end, stepMinutes),
+      rangeStart: startAligned,
+      rangeEnd: endAligned,
+      ticks: buildTicks(startAligned, endAligned, stepMinutes),
     };
   }, [groups, stepMinutes]);
 
@@ -139,7 +140,7 @@ export default function GanttBoard({ groups = [] }) {
   const totalCols = Math.max(1, Math.ceil(totalMinutes / stepMinutes));
   const gridWidthPx = totalCols * colWidth;
 
-  // ====== palette ======
+  // palette
   const barPalette = [
     "bg-[#86DCF0] border border-[#86DCF0]/60",
     "bg-[#869AF0] border border-[#869AF0]/60",
@@ -164,7 +165,11 @@ export default function GanttBoard({ groups = [] }) {
             scrollLeft={scrollLeft}
           />
 
-          <div className="flex flex-1 min-h-0 min-w-0">
+          {/* ✅ 본문: 아래 고정 스크롤바 자리(bottomScrollHeight)만큼 빼서 높이 확보 */}
+          <div
+            className="flex flex-1 min-h-0 min-w-0"
+            style={{ paddingBottom: bottomScrollHeight }}
+          >
             <GanttLeftPanel
               groups={groups}
               collapsed={collapsed}
@@ -175,7 +180,6 @@ export default function GanttBoard({ groups = [] }) {
               groupHeaderHeight={groupHeaderHeight}
               rowHeight={rowHeight}
               leftScrollRef={leftScrollRef}
-              onLeftScrollY={onLeftScrollY}
               bottomScrollHeight={bottomScrollHeight}
             />
 
@@ -185,7 +189,6 @@ export default function GanttBoard({ groups = [] }) {
               opCollapsed={opCollapsed}
               pickBarClass={pickBarClass}
               gridWidthPx={gridWidthPx}
-              totalCols={totalCols}
               colWidth={colWidth}
               rowHeight={rowHeight}
               groupHeaderHeight={groupHeaderHeight}
@@ -200,7 +203,19 @@ export default function GanttBoard({ groups = [] }) {
             />
           </div>
 
-          <div className="h-10 border-t border-slate-200/70 bg-slate-50/40" />
+          {/* ✅ 하단 “고정” 가로 스크롤바 */}
+          <div
+            className="shrink-0 border-t border-slate-200/70 bg-white"
+            style={{ height: bottomScrollHeight }}
+          >
+            <div
+              ref={bottomXRef}
+              onScroll={onBottomScrollX}
+              className="h-full overflow-x-auto overflow-y-hidden"
+            >
+              <div style={{ width: gridWidthPx, height: 1 }} />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

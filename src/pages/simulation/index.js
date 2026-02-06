@@ -123,7 +123,6 @@ export default function SimulationPage() {
     title: "",
     description: "",
     productIds: [],
-    productNames: [],
     requiredStaff: "",
     startDate: fmtDate(new Date().toISOString()),
     startTime: "09:00",

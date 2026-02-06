@@ -1,52 +1,86 @@
-// src/components/gantt/gantt-groups.js
+// src/components/gantt-test/gantt-groups.js
 
 export function buildGroupsByProductOperation(scheduleList = []) {
   const prodMap = new Map();
 
-  for (const s of scheduleList || []) {
-    const productName = s.productName || "NO_PRODUCT";
-    const operationId = String(s.operationId ?? "NO_OPERATION");
+  function splitProducts(v) {
+    const s = String(v || "").trim();
+    if (!s) return ["NO_PRODUCT"];
 
-    const taskId = String(s.taskId ?? s.taskName ?? "TASK");
-    const plannerName = s.plannerName || s.planner || s.planerName || ""; // 혹시 키 다를 때 대비
-    const workerName = s.workerName || s.worker || s.machineName || "";
+    // "iPhone, Galaxy" / "iPhone | Galaxy" / "iPhone / Galaxy" 방어
+    const parts = s
+      .split(/[,|/]/g)
+      .map((x) => x.trim())
+      .filter(Boolean);
 
-    if (!prodMap.has(productName)) prodMap.set(productName, new Map());
-    const opMap = prodMap.get(productName);
-
-    if (!opMap.has(operationId)) {
-      opMap.set(operationId, {
-        id: `${productName}__${operationId}`,
-        operationId,
-        plannerName: plannerName || "",
-        tasks: [],
-      });
-    }
-
-    const opNode = opMap.get(operationId);
-
-    // operation에 plannerName이 비어있고 이번에 들어온 값이 있으면 채움
-    if (!opNode.plannerName && plannerName) opNode.plannerName = plannerName;
-
-    opNode.tasks.push({
-      id:
-        s.id ||
-        `${productName}__${operationId}__${taskId}__${s.startAt}__${s.endAt}`,
-      taskId,
-      workerName,
-      startAt: s.startAt,
-      endAt: s.endAt,
-      raw: s,
-    });
+    return parts.length ? parts : ["NO_PRODUCT"];
   }
 
+  for (const s of scheduleList || []) {
+    const productNames = splitProducts(s.productName);
+
+    const operationId = String(s.operationId ?? "NO_OPERATION");
+    const operationName = String(s.operationName || "");
+
+    const taskId = String(s.taskId ?? "TASK");
+    const taskName = String(s.taskName || "");
+
+    const plannerName = s.plannerName || s.planner || s.planerName || "";
+    const workerName = s.workerName || s.worker || "";
+
+    const startAt = s.startAt;
+    const endAt = s.endAt;
+
+    // ✅ 시간 없으면 스킵 (렌더/범위 계산 깨짐 방지)
+    if (!startAt || !endAt) continue;
+
+    // ✅ product가 여러 개면 각각에 동일 task를 넣음 (합쳐지는 현상 방지)
+    for (const productName of productNames) {
+      if (!prodMap.has(productName)) prodMap.set(productName, new Map());
+      const opMap = prodMap.get(productName);
+
+      // ✅ op.id는 반드시 product 포함해서 유니크하게
+      const opKey = `${productName}__${operationId}`;
+
+      if (!opMap.has(opKey)) {
+        opMap.set(opKey, {
+          id: opKey,
+          operationId,
+          operationName,
+          plannerName: plannerName || "",
+          tasks: [],
+        });
+      }
+
+      const opNode = opMap.get(opKey);
+
+      if (!opNode.plannerName && plannerName) opNode.plannerName = plannerName;
+      if (!opNode.operationName && operationName)
+        opNode.operationName = operationName;
+
+      // ✅ task id도 유니크하게
+      const taskKey = `${opKey}__${taskId}__${startAt}__${endAt}`;
+
+      opNode.tasks.push({
+        id: taskKey,
+        taskId,
+        taskName,
+        workerName,
+        startAt,
+        endAt,
+        raw: s,
+      });
+    }
+  }
+
+  // ✅ groups: [{ id: productName, title: productName, operations: [...] }]
   const groups = Array.from(prodMap.entries()).map(([productName, opMap]) => {
     const operations = Array.from(opMap.values()).map((op) => {
       op.tasks.sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
       return op;
     });
 
-    // operation 정렬(원하시면 startAt 기준으로도 가능)
+    // operation 정렬(원하면 operationName 기준으로 바꿔도 됨)
     operations.sort((a, b) =>
       String(a.operationId).localeCompare(String(b.operationId)),
     );
@@ -57,6 +91,9 @@ export function buildGroupsByProductOperation(scheduleList = []) {
       operations,
     };
   });
+
+  // product 정렬
+  groups.sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
   return groups;
 }

@@ -47,6 +47,8 @@ export default function GanttHeaderRow({
           >
             <div className="flex h-full">
               {Array.from({ length: totalCols }).map((_, i) => {
+                if (!rangeStart) return null;
+
                 const d =
                   ticks?.[i] ||
                   new Date(rangeStart.getTime() + i * stepMinutes * 60 * 1000);
