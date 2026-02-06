@@ -80,8 +80,11 @@ export default function GanttRightPanel({
         <div
           ref={rightScrollXRef}
           onScroll={onRightScrollX}
-          className="h-full overflow-x-scroll overflow-y-hidden force-scrollbar"
-          style={{ scrollbarGutter: "stable" }}
+          className="min-w-0 overflow-x-auto"
+          style={{
+            scrollbarWidth: "none", // firefox
+            msOverflowStyle: "none", // old edge/ie
+          }}
         >
           {/* webkit 스크롤바 숨김: 해당 컨테이너에만 적용 */}
           <style jsx>{`
