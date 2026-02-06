@@ -1,4 +1,4 @@
-// src/components/gantt/gantt-left-panel.js
+// src/components/gantt-test/gantt-left-panel.js
 "use client";
 
 import React from "react";
@@ -19,8 +19,6 @@ export default function GanttLeftPanel({
   rowHeight,
 
   leftScrollRef,
-  onLeftScrollY,
-
   bottomScrollHeight,
 }) {
   const groupTint = [
@@ -32,21 +30,22 @@ export default function GanttLeftPanel({
 
   return (
     <div
-      className="shrink-0 bg-white border-r border-slate-200/80 flex flex-col"
+      className="shrink-0 bg-white border-r border-slate-200/80 flex flex-col min-h-0"
       style={{ width: leftWidth }}
     >
+      {/* ✅ 스크롤바는 안 보이게(overflow-hidden), 다만 scrollTop 동기화는 ref로 적용됨 */}
       <div
         ref={leftScrollRef}
-        onScroll={onLeftScrollY}
-        className="flex-1 min-h-0 overflow-y-auto"
+        className="flex-1 min-h-0 overflow-hidden"
+        style={{ paddingBottom: bottomScrollHeight }}
       >
         {(groups || []).map((g, gi) => {
-          const isGroupCollapsed = !!collapsed[g.id];
+          const isGroupCollapsed = !!collapsed?.[g.id];
           const opCount = (g.operations || []).length;
 
           return (
             <div key={g.id} className="border-b border-slate-200/60">
-              {/* ✅ product 그룹 헤더 */}
+              {/* product header */}
               <div
                 style={{ height: groupHeaderHeight }}
                 className={[
@@ -84,11 +83,19 @@ export default function GanttLeftPanel({
                 </div>
               </div>
 
-              {/* ✅ operation 리스트 */}
+              {/* operations */}
               {!isGroupCollapsed &&
                 (g.operations || []).map((op) => {
-                  const isOpCollapsed = opCollapsed?.[op.id] ?? true;
+                  const isOpCollapsed = opCollapsed?.[op.id] ?? false;
                   const planner = op.plannerName || "";
+
+                  const opLabel = String(
+                    op.operationName ||
+                      op.name ||
+                      op.operationId ||
+                      op.id ||
+                      "",
+                  );
 
                   return (
                     <div key={op.id} className="border-t border-slate-200/50">
@@ -96,12 +103,9 @@ export default function GanttLeftPanel({
                       <button
                         type="button"
                         onClick={() => toggleOperation(op.id)}
-                        className={[
-                          "w-full flex items-center gap-2 px-3",
-                          "hover:bg-slate-50/70 transition-colors",
-                        ].join(" ")}
+                        className="w-full flex items-center gap-2 px-3 hover:bg-slate-50/70 transition-colors"
                         style={{ height: rowHeight }}
-                        title={op.operationId}
+                        title={String(op.operationId || opLabel)}
                       >
                         {isOpCollapsed ? (
                           <ChevronRight className="h-4 w-4 text-slate-500 shrink-0" />
@@ -109,13 +113,12 @@ export default function GanttLeftPanel({
                           <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                         )}
 
-                        <div className="min-w-0">
-                          {/* OP ID */}
+                        <div className="min-w-0 flex-1">
                           <div className="truncate text-[13px] font-semibold text-slate-800">
-                            {op.operationId}
+                            {opLabel}
                           </div>
 
-                          {/* Planner (아래줄) */}
+                          {/* ✅ plannerName 작게 */}
                           {planner && (
                             <div className="text-[11px] text-slate-500 truncate">
                               {planner}
@@ -128,30 +131,35 @@ export default function GanttLeftPanel({
                         </Badge>
                       </button>
 
-                      {/* task rows (operation 펼치면) */}
+                      {/* task rows */}
                       {!isOpCollapsed &&
-                        (op.tasks || []).map((t) => (
-                          <div
-                            key={t.id}
-                            className="flex items-center px-8 border-t border-slate-100 hover:bg-blue-50/40 transition-colors"
-                            style={{ height: rowHeight }}
-                            title={t.taskId}
-                          >
-                            <div className="min-w-0">
-                              {/* TASK ID */}
-                              <div className="truncate text-[12.5px] font-semibold text-slate-700">
-                                {t.taskId}
-                              </div>
+                        (op.tasks || []).map((t) => {
+                          const taskIdOnly = String(
+                            t.taskId || t.id || t.raw?.taskId || "",
+                          );
 
-                              {/* Worker (아래줄) */}
-                              {t.workerName && (
-                                <div className="text-[11px] text-slate-500 truncate">
-                                  {t.workerName}
+                          return (
+                            <div
+                              key={String(t.id || `${op.id}__${taskIdOnly}`)}
+                              className="flex items-center px-8 border-t border-slate-100 hover:bg-blue-50/40 transition-colors"
+                              style={{ height: rowHeight }}
+                              title={taskIdOnly}
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate text-[12.5px] font-semibold text-slate-700">
+                                  {taskIdOnly || "-"}
                                 </div>
-                              )}
+
+                                {/* ✅ workerName 작게 */}
+                                {t.workerName && (
+                                  <div className="text-[11px] text-slate-500 truncate">
+                                    {t.workerName}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   );
                 })}
@@ -159,11 +167,6 @@ export default function GanttLeftPanel({
           );
         })}
       </div>
-
-      <div
-        className="border-t border-slate-200/70 bg-white shrink-0"
-        style={{ height: bottomScrollHeight }}
-      />
     </div>
   );
 }

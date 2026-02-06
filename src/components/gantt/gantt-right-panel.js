@@ -1,20 +1,26 @@
-// src/components/gantt/gantt-right-panel.js
+// src/components/gantt-test/gantt-right-panel.js
 "use client";
 
 import React from "react";
-import { fmtHM, calcBar as calcBarUtil } from "./gantt-utils";
+import { toMs } from "./gantt-utils";
+
+function fmtHM(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
 
 export default function GanttRightPanel({
   groups,
   collapsed,
   opCollapsed,
-
   pickBarClass,
 
   gridWidthPx,
-  totalCols,
   colWidth,
-
   rowHeight,
   groupHeaderHeight,
   bottomScrollHeight,
@@ -23,149 +29,185 @@ export default function GanttRightPanel({
   stepMinutes,
 
   scrollLeft,
+
   rightScrollYRef,
   onRightScrollY,
+
   rightScrollXRef,
   onRightScrollX,
 }) {
+  // ✅ 분당 px 비율
+  const pxPerMinute = colWidth / stepMinutes;
+
+  // ✅ 바 위치 계산 (클램프 포함: 잘림 해결)
+  const calcLeftWidth = (startAt, endAt) => {
+    const s = toMs(startAt);
+    const e = toMs(endAt);
+
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) {
+      return { left: 0, width: 0 };
+    }
+
+    const base = rangeStart.getTime();
+
+    // 원래 좌표(분)
+    const leftMin = (s - base) / 60000;
+    const durMin = (e - s) / 60000;
+
+    const rawLeft = leftMin * pxPerMinute;
+    const rawWidth = durMin * pxPerMinute;
+
+    // ✅ 화면 범위로 클램프 (0 ~ gridWidthPx)
+    const visLeft = Math.max(0, rawLeft);
+    const visRight = Math.min(gridWidthPx, rawLeft + rawWidth);
+    const visWidth = Math.max(0, visRight - visLeft);
+
+    if (visWidth <= 0) return { left: 0, width: 0 };
+
+    return { left: visLeft, width: Math.max(2, visWidth) };
+  };
+
   return (
-    <div className="relative flex-1 min-w-0 overflow-hidden bg-white">
+    <div className="flex-1 min-w-0 min-h-0 bg-white">
+      {/* ✅ Y 스크롤: 여기만 1개 (왼쪽과 scrollTop 동기화) */}
       <div
         ref={rightScrollYRef}
         onScroll={onRightScrollY}
-        className={[
-          "min-h-0 overflow-y-auto overflow-x-hidden",
-          "[&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0",
-          "[scrollbar-width:none] [-ms-overflow-style:none]",
-        ].join(" ")}
-        style={{ height: `calc(100% - ${bottomScrollHeight}px)` }}
+        className="h-full min-h-0 overflow-y-auto"
+        style={{ paddingBottom: bottomScrollHeight }}
       >
-        <div
-          className="relative"
-          style={{
-            width: gridWidthPx,
-            transform: `translateX(${-scrollLeft}px)`,
-            willChange: "transform",
-          }}
-        >
-          {/* 배경: 시간축 세로줄 + 세로띠 */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 flex">
-              {Array.from({ length: totalCols }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{ width: colWidth }}
-                  className={[
-                    "h-full border-l border-slate-200/60",
-                    i % 2 === 0 ? "bg-slate-50/70" : "bg-transparent",
-                  ].join(" ")}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="relative">
-            {(groups || []).map((g, gi) => {
-              const isGroupCollapsed = !!collapsed[g.id];
-              const barClass = pickBarClass(gi);
-
-              return (
-                <div key={g.id}>
-                  {/* ✅ product 그룹 헤더 공간 */}
-                  <div style={{ height: groupHeaderHeight }} />
-
-                  {!isGroupCollapsed &&
-                    (g.operations || []).map((op) => {
-                      const isOpCollapsed = opCollapsed?.[op.id] ?? true;
-
-                      return (
-                        <div key={op.id}>
-                          {/* ✅ operation row 높이(좌측과 맞춤) : 바 없음 */}
-                          <div
-                            className="relative border-t border-slate-200/60"
-                            style={{ height: rowHeight }}
-                          >
-                            <div className="absolute inset-0 hover:bg-slate-50/50 transition-colors" />
-                          </div>
-
-                          {/* ✅ operation 펼쳤을 때 task rows 렌더 + 바 표시 */}
-                          {!isOpCollapsed &&
-                            (op.tasks || []).map((t) => {
-                              const { left, width } = calcBarUtil({
-                                task: t,
-                                rangeStart,
-                                stepMinutes,
-                                colWidth,
-                              });
-
-                              return (
-                                <div
-                                  key={t.id}
-                                  className="relative border-t border-slate-100"
-                                  style={{ height: rowHeight }}
-                                >
-                                  <div className="absolute inset-0 hover:bg-blue-50/60 transition-colors" />
-
-                                  <div
-                                    className={[
-                                      "absolute rounded-md shadow-sm",
-                                      "px-3 py-2 flex items-center",
-                                      "text-slate-900",
-                                      barClass,
-                                      "hover:brightness-[1.03] transition",
-                                    ].join(" ")}
-                                    style={{
-                                      left,
-                                      width,
-                                      top: 6,
-                                      height: rowHeight - 12,
-                                    }}
-                                    title={[
-                                      `${g.title}`,
-                                      `OP: ${op.operationId} (${op.plannerName || "-"})`,
-                                      `TASK: ${t.taskId} (${t.workerName || "-"})`,
-                                      `${fmtHM(t.startAt)} ~ ${fmtHM(t.endAt)}`,
-                                    ].join("\n")}
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="text-[12px] font-extrabold truncate">
-                                        {t.taskId}
-                                        {t.workerName ? (
-                                          <span className="ml-2 text-[11px] font-medium text-slate-700/80">
-                                            {t.workerName}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <div className="text-[11px] font-semibold text-slate-700 truncate">
-                                        {fmtHM(t.startAt)} ~ {fmtHM(t.endAt)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      );
-                    })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 아래: 가로 스크롤 */}
-      <div
-        className="border-t border-slate-200/80 bg-white"
-        style={{ height: bottomScrollHeight }}
-      >
+        {/* ✅ X 스크롤 컨테이너는 유지하되 스크롤바는 숨김 */}
         <div
           ref={rightScrollXRef}
           onScroll={onRightScrollX}
-          className="h-full overflow-x-scroll overflow-y-hidden"
-          style={{ scrollbarGutter: "stable" }}
+          className="min-w-0 overflow-x-auto"
+          style={{
+            scrollbarWidth: "none", // firefox
+            msOverflowStyle: "none", // old edge/ie
+          }}
         >
-          <div style={{ width: gridWidthPx, height: bottomScrollHeight }} />
+          {/* webkit 스크롤바 숨김: 해당 컨테이너에만 적용 */}
+          <style jsx>{`
+            .hide-x-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+
+          <div className="hide-x-scrollbar">
+            <div
+              className="relative"
+              style={{
+                width: gridWidthPx,
+                minWidth: gridWidthPx,
+              }}
+            >
+              {(groups || []).map((g, gi) => {
+                const isGroupCollapsed = !!collapsed?.[g.id];
+
+                return (
+                  <div key={g.id}>
+                    {/* product header row (오른쪽은 높이만 맞춤) */}
+                    <div
+                      className="border-b border-slate-200/60 bg-white"
+                      style={{ height: groupHeaderHeight }}
+                    />
+
+                    {/* 그룹 접힘 */}
+                    {isGroupCollapsed ? null : (
+                      <div>
+                        {(g.operations || []).map((op) => {
+                          const isOpCollapsed = opCollapsed?.[op.id] ?? false;
+
+                          return (
+                            <div
+                              key={op.id}
+                              className="border-b border-slate-100"
+                            >
+                              {/* operation row */}
+                              <div
+                                className="relative bg-white"
+                                style={{ height: rowHeight }}
+                              >
+                                <div className="absolute inset-0 pointer-events-none" />
+                              </div>
+
+                              {/* task rows */}
+                              {isOpCollapsed
+                                ? null
+                                : (op.tasks || []).map((t, ti) => {
+                                    const taskId = String(
+                                      t.taskId || t.id || t.raw?.taskId || "",
+                                    );
+                                    const worker = String(t.workerName || "");
+
+                                    const { left, width } = calcLeftWidth(
+                                      t.startAt,
+                                      t.endAt,
+                                    );
+
+                                    if (width <= 0) return null;
+
+                                    const st = fmtHM(t.startAt);
+                                    const et = fmtHM(t.endAt);
+                                    const timeText =
+                                      st && et ? `${st}~${et}` : st || et || "";
+
+                                    const label = [
+                                      taskId,
+                                      worker || null,
+                                      timeText || null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ");
+
+                                    const showText = width >= 90;
+
+                                    return (
+                                      <div
+                                        key={String(
+                                          t.id || `${op.id}__${taskId}__${ti}`,
+                                        )}
+                                        className="relative border-b border-slate-100 bg-white"
+                                        style={{ height: rowHeight }}
+                                        title={label}
+                                      >
+                                        {/* bar */}
+                                        <div
+                                          className={[
+                                            "absolute top-1/2 -translate-y-1/2",
+                                            "h-8 rounded-md",
+                                            "shadow-sm",
+                                            pickBarClass(gi),
+                                          ].join(" ")}
+                                          style={{ left, width }}
+                                        >
+                                          {showText ? (
+                                            <div className="h-full w-full px-2 flex items-center text-[12px] font-semibold text-slate-900 overflow-hidden">
+                                              <span className="truncate">
+                                                {label}
+                                              </span>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* bottom spacing */}
+              <div
+                className="bg-white"
+                style={{ height: bottomScrollHeight }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
