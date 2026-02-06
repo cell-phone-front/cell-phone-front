@@ -2,7 +2,21 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
+import { ArrowDownToLine, FileUp } from "lucide-react";
 import { getMachine, postMachine, parseMachineXLS } from "@/api/machine-api";
+
+/* ===============================
+   util
+=============================== */
+function cryptoId() {
+  try {
+    return (
+      globalThis.crypto?.randomUUID?.() || `rid-${Date.now()}-${Math.random()}`
+    );
+  } catch {
+    return `rid-${Date.now()}-${Math.random()}`;
+  }
+}
 
 export default function MachinePage() {
   const token = useToken((s) => s.token);
@@ -10,52 +24,57 @@ export default function MachinePage() {
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dirty, setDirty] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   // pagination
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(10);
 
+  // ✅ Operation 스타일처럼 검색창
+  const [query, setQuery] = useState("");
+
   const fileRef = useRef(null);
 
-  // load
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
 
-    getMachine(token)
+    getMachine(token, query) // ✅ 여기!
       .then((json) => {
         if (!alive) return;
 
-        const rows = (json.machineList || []).map((r) => ({
+        const list = json.machineList || json.items || json.data || [];
+        const rows = (list || []).map((r) => ({
           ...r,
           _rid: r._rid || cryptoId(),
-          flag: "Y", // 기존 데이터 표시용 (원하면 제거 가능)
+          flag: r.flag ?? "Y",
         }));
 
         setData(rows);
         setSelected(new Set());
         setPageIndex(0);
-        setDirty(false);
+        setLoadError("");
       })
       .catch((err) => {
         console.error(err);
-        window.alert(err?.message || "Machine 불러오기 실패");
+        setLoadError(err?.message || "Machine 불러오기 실패");
       });
 
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, query]);
 
   // pagination calc
   const totalRows = data.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
   const pageRows = useMemo(() => {
-    const start = pageIndex * pageSize;
+    const safeIndex = Math.min(pageIndex, pageCount - 1);
+    const start = safeIndex * pageSize;
     return data.slice(start, start + pageSize);
-  }, [data, pageIndex, pageSize]);
+  }, [data, pageIndex, pageSize, pageCount]);
 
   // selection calc
   const selectedCount = selected.size;
@@ -66,7 +85,6 @@ export default function MachinePage() {
   const isSomePageSelected =
     pageRows.some((r) => selected.has(r._rid)) && !isAllPageSelected;
 
-  // handlers
   const toggleAllPage = (checked) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -100,6 +118,7 @@ export default function MachinePage() {
         _rid: cryptoId(),
         flag: "new",
         id: "",
+        name: "",
         koreanName: "",
         description: "",
       },
@@ -119,7 +138,10 @@ export default function MachinePage() {
   };
 
   const saveHandle = () => {
-    if (!token) return;
+    if (!token) {
+      window.alert("토큰이 없어서 저장할 수 없어요. 다시 로그인 해주세요.");
+      return;
+    }
 
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
@@ -135,6 +157,10 @@ export default function MachinePage() {
   };
 
   const uploadHandle = () => {
+    if (!token) {
+      window.alert("토큰이 없어서 업로드할 수 없어요. 다시 로그인 해주세요.");
+      return;
+    }
     fileRef.current?.click();
   };
 
@@ -144,7 +170,8 @@ export default function MachinePage() {
 
     parseMachineXLS(file, token)
       .then((json) => {
-        const items = (json.machineList || []).map((r) => ({
+        const list = json.machineList || json.items || json.data || [];
+        const items = (list || []).map((r) => ({
           ...r,
           _rid: cryptoId(),
           flag: "pre",
@@ -167,93 +194,162 @@ export default function MachinePage() {
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
   return (
-    <DashboardShell crumbTop="결과분석" crumbCurrent="machine">
-      <div>
-        {/* 헤더 */}
-        <div className="flex items-center justify-between gap-4 px-3 py-3">
-          <div className="flex justify-between gap-4 items-center">
-            <h2 className="text-2xl font-bold tracking-tight">Machine</h2>
-            <p className="mt-1 text-xs text-gray-500">
-              기계 목록을 편집/업로드 후 저장할 수 있어요.
-            </p>
-          </div>
+    <DashboardShell crumbTop="테이블" crumbCurrent="machine">
+      {/* ✅ 헤더 (Operation 스타일) */}
+      <div className="flex items-start justify-between gap-4 px-3 py-3">
+        <div className="flex gap-4 items-center">
+          <h2 className="text-2xl font-bold tracking-tight">Machine</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            행 추가/ 파일 업로드 후 저장됩니다.
+          </p>
         </div>
 
-        {/* 툴바 */}
-        <div className="flex items-center justify-between gap-3 px-4 py-1">
-          <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
-            <span>총 {totalRows.toLocaleString()}건</span>
-            <span className="mx-1 h-4 w-px bg-gray-200" />
-            <span>선택 {selectedCount.toLocaleString()}건</span>
-            <span className="mx-1 h-4 w-px bg-gray-200" />
-
+        {/* ✅ 검색창 (Operation과 동일 스타일) */}
+        <div className="relative mr-[10px]">
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPageIndex(0);
+            }}
+            placeholder="검색 (Machine/Name/Description)"
+            className="
+              h-9 w-[300px] rounded-md border bg-white
+              px-3 pr-8 text-[12px] outline-none transition
+              hover:border-slate-300
+              focus:ring-2 focus:ring-gray-200
+              placeholder:text-[11px]
+              placeholder:text-gray-400
+            "
+          />
+          {query ? (
             <button
               type="button"
-              onClick={deleteSelected}
-              disabled={selectedCount === 0}
-              className={[
-                "h-8 rounded-md border px-3 text-sm transition",
-                selectedCount === 0
-                  ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
-                  : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
-              ].join(" ")}
+              onClick={() => {
+                setQuery("");
+                setPageIndex(0);
+              }}
+              className="
+                absolute right-2 top-1/2 -translate-y-1/2
+                text-gray-400 transition
+                hover:text-indigo-500 active:text-indigo-700
+              "
+              aria-label="clear"
             >
-              선택 삭제
+              ✕
             </button>
-          </div>
+          ) : null}
+        </div>
+      </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={addRow}
-              className="h-8 rounded-md border transition border-blue-200 text-blue-500 bg-white px-4 text-sm hover:bg-blue-50 cursor-pointer"
-            >
-              + 행 추가
-            </button>
+      {/* ✅ 상단 바 (Operation 스타일) */}
+      <div className="flex items-center justify-between gap-3 px-6">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+          <span>총 {totalRows.toLocaleString()}건</span>
+          <span className="mx-1 h-3 w-px bg-gray-400" />
+          <span>선택 {selectedCount.toLocaleString()}건</span>
+          <span className="mx-1 h-4 w-px" />
 
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              accept=".xls,.xlsx"
-              onChange={fileChangeHandle}
-            />
+          <button
+            type="button"
+            onClick={deleteSelected}
+            disabled={selectedCount === 0}
+            className={[
+              "h-9.5 rounded-md border px-5 text-sm transition",
+              selectedCount === 0
+                ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
+                : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
+            ].join(" ")}
+          >
+            선택 삭제
+          </button>
 
-            <button
-              type="button"
-              onClick={uploadHandle}
-              className="h-8 rounded-md border px-3 text-sm bg-white hover:bg-gray-200 cursor-pointer transition"
-            >
-              XLS 업로드
-            </button>
+          {loadError ? (
+            <span className="ml-2 text-[12px] text-red-500">{loadError}</span>
+          ) : null}
+        </div>
 
-            <button
-              type="button"
-              onClick={saveHandle}
-              disabled={!dirty}
-              className={[
-                "h-8 rounded-md border px-7 text-sm font-medium transition",
+        {/* ✅ 오른쪽 버튼들 (Operation 스타일) */}
+        <div className="ml-auto flex items-center gap-4">
+          <button
+            type="button"
+            onClick={uploadHandle}
+            className="
+              flex items-center justify-center gap-2
+              text-slate-700 text-sm font-medium
+              cursor-pointer
+            "
+          >
+            <FileUp size={15} />
+            <span>XLS 파일</span>
+          </button>
+
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept=".xls,.xlsx"
+            onChange={fileChangeHandle}
+          />
+
+          <button
+            type="button"
+            onClick={addRow}
+            className="
+              h-9.5 rounded-md border border-gray-200 bg-white px-5 text-sm text-gray-600
+              transition cursor-pointer font-medium
+              hover:bg-gray-600 hover:text-white
+              focus:outline-none focus:ring-1 focus:ring-gray-500
+            "
+          >
+            + 행 추가
+          </button>
+
+          <button
+            type="button"
+            onClick={saveHandle}
+            disabled={!dirty}
+            className={`
+              h-9 px-5 rounded-md border
+              flex items-center gap-2 justify-center
+              text-sm font-semibold
+              transition-all duration-200
+              focus:outline-none
+              ${
                 dirty
-                  ? "bg-slate-800 text-white hover:bg-slate-700 cursor-pointer"
-                  : "bg-slate-200 text-slate-500 border-slate-200 cursor-not-allowed",
-              ].join(" ")}
-            >
-              저장
-            </button>
-          </div>
+                  ? `
+                    bg-indigo-600 text-white border-indigo-600
+                    hover:bg-indigo-500 active:bg-indigo-700
+                    active:scale-[0.97]
+                    cursor-pointer shadow-sm
+                    focus:ring-2 focus:ring-indigo-200
+                  `
+                  : `
+                    bg-indigo-50 text-indigo-300 border-indigo-100
+                    cursor-not-allowed
+                  `
+              }
+            `}
+          >
+            <ArrowDownToLine size={16} className="shrink-0" />
+            <span>저장</span>
+          </button>
         </div>
+      </div>
 
-        {/* 테이블 */}
-        <div className="px-4 pt-4">
-          <div className="h-full overflow-auto bg-white">
+      {/* ✅ 테이블 카드 (Operation 스타일) */}
+      <div className="px-4 pt-4">
+        {/* 표라운드 */}
+        <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
+          <div className="h-full overflow-auto">
             <table className="w-full border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10 bg-slate-200">
+              <thead className="sticky top-0 z-10 bg-gray-600 text-white">
                 <tr className="text-left text-sm">
-                  <th className="w-11 border-b px-3 py-3">
+                  <th className="w-[44px] border-b border-slate-200 px-3 py-3">
                     <div className="flex justify-center">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-black"
+                        className="h-4 w-4  accent-pink-700"
                         checked={isAllPageSelected}
                         ref={(el) => {
                           if (!el) return;
@@ -264,17 +360,16 @@ export default function MachinePage() {
                     </div>
                   </th>
 
-                  <th className="min-w-45 border-b px-3 py-3 font-medium">
+                  <th className="min-w-[160px] border-b border-slate-200 px-3 py-3 font-medium">
                     Machine Id
                   </th>
-                  <th className="min-w-45 border-b px-3 py-3 font-medium">
+                  <th className="min-w-[220px] border-b border-slate-200 px-3 py-3 font-medium">
                     Name
                   </th>
-                  <th className="min-w-95 border-b px-3 py-3 font-medium">
+                  <th className="min-w-[520px] border-b border-slate-200 px-3 py-3 font-medium">
                     Description
                   </th>
-
-                  <th className="min-w-25 border-b px-3 py-3 font-medium">
+                  <th className="min-w-[100px] border-b border-slate-200 px-3 py-3 font-medium">
                     Status
                   </th>
                 </tr>
@@ -288,19 +383,26 @@ export default function MachinePage() {
                   const rowBg = isUploaded
                     ? "bg-green-100/10"
                     : isNew
-                      ? "bg-blue-100/30"
+                      ? "bg-indigo-50"
                       : "";
 
                   return (
                     <tr
                       key={row._rid}
-                      className={["hover:bg-slate-200/80", rowBg].join(" ")}
+                      className={[
+                        "transition-colors hover:bg-gray-200",
+                        rowBg,
+                      ].join(" ")}
                     >
-                      <td className="border-b px-3 py-2">
+                      <td className="border-b border-slate-100 px-3 py-2">
                         <div className="flex justify-center">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 accent-black"
+                            className=" h-4 w-4 accent-pink-700
+                            rounded
+                            cursor-pointer
+                            hover:opacity-90
+                            focus:outline-none focus:ring-2 focus:ring-pink-200"
                             checked={selected.has(row._rid)}
                             onChange={(e) =>
                               toggleOne(row._rid, e.target.checked)
@@ -309,51 +411,66 @@ export default function MachinePage() {
                         </div>
                       </td>
 
-                      <td className="border-b px-3 py-2">
+                      <td className="border-b border-slate-100 px-3 py-2">
                         <input
                           value={row.id ?? ""}
                           onChange={(e) =>
                             updateCell(row._rid, "id", e.target.value)
                           }
-                          className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
+                          className="
+                            h-9 w-full rounded-md border px-3
+                            bg-white text-sm outline-none transition
+                            hover:border-slate-300
+                            focus:ring-2 focus:ring-gray-200
+                          "
                           placeholder="Machine Id"
                         />
                       </td>
 
-                      <td className="border-b px-3 py-2">
+                      <td className="border-b border-slate-100 px-3 py-2">
                         <input
-                          value={row.name ?? ""}
+                          value={row.name ?? row.koreanName ?? ""}
                           onChange={(e) =>
                             updateCell(row._rid, "name", e.target.value)
                           }
-                          className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
+                          className="
+                            h-9 w-full rounded-md border px-3
+                            bg-white text-sm outline-none transition
+                            hover:border-slate-300
+                            focus:ring-2 focus:ring-gray-200
+                          "
                           placeholder="Name"
                         />
                       </td>
 
-                      <td className="border-b px-3 py-2">
+                      <td className="border-b border-slate-100 px-3 py-2">
                         <input
                           value={row.description ?? ""}
                           onChange={(e) =>
                             updateCell(row._rid, "description", e.target.value)
                           }
-                          className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 placeholder:text-[12px] placeholder:text-gray-400 bg-white"
+                          className="
+                            h-9 w-full rounded-md border px-3
+                            bg-white text-sm outline-none transition
+                            hover:border-slate-300
+                            focus:ring-2 focus:ring-gray-200
+                          "
                           placeholder="Description"
                         />
                       </td>
-                      {/* 상태 */}
-                      <td className="border-b px-3 py-2">
+
+                      <td className="border-b border-slate-100 px-3 py-2">
                         <div className="flex items-center">
                           {isUploaded ? (
-                            <span className="inline-flex justify-center min-w-[60px] text-center text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+                            <span className="inline-flex justify-center min-w-[64px] text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-200 font-medium">
                               Imported
                             </span>
                           ) : isNew ? (
-                            <span className="inline-flex justify-center min-w-[60px] text-center text-[11px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                            <span className="inline-flex justify-center min-w-[64px] text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 font-medium">
                               New
                             </span>
                           ) : (
-                            <span className="inline-flex justify-center min-w-[60px] text-center text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                            <span className="inline-flex justify-center min-w-[64px] text-[11px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200 font-medium">
                               Saved
                             </span>
                           )}
@@ -369,9 +486,13 @@ export default function MachinePage() {
                       <button
                         type="button"
                         onClick={addRow}
-                        className="w-full px-4 py-10 text-center text-sm text-gray-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-black/10 cursor-pointer"
+                        className="
+                          w-full px-4 py-10 text-center text-sm text-gray-500
+                          hover:bg-indigo-50 focus:outline-none
+                          focus:ring-2 focus:ring-indigo-200 cursor-pointer
+                        "
                       >
-                        <span className="font-medium text-blue-700">
+                        <span className="font-medium text-indigo-700">
                           클릭해서 행 추가
                         </span>{" "}
                         또는 XLS 업로드 해주세요.
@@ -382,56 +503,46 @@ export default function MachinePage() {
               </tbody>
             </table>
           </div>
-
-          {/* 페이지네이션 */}
-          <div className="mt-2 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={pageIndex === 0}
-              className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
-                pageIndex === 0
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-200 active:font-medium cursor-pointer",
-              ].join(" ")}
-            >
-              이전
-            </button>
-
-            <div className="min-w-20 text-center text-[13px]">
-              <span className="font-medium">{pageIndex + 1}</span>
-              <span className="text-gray-500"> / {pageCount}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={pageIndex >= pageCount - 1}
-              className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
-                pageIndex >= pageCount - 1
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-200 active:font-medium cursor-pointer",
-              ].join(" ")}
-            >
-              다음
-            </button>
-          </div>
         </div>
 
-        <div className="h-4" />
+        {/* ✅ 페이지네이션 (Operation 스타일) */}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={pageIndex === 0}
+            className={[
+              "h-8 px-3 text-[12px] rounded-md transition",
+              pageIndex === 0
+                ? "text-gray-300 cursor-not-allowed"
+                : "text-gray-700 hover:bg-gray-200 cursor-pointer",
+            ].join(" ")}
+          >
+            이전
+          </button>
+
+          <div className="min-w-20 text-center text-[13px]">
+            <span className="font-medium">{pageIndex + 1}</span>
+            <span className="text-gray-500"> / {pageCount}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={pageIndex >= pageCount - 1}
+            className={[
+              "h-8 px-3 text-[12px] rounded-md transition",
+              pageIndex >= pageCount - 1
+                ? "text-gray-300 cursor-not-allowed"
+                : "text-gray-700 hover:bg-gray-200 cursor-pointer",
+            ].join(" ")}
+          >
+            다음
+          </button>
+        </div>
       </div>
+
+      <div className="h-4" />
     </DashboardShell>
   );
-}
-
-function cryptoId() {
-  try {
-    return (
-      globalThis.crypto?.randomUUID?.() || `rid-${Date.now()}-${Math.random()}`
-    );
-  } catch {
-    return `rid-${Date.now()}-${Math.random()}`;
-  }
 }
