@@ -162,7 +162,7 @@ export default function GanttRightPanel({
         <div
           ref={rightScrollXRef}
           onScroll={onRightScrollX}
-          className="h-full overflow-x-scroll overflow-y-hidden"
+          className="h-full overflow-x-scroll overflow-y-hidden force-scrollbar"
           style={{ scrollbarGutter: "stable" }}
         >
           <div style={{ width: gridWidthPx, height: bottomScrollHeight }} />
