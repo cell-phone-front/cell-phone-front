@@ -16,17 +16,18 @@ export default function Product() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  // ✅ 검색
   const [query, setQuery] = useState("");
 
   const fileRef = useRef();
 
+  // ✅ 전체조회 + 검색조회 통합
   useEffect(() => {
     if (!token) return;
 
-    getProducts(token)
+    getProducts(token, query) // ← query 전달
       .then((json) => {
         const list = json.productList || json.items || json.data || [];
+
         setData(
           (list || []).map((r) => ({
             ...r,
@@ -34,6 +35,7 @@ export default function Product() {
             flag: r.flag ?? "Y",
           })),
         );
+
         setSelected(new Set());
         setPageIndex(0);
         setDirty(false);
@@ -42,37 +44,17 @@ export default function Product() {
         console.error(err);
         window.alert(err?.message || "생산대상 조회 실패");
       });
-  }, [token]);
+  }, [token, query]); // ← query 추가
 
   // ✅ 검색 필터 (id/brand/name/description)
-  const filtered = useMemo(() => {
-    const q = String(query || "")
-      .trim()
-      .toLowerCase();
-    if (!q) return data;
-
-    return (data || []).filter((r) => {
-      const id = String(r.id ?? "").toLowerCase();
-      const brand = String(r.brand ?? "").toLowerCase();
-      const name = String(r.name ?? r.productName ?? "").toLowerCase();
-      const desc = String(r.description ?? r.desc ?? "").toLowerCase();
-      return (
-        id.includes(q) ||
-        brand.includes(q) ||
-        name.includes(q) ||
-        desc.includes(q)
-      );
-    });
-  }, [data, query]);
-
-  const totalRows = filtered.length;
+  const totalRows = data.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
   const pageRows = useMemo(() => {
     const safeIndex = Math.min(pageIndex, pageCount - 1);
     const start = safeIndex * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, pageIndex, pageSize, pageCount]);
+    return data.slice(start, start + pageSize);
+  }, [data, pageIndex, pageSize, pageCount]);
 
   const selectedCount = selected.size;
 
@@ -272,7 +254,7 @@ export default function Product() {
             onClick={uploadHandle}
             className="
             flex items-center justify-center gap-2
-            text-slate-700 text-sm font-medium 
+            text-slate-700 text-sm font-medium
             cursor-pointer
           "
           >
@@ -341,8 +323,8 @@ export default function Product() {
 
       {/* ✅ 테이블 (여기만 라운드 + shadow) */}
       <div className="px-4 pt-4">
-        {/* ✅ 바깥 카드 */}
-        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
+        {/* 전체 표 라운드 */}
+        <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
           {/*  */}
           <div className="h-full overflow-auto">
             <table className="w-full border-separate border-spacing-0">
@@ -353,7 +335,7 @@ export default function Product() {
                     <div className="flex justify-center">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-black"
+                        className="h-4 w-4 accent-pink-700"
                         checked={isAllPageSelected}
                         ref={(el) => {
                           if (!el) return;
@@ -397,7 +379,13 @@ export default function Product() {
                         <div className="flex justify-center">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 accent-black"
+                            className="
+                            h-4 w-4 accent-pink-700
+                            rounded
+                            cursor-pointer
+                            hover:opacity-90
+                            focus:outline-none focus:ring-2 focus:ring-pink-200
+  "
                             checked={selected.has(row._rid)}
                             onChange={(e) =>
                               toggleOne(row._rid, e.target.checked)
