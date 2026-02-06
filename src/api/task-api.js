@@ -1,16 +1,17 @@
 // src/api/task-api.js
 const serverAddr = "http://localhost:8080";
 
-// 작업 목록 조회
-export async function getTasks(token) {
-  const res = await fetch(`${serverAddr}/api/operation/task`, {
-    method: "GET",
+// 작업 목록 조회 + 검색
+export async function getTasks(token, keyword = "") {
+  const url = keyword
+    ? `${serverAddr}/api/operation/task?keyword=${keyword}`
+    : `${serverAddr}/api/operation/task`;
+
+  return fetch(url, {
     headers: {
       Authorization: "Bearer " + token,
     },
-  });
-
-  return res.json();
+  }).then((r) => r.json());
 }
 
 // 작업 upsert

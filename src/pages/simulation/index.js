@@ -11,20 +11,12 @@ import {
   deleteSimulation,
   getSimulationMetaJson,
 } from "@/api/simulation-api";
+import SimulationCreateDrawer from "@/components/simulation/simulation-create-drawer";
 
 import { getProducts } from "@/api/product-api";
 
 import { Spinner } from "@/components/ui/spinner";
 import { Play, Check, Plus, Search, X } from "lucide-react";
-
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 
 function fmtDate(v) {
   if (!v) return "-";
@@ -181,7 +173,6 @@ export default function SimulationPage() {
             productId: row.productId || firstIdFromSPL,
             productName: row.productName || firstNameFromSPL,
 
-            // ✅ 화면에서 쓰는 productCount는
             // (1) 목록 응답에 있으면 그거 우선
             // (2) 없거나 0이면 metaCount로 채움
             productCount:
@@ -519,30 +510,69 @@ export default function SimulationPage() {
 
   return (
     <DashboardShell crumbTop="시뮬레이션" crumbCurrent="Simulation">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between gap-4 px-3 py-3">
-        <div className="flex justify-between gap-4 items-center">
+      {/* ✅ 헤더 (Operation 스타일) */}
+      <div className="flex items-start justify-between gap-4 px-3 py-3">
+        <div className="flex gap-4 items-center">
           <h2 className="text-2xl font-bold tracking-tight">Simulation</h2>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-sm text-gray-500">
             생성 / 실행 / 결과(스케줄) 확인
           </p>
         </div>
+
+        {/* ✅ 검색창 (Operation 스타일) */}
+        <div className="relative mr-[10px] w-[360px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPageIndex(0);
+            }}
+            placeholder="검색 (제목/작성자/상태/제품)"
+            className="
+            h-9 w-full rounded-md border bg-white
+            pl-9 pr-8 text-[12px] outline-none transition
+            hover:border-slate-300
+            focus:ring-2 focus:ring-gray-200
+            placeholder:text-[11px]
+            placeholder:text-gray-400
+          "
+          />
+
+          {q ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+                setPageIndex(0);
+              }}
+              className="
+              absolute right-2 top-1/2 -translate-y-1/2
+              text-gray-400 transition
+              hover:text-indigo-500 active:text-indigo-700
+            "
+              aria-label="clear"
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {/* 상단 바 */}
-      <div className="flex items-center justify-between gap-3 px-4">
-        <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-600">
+      {/* ✅ 상단 바 (Operation 스타일) */}
+      <div className="flex items-center justify-between gap-3 px-6">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
           <span>총 {totalRows.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px bg-gray-200" />
+          <span className="mx-1 h-3 w-px bg-gray-400" />
           <span>선택 {selectedIds.size.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px bg-gray-200" />
+          <span className="mx-1 h-4 w-px" />
 
           <button
             type="button"
             onClick={deleteSelectedHandle}
             disabled={!canEdit || selectedIds.size === 0}
             className={[
-              "h-8 rounded-md border px-3 text-sm transition",
+              "h-9.5 rounded-md border px-5 text-sm transition",
               !canEdit || selectedIds.size === 0
                 ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
                 : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
@@ -553,25 +583,18 @@ export default function SimulationPage() {
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative w-[360px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPageIndex(0);
-              }}
-              placeholder="검색 (제목/작성자/상태)"
-              className="h-8 w-full rounded-md border bg-white pl-9 pr-3 text-sm outline-none focus:ring-1 focus:ring-black/10"
-            />
-          </div>
-
+        <div className="ml-auto flex items-center gap-4">
           {canEdit && (
             <button
               type="button"
               onClick={() => setOpenNew(true)}
-              className="h-8 rounded-md border transition border-blue-200 text-blue-600 bg-white px-4 text-sm hover:bg-blue-50 cursor-pointer inline-flex items-center gap-2"
+              className="
+              h-9.5 rounded-md border border-gray-200 bg-white px-5 text-sm text-gray-600
+              transition cursor-pointer font-medium
+              hover:bg-gray-600 hover:text-white
+              focus:outline-none focus:ring-1 focus:ring-gray-500
+              inline-flex items-center gap-2
+            "
             >
               <Plus className="h-4 w-4" />
               생성
@@ -580,157 +603,162 @@ export default function SimulationPage() {
         </div>
       </div>
 
+      {/* ✅ 테이블 카드 (Operation 스타일) */}
       <div className="px-4 pt-4">
-        {/* 표 박스 */}
-        <div className="rounded-lg border bg-white overflow-hidden">
-          <table className="w-full border-separate border-spacing-0">
-            <thead className="bg-slate-200">
-              <tr className="text-left text-sm">
-                <th className="w-[44px] border-b px-3 py-3">
-                  <div className="flex justify-center">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-black"
-                      checked={isAllPageSelected}
-                      ref={(el) => {
-                        if (!el) return;
-                        el.indeterminate = isSomePageSelected;
-                      }}
-                      onChange={(e) => toggleAllPage(e.target.checked)}
-                    />
-                  </div>
-                </th>
+        <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <table className="w-full border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-gray-600 text-white">
+                <tr className="text-left text-sm">
+                  <th className="w-[44px] border-b border-slate-200 px-3 py-3">
+                    <div className="flex justify-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-pink-700"
+                        checked={isAllPageSelected}
+                        ref={(el) => {
+                          if (!el) return;
+                          el.indeterminate = isSomePageSelected;
+                        }}
+                        onChange={(e) => toggleAllPage(e.target.checked)}
+                      />
+                    </div>
+                  </th>
 
-                <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  Id
-                </th>
-                <th className="min-w-[320px] border-b px-3 py-3 font-medium">
-                  Title
-                </th>
-                <th className="min-w-[140px] border-b px-3 py-3 font-medium">
-                  Member
-                </th>
-                <th className="min-w-[120px] border-b px-3 py-3 font-medium text-right">
-                  Product Count
-                </th>
-
-                <th className="min-w-[90px] border-b px-3 py-3 font-medium text-right">
-                  Staff
-                </th>
-                <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  Status
-                </th>
-                <th className="min-w-[120px] border-b px-3 py-3 font-medium">
-                  Start Date
-                </th>
-                <th className="min-w-[90px] border-b px-3 py-3 pr-5 font-medium text-right">
-                  Work Time
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="border-b px-3 py-10 text-center">
-                    <span className="text-gray-500">불러오는 중...</span>
-                  </td>
+                  <th className="min-w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
+                    Id
+                  </th>
+                  <th className="min-w-[320px] border-b border-slate-200 px-3 py-3 font-medium">
+                    Title
+                  </th>
+                  <th className="min-w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
+                    Member
+                  </th>
+                  <th className="min-w-[120px] border-b border-slate-200 px-3 py-3 font-medium text-right">
+                    Product Count
+                  </th>
+                  <th className="min-w-[90px] border-b border-slate-200 px-3 py-3 font-medium text-right">
+                    Staff
+                  </th>
+                  <th className="min-w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
+                    Status
+                  </th>
+                  <th className="min-w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
+                    Start Date
+                  </th>
+                  <th className="min-w-[90px] border-b border-slate-200 px-3 py-3 pr-5 font-medium text-right">
+                    Work Time
+                  </th>
                 </tr>
-              ) : pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="border-b px-3 py-10 text-center">
-                    <span className="text-gray-500">데이터가 없습니다.</span>
-                  </td>
-                </tr>
-              ) : (
-                pageRows.map((r) => {
-                  const st = String(r.status || "").toUpperCase();
-                  const isReady = st === "READY" || st === "대기중";
-                  const isPending = st === "PENDING";
+              </thead>
 
-                  const goDetail = () => {
-                    router.push(`/simulation/${r.id}/gantt`);
-                  };
+              <tbody className="text-sm">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="border-b px-3 py-10 text-center">
+                      <span className="text-gray-500">불러오는 중...</span>
+                    </td>
+                  </tr>
+                ) : pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="border-b px-3 py-10 text-center">
+                      <span className="text-gray-500">데이터가 없습니다.</span>
+                    </td>
+                  </tr>
+                ) : (
+                  pageRows.map((r) => {
+                    const st = String(r.status || "").toUpperCase();
+                    const isReady = st === "READY" || st === "대기중";
+                    const isPending = st === "PENDING";
 
-                  return (
-                    <tr
-                      key={r.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={goDetail}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") goDetail();
-                      }}
-                      className={[
-                        "cursor-pointer hover:bg-slate-200/80",
-                        selectedIds.has(r.id) ? "bg-slate-100" : "",
-                      ].join(" ")}
-                    >
-                      <td
-                        className="border-b px-3 py-3"
-                        onClick={(e) => e.stopPropagation()}
+                    const goDetail = () => {
+                      router.push(`/simulation/${r.id}/gantt`);
+                    };
+
+                    return (
+                      <tr
+                        key={r.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={goDetail}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") goDetail();
+                        }}
+                        className={[
+                          "cursor-pointer transition-colors hover:bg-gray-200",
+                          selectedIds.has(r.id) ? "bg-gray-300" : "",
+                        ].join(" ")}
                       >
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-black"
-                            checked={selectedIds.has(r.id)}
-                            onChange={(e) => toggleOne(r.id, e.target.checked)}
-                          />
-                        </div>
-                      </td>
-
-                      <td className="border-b px-3 py-3 font-mono text-xs text-gray-700">
-                        {r.id}
-                      </td>
-
-                      <td className="border-b px-3 py-3">
-                        <div className="font-medium">{r.title}</div>
-                        {r.description ? (
-                          <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                            {r.description}
+                        <td
+                          className="border-b border-slate-100 px-3 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex justify-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4  accent-pink-700"
+                              checked={selectedIds.has(r.id)}
+                              onChange={(e) =>
+                                toggleOne(r.id, e.target.checked)
+                              }
+                            />
                           </div>
-                        ) : null}
-                      </td>
+                        </td>
 
-                      <td className="border-b px-3 py-3">{r.memberName}</td>
+                        <td className="border-b border-slate-100 px-3 py-3 font-mono text-xs text-gray-700">
+                          {r.id}
+                        </td>
 
-                      <td className="border-b px-3 py-3 text-right tabular-nums">
-                        {Number(r.productCount ?? 0)}
-                      </td>
+                        <td className="border-b border-slate-100 px-3 py-3">
+                          <div className="font-medium">{r.title}</div>
+                          {r.description ? (
+                            <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                              {r.description}
+                            </div>
+                          ) : null}
+                        </td>
 
-                      <td className="border-b px-3 py-3 text-right tabular-nums">
-                        {Number(r.requiredStaff || 0)}
-                      </td>
+                        <td className="border-b border-slate-100 px-3 py-3">
+                          {r.memberName}
+                        </td>
 
-                      <td
-                        className="border-b px-3 py-3"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <StatusPill
-                          status={r.status}
-                          clickable={canEdit && isReady && !isPending}
-                          onClick={() => onRun(r.id)}
-                        />
-                      </td>
+                        <td className="border-b border-slate-100 px-3 py-3 text-right tabular-nums">
+                          {Number(r.productCount ?? 0)}
+                        </td>
 
-                      <td className="border-b px-3 py-3">
-                        {fmtDate(r.simulationStartDate)}
-                      </td>
+                        <td className="border-b border-slate-100 px-3 py-3 text-right tabular-nums">
+                          {Number(r.requiredStaff || 0)}
+                        </td>
 
-                      <td className="border-b px-3 py-3 text-right tabular-nums">
-                        {Number(r.workTime || 0)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        <td
+                          className="border-b border-slate-100 px-3 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <StatusPill
+                            status={r.status}
+                            clickable={canEdit && isReady && !isPending}
+                            onClick={() => onRun(r.id)}
+                          />
+                        </td>
+
+                        <td className="border-b border-slate-100 px-3 py-3">
+                          {fmtDate(r.simulationStartDate)}
+                        </td>
+
+                        <td className="border-b border-slate-100 px-3 py-3 text-right tabular-nums">
+                          {Number(r.workTime || 0)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ✅ 페이지네이션 footer (Operation 스타일: border-t + padding) */}
         </div>
-
-        {/* 페이지네이션 */}
-        <div className="mt-2 flex items-center justify-end gap-2 px-1">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
           <button
             type="button"
             onClick={goPrev}
@@ -768,246 +796,18 @@ export default function SimulationPage() {
 
       <div className="h-4" />
 
-      {/* Drawer */}
-      <Drawer open={openNew} onOpenChange={setOpenNew} direction="right">
-        <DrawerContent className="fixed right-0 top-0 h-dvh w-[420px] sm:w-[520px] rounded-none border-l bg-white p-0">
-          <div className="flex h-dvh flex-col">
-            <DrawerHeader>
-              <DrawerTitle>시뮬레이션 생성</DrawerTitle>
-            </DrawerHeader>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-              {/* Title */}
-              <div>
-                <div className="flex items-end justify-between mb-1">
-                  <div className="text-xs text-gray-500">Title</div>
-                  <div className="text-[11px] text-gray-400">
-                    {(newForm.title || "").length}/{TITLE_MAX}
-                  </div>
-                </div>
-
-                <input
-                  value={newForm.title}
-                  maxLength={TITLE_MAX}
-                  onChange={(e) =>
-                    setNewForm((s) => ({ ...s, title: e.target.value }))
-                  }
-                  className="h-10 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
-                  placeholder="Title"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <div className="flex items-end justify-between mb-1">
-                  <div className="text-xs text-gray-500">Description</div>
-                  <div className="text-[11px] text-gray-400">
-                    {(newForm.description || "").length}/{DESC_MAX}
-                  </div>
-                </div>
-
-                <textarea
-                  value={newForm.description}
-                  maxLength={DESC_MAX}
-                  onChange={(e) =>
-                    setNewForm((s) => ({ ...s, description: e.target.value }))
-                  }
-                  className="h-30 w-full rounded-md border px-2 py-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs resize-none"
-                  placeholder="Description"
-                />
-              </div>
-
-              {/* Product list */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-gray-500">Product List</div>
-
-                  {(newForm.productIds || []).length > 0 && (
-                    <button
-                      type="button"
-                      onClick={clearAllProducts}
-                      className="text-[11px] text-gray-500 hover:text-gray-800"
-                    >
-                      선택해제
-                    </button>
-                  )}
-                </div>
-
-                <div className="rounded-md border bg-white">
-                  <div className="max-h-[240px] overflow-y-auto p-2 space-y-2">
-                    {prodLoading ? (
-                      <div className="px-2 py-2 text-xs text-gray-500">
-                        제품 목록 불러오는 중...
-                      </div>
-                    ) : products.length === 0 ? (
-                      <div className="px-2 py-2 text-xs text-gray-500">
-                        등록된 제품이 없습니다
-                      </div>
-                    ) : (
-                      products.map((p) => {
-                        const pid = String(p.id);
-                        const pname = String(p.name || "");
-                        const checked = (newForm.productIds || []).some(
-                          (x) => String(x) === pid,
-                        );
-
-                        return (
-                          <label
-                            key={pid}
-                            className={[
-                              "flex items-center gap-2 rounded-md px-2 py-2 cursor-pointer",
-                              "hover:bg-slate-100",
-                              checked ? "bg-slate-100" : "",
-                            ].join(" ")}
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-black"
-                              checked={checked}
-                              onChange={(e) =>
-                                toggleProduct(p, e.target.checked)
-                              }
-                            />
-
-                            <div className="min-w-0 flex-1 text-[12px] leading-none">
-                              <span className="font-mono text-gray-900">
-                                {pid}
-                              </span>
-                              <span className="mx-2 text-gray-400">—</span>
-                              <span className="text-gray-700 truncate inline-block align-bottom max-w-[320px]">
-                                {pname || "-"}
-                              </span>
-                            </div>
-                          </label>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {prodErr ? (
-                  <div className="mt-2 text-xs text-red-600">{prodErr}</div>
-                ) : null}
-              </div>
-
-              {/* Selected */}
-              <div>
-                <div className="text-xs text-gray-500 mb-2">
-                  Selected Product
-                  <span className="ml-2 text-[11px] text-gray-400">
-                    {(newForm.productIds || []).length}개 선택됨
-                  </span>
-                </div>
-
-                {(newForm.productIds || []).length === 0 ? (
-                  <div className="h-10 w-full rounded-md border bg-gray-50 px-3 flex items-center text-sm text-gray-400">
-                    -
-                  </div>
-                ) : (
-                  <div className="rounded-md border bg-gray-50 p-2 flex flex-wrap gap-2">
-                    {(newForm.productIds || []).map((id) => (
-                      <div
-                        key={String(id)}
-                        className="inline-flex items-center gap-2 rounded-md border bg-white px-2 py-1"
-                      >
-                        <div className="text-[12px] font-mono text-gray-800">
-                          {String(id)}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeOneSelected(id)}
-                          className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-gray-100"
-                          title="삭제"
-                        >
-                          <X className="h-3.5 w-3.5 text-gray-500" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Staff */}
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Staff</div>
-                <input
-                  type="number"
-                  value={newForm.requiredStaff}
-                  onChange={(e) =>
-                    setNewForm((s) => ({ ...s, requiredStaff: e.target.value }))
-                  }
-                  className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
-                  min={0}
-                  placeholder="Staff"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Start Date</div>
-                  <input
-                    type="date"
-                    value={newForm.startDate || ""}
-                    onChange={(e) =>
-                      setNewForm((s) => ({ ...s, startDate: e.target.value }))
-                    }
-                    data-vaul-no-drag
-                    onPointerDownCapture={(e) => e.stopPropagation()}
-                    className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
-                  />
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Start Time</div>
-                  <input
-                    type="time"
-                    value={newForm.startTime || ""}
-                    onChange={(e) =>
-                      setNewForm((s) => ({ ...s, startTime: e.target.value }))
-                    }
-                    data-vaul-no-drag
-                    onPointerDownCapture={(e) => e.stopPropagation()}
-                    className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <DrawerFooter>
-              <button
-                type="button"
-                onClick={onCreate}
-                disabled={!canEdit || !isFormValid}
-                className={[
-                  "h-9 rounded-md border px-4 text-sm transition",
-                  !canEdit || !isFormValid
-                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                    : "bg-white text-gray-900 border-gray-200 hover:bg-gray-100 cursor-pointer",
-                ].join(" ")}
-                title={
-                  !canEdit
-                    ? "권한 없음"
-                    : !isFormValid
-                      ? "필수 항목을 입력해 주세요"
-                      : ""
-                }
-              >
-                생성
-              </button>
-
-              <DrawerClose asChild>
-                <button
-                  type="button"
-                  className="h-9 rounded-md border border-gray-200 bg-white px-4 text-sm hover:bg-gray-100"
-                >
-                  취소
-                </button>
-              </DrawerClose>
-            </DrawerFooter>
-          </div>
-        </DrawerContent>
-      </Drawer>
+      {/* ✅ Drawer는 분리된 컴포넌트 */}
+      <SimulationCreateDrawer
+        open={openNew}
+        onOpenChange={setOpenNew}
+        canEdit={canEdit}
+        products={products}
+        prodLoading={prodLoading}
+        prodErr={prodErr}
+        newForm={newForm}
+        setNewForm={setNewForm}
+        onCreate={onCreate}
+      />
     </DashboardShell>
   );
 }

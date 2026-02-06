@@ -70,8 +70,46 @@ function getRowKey(n, idx) {
   return `notice-x-${n?.createdAt ?? "noDate"}-${n?.title ?? "noTitle"}-${idx}`;
 }
 
+// 추가 또는 교체할 내용 (파일 상단 helper 함수 섹션에 넣으세요)
+
+function normalizeFiles(n) {
+  const raw =
+    n?.attachments ||
+    n?.files ||
+    n?.attachedFiles ||
+    n?.attachmentsList ||
+    n?.fileList ||
+    n?.existingFiles ||
+    [];
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((f) => {
+      if (!f) return null;
+      if (typeof f === "string") {
+        return { id: null, name: f.split("/").pop(), url: f };
+      }
+      return {
+        id: f.id ?? f.fileId ?? f._id ?? null,
+        name:
+          f.name ??
+          f.filename ??
+          f.originalName ??
+          f.fileName ??
+          (f.url ? f.url.split("/").pop() : "파일"),
+        url: f.url ?? f.path ?? f.fileUrl ?? f.downloadUrl ?? null,
+      };
+    })
+    .filter(Boolean);
+}
+
 function normalizeRow(n) {
-  return { ...n, id: getId(n), pinned: isPinned(n) };
+  return {
+    ...n,
+    id: getId(n),
+    pinned: isPinned(n),
+    files: normalizeFiles(n), // <-- 항상 files 배열을 포함
+  };
 }
 
 function getWriter(n) {
@@ -116,6 +154,43 @@ function NoticeModal({ open, onClose, notice }) {
   if (!open) return null;
   const stop = (e) => e.stopPropagation();
 
+  // 안전한 파일 정규화(모달에서 직접 사용)
+  const normalizeFilesForModal = (n) => {
+    const raw =
+      n?.files ??
+      n?.attachments ??
+      n?.attachedFiles ??
+      n?.attachmentsList ??
+      n?.fileList ??
+      n?.existingFiles ??
+      [];
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((f) => {
+        if (!f) return null;
+        if (typeof f === "string") {
+          return { id: null, name: f.split("/").pop(), url: f };
+        }
+        return {
+          id: f.id ?? f.fileId ?? f._id ?? null,
+          name:
+            f.name ??
+            f.filename ??
+            f.originalName ??
+            f.fileName ??
+            (f.url ? f.url.split("/").pop() : "파일"),
+          url: f.url ?? f.path ?? f.fileUrl ?? f.downloadUrl ?? null,
+        };
+      })
+      .filter(Boolean);
+  };
+
+  const files = normalizeFilesForModal(notice);
+
+  const isImage = (url) =>
+    typeof url === "string" && /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(url);
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -158,6 +233,70 @@ function NoticeModal({ open, onClose, notice }) {
           <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 wrap-break-word">
             {notice?.content || notice?.description || "내용이 없습니다."}
           </div>
+
+          {/* 첨부파일 표시 */}
+          {files.length > 0 && (
+            <div className="mt-6">
+              <div className="text-sm text-neutral-500 mb-2">첨부파일</div>
+              <div className="grid grid-cols-1 gap-3">
+                {files.map((f, idx) => {
+                  const key = f.id ?? f.url ?? idx;
+                  if (!f.url) {
+                    return (
+                      <div key={key} className="text-sm text-gray-600">
+                        {f.name}
+                      </div>
+                    );
+                  }
+                  if (isImage(f.url)) {
+                    return (
+                      <a
+                        key={key}
+                        href={f.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block"
+                      >
+                        <img
+                          src={f.url}
+                          alt={f.name}
+                          className="max-w-full rounded-md border"
+                          style={{ maxHeight: 240 }}
+                        />
+                        <div className="text-xs text-neutral-500 mt-1">
+                          {f.name}
+                        </div>
+                      </a>
+                    );
+                  }
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between"
+                    >
+                      <a
+                        href={f.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-blue-600 underline truncate pr-4"
+                      >
+                        {f.name}
+                      </a>
+                      <a
+                        href={f.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-gray-500 hover:underline"
+                        download
+                      >
+                        다운로드
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 bg-white px-6 py-4 flex justify-end gap-2">
@@ -226,8 +365,24 @@ export default function Notice() {
 
     try {
       const detail = await getNoticeById(row.id, token);
+      console.log("[NOTICE DETAIL RAW]", detail); // 디버그: 서버 응답 전체
       const item = detail?.notice || detail?.data || detail;
-      if (item) setSelected(normalizeRow(item));
+      // 정규화된 항목
+      const normalized = normalizeRow(item || {});
+      console.log("[NORMALIZED ITEM]", normalized); // 디버그: 정규화 결과
+
+      // 만약 상세(item)가 파일 정보를 안주면(빈 배열) 기존 row의 files를 보존
+      const merged = {
+        ...row,
+        ...normalized,
+        // prefer normalized.files if present and non-empty, otherwise keep row.files
+        files:
+          Array.isArray(normalized.files) && normalized.files.length > 0
+            ? normalized.files
+            : (row?.files ?? row?.attachments ?? []),
+      };
+
+      setSelected(merged);
     } catch (e) {
       console.error("[NOTICE DETAIL ERROR]", e);
     }

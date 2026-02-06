@@ -2,12 +2,16 @@
 const serverAddr = "http://localhost:8080";
 
 // (1) 기계 전체 조회
-export async function getMachine(token) {
-  return fetch(`${serverAddr}/api/operation/machine`, {
+export async function getMachine(token, keyword = "") {
+  const url = keyword
+    ? `${serverAddr}/api/operation/machine?keyword=${keyword}`
+    : `${serverAddr}/api/operation/machine`;
+
+  return fetch(url, {
     headers: {
       Authorization: "Bearer " + token,
     },
-  }).then((r) => r.json()); // { machineList: [...] }
+  }).then((r) => r.json());
 }
 
 // (2) 기계 upsert (추가/수정/삭제)

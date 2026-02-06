@@ -3,6 +3,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* macOS 스크롤바 항상 표시 */
+.force-scrollbar::-webkit-scrollbar {
+  height: 10px;
+}
+
+.force-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.force-scrollbar::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);

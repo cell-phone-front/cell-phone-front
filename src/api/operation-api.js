@@ -1,9 +1,13 @@
 // src/api/operation-api.js
 const serverAddr = "http://localhost:8080";
 
-// 공정 단계 전체 조회
-export async function getOperations(token) {
-  return fetch(`${serverAddr}/api/operation`, {
+// 공정단계 전체 조회 (+ 검색 조회)
+export async function getOperations(token, keyword = "") {
+  const url = keyword
+    ? `${serverAddr}/api/operation?keyword=${keyword}`
+    : `${serverAddr}/api/operation`;
+
+  return fetch(url, {
     headers: {
       Authorization: "Bearer " + token,
     },
@@ -35,4 +39,3 @@ export async function parseOperationXLS(file, token) {
     body: formData,
   }).then((r) => r.json());
 }
-
