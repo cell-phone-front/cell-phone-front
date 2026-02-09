@@ -1,5 +1,5 @@
 // pages/notice/index.js
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
   Plus,
@@ -12,6 +12,8 @@ import {
   Search,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
+import NoticeModal from "@/components/notice/modal";
+
 import { useAccount, useToken } from "@/stores/account-store";
 import {
   getNotices,
@@ -20,6 +22,9 @@ import {
   deleteNotice,
 } from "@/api/notice-api";
 
+/* ===============================
+   utils
+=============================== */
 function fmtDate(v) {
   if (!v) return "-";
   const s = String(v);
@@ -28,6 +33,10 @@ function fmtDate(v) {
   else if (d.includes(" ")) d = d.split(" ")[0];
   else d = d.slice(0, 10);
   return d.replaceAll("-", ".");
+}
+
+function safeLower(v) {
+  return String(v ?? "").toLowerCase();
 }
 
 function isPinned(n) {
@@ -78,37 +87,38 @@ function normalizeFiles(n) {
     n?.attachedFiles ||
     n?.attachmentsList ||
     n?.fileList ||
-    n?.existingFiles ||
+    n?.noticeAttachmentList ||
+    n?.attachmentList ||
+    n?.noticeAttachments ||
     [];
+
   if (!Array.isArray(raw)) return [];
 
   return raw
     .map((f) => {
       if (!f) return null;
-      if (typeof f === "string") {
+      if (typeof f === "string")
         return { id: null, name: f.split("/").pop(), url: f };
-      }
+
       return {
-        id: f.id ?? f.fileId ?? f._id ?? null,
+        id:
+          f.id ??
+          f.noticeAttachmentId ??
+          f.attachmentId ??
+          f.fileId ??
+          f._id ??
+          null,
         name:
           f.name ??
-          f.filename ??
           f.originalName ??
+          f.filename ??
           f.fileName ??
+          f.storedName ??
           (f.url ? f.url.split("/").pop() : "파일"),
         url: f.url ?? f.path ?? f.fileUrl ?? f.downloadUrl ?? null,
       };
     })
     .filter(Boolean);
-}
-
-function normalizeRow(n) {
-  return {
-    ...n,
-    id: getId(n),
-    pinned: isPinned(n),
-    files: normalizeFiles(n),
-  };
 }
 
 function getWriter(n) {
@@ -125,6 +135,25 @@ function getWriter(n) {
   );
 }
 
+// ✅ 공지 작성자 id 추출(서버 응답 키가 제각각이라 방어)
+function getWriterId(n) {
+  if (!n) return null;
+
+  const v =
+    n.memberId ??
+    n.member_id ??
+    n.writerId ??
+    n.writer_id ??
+    n.authorId ??
+    n.author_id ??
+    n.member?.id ??
+    n.author?.id ??
+    n.writer?.id ??
+    null;
+
+  return v != null ? String(v) : null;
+}
+
 function getViews(n) {
   const v =
     n?.views ??
@@ -138,191 +167,37 @@ function getViews(n) {
   return v ?? "-";
 }
 
-function NoticeModal({ open, onClose, notice }) {
-  React.useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-  const stop = (e) => e.stopPropagation();
-
-  const normalizeFilesForModal = (n) => {
-    const raw =
-      n?.files ??
-      n?.attachments ??
-      n?.attachedFiles ??
-      n?.attachmentsList ??
-      n?.fileList ??
-      n?.existingFiles ??
-      [];
-    if (!Array.isArray(raw)) return [];
-
-    return raw
-      .map((f) => {
-        if (!f) return null;
-        if (typeof f === "string") {
-          return { id: null, name: f.split("/").pop(), url: f };
-        }
-        return {
-          id: f.id ?? f.fileId ?? f._id ?? null,
-          name:
-            f.name ??
-            f.filename ??
-            f.originalName ??
-            f.fileName ??
-            (f.url ? f.url.split("/").pop() : "파일"),
-          url: f.url ?? f.path ?? f.fileUrl ?? f.downloadUrl ?? null,
-        };
-      })
-      .filter(Boolean);
+/** ✅ 누락되면 normalizeRow is not defined 로 터집니다 */
+function normalizeRow(n) {
+  const id = getId(n);
+  return {
+    ...n,
+    id: id != null ? String(id) : null,
+    pinned: isPinned(n),
+    files: normalizeFiles(n),
+    __writerId: getWriterId(n), // ✅ 작성자 id 보관
   };
-
-  const files = normalizeFilesForModal(notice);
-
-  const isImage = (url) =>
-    typeof url === "string" && /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(url);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl bg-white rounded-md shadow-xl overflow-hidden p-4 max-h-[85vh] flex flex-col"
-        onClick={stop}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="sticky top-0 z-10 bg-white px-6 py-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-2xl font-semibold leading-snug wrap-break-word pb-2">
-                {notice?.title || "공지사항"}
-              </div>
-
-              <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1 pb-1">
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-gray-400">작성자</span>
-                  <span className="text-gray-700">{getWriter(notice)}</span>
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-gray-400">작성일</span>
-                  <span className="text-gray-700">
-                    {fmtDate(notice?.createdAt || notice?.date)}
-                  </span>
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Eye className="w-4 h-4 text-gray-300" />
-                  <span className="text-gray-700">{getViews(notice)}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 pt-1 pb-5 overflow-y-auto flex-1 min-h-0">
-          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 wrap-break-word">
-            {notice?.content || notice?.description || "내용이 없습니다."}
-          </div>
-
-          {files.length > 0 && (
-            <div className="mt-6">
-              <div className="text-sm text-neutral-500 mb-2">첨부파일</div>
-              <div className="grid grid-cols-1 gap-3">
-                {files.map((f, idx) => {
-                  const key = f.id ?? f.url ?? idx;
-                  if (!f.url) {
-                    return (
-                      <div key={key} className="text-sm text-gray-600">
-                        {f.name}
-                      </div>
-                    );
-                  }
-                  if (isImage(f.url)) {
-                    return (
-                      <a
-                        key={key}
-                        href={f.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-block"
-                      >
-                        <img
-                          src={f.url}
-                          alt={f.name}
-                          className="max-w-full rounded-md border"
-                          style={{ maxHeight: 240 }}
-                        />
-                        <div className="text-xs text-neutral-500 mt-1">
-                          {f.name}
-                        </div>
-                      </a>
-                    );
-                  }
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between"
-                    >
-                      <a
-                        href={f.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm text-blue-600 underline truncate pr-4"
-                      >
-                        {f.name}
-                      </a>
-                      <a
-                        href={f.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-gray-500 hover:underline"
-                        download
-                      >
-                        다운로드
-                      </a>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 bg-white px-6 py-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="cursor-pointer h-8 px-4 rounded-md bg-gray-400 text-white text-xs hover:bg-slate-900 active:scale-[0.99]"
-            type="button"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
+/* ===============================
+   page
+=============================== */
 export default function Notice() {
-  const [query, setQuery] = useState("");
-
   const router = useRouter();
   const { account } = useAccount();
   const { token } = useToken();
 
   const role = String(account?.role || "").toLowerCase();
+  // ✅ 공지는 admin/planner만 "관리 가능"이지만, 표시 자체는 "내 글"일 때만
   const canWriteNotice = role === "admin" || role === "planner";
 
-  const [notices, setNotices] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
+  // ✅ 내 id
+  const meId = account?.id != null ? String(account.id) : null;
+
+  const [query, setQuery] = useState("");
+  const [notices, setNotices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   async function loadList() {
     setLoading(true);
@@ -330,8 +205,7 @@ export default function Notice() {
     try {
       const json = await getNotices(token);
       const raw = Array.isArray(json?.noticeList) ? json.noticeList : [];
-      const arr = raw.map(normalizeRow);
-      setNotices(arr);
+      setNotices(raw.map(normalizeRow));
     } catch (e) {
       console.error(e);
       setError(e?.message || "공지사항을 불러오지 못했습니다.");
@@ -346,10 +220,11 @@ export default function Notice() {
     loadList();
   }, [token]);
 
-  const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState(null);
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
 
   async function openModal(row) {
+    // 낙관적 조회수 +1
     setNotices((prev) =>
       prev.map((n) =>
         n.id === row.id ? { ...n, views: (Number(getViews(n)) || 0) + 1 } : n,
@@ -365,16 +240,14 @@ export default function Notice() {
       const detail = await getNoticeById(row.id, token);
       const item = detail?.notice || detail?.data || detail;
       const normalized = normalizeRow(item || {});
-
       const merged = {
         ...row,
         ...normalized,
         files:
           Array.isArray(normalized.files) && normalized.files.length > 0
             ? normalized.files
-            : (row?.files ?? row?.attachments ?? []),
+            : normalizeFiles(row || {}),
       };
-
       setSelected(merged);
     } catch (e) {
       console.error("[NOTICE DETAIL ERROR]", e);
@@ -387,6 +260,7 @@ export default function Notice() {
   }
 
   async function onTogglePin(e, row) {
+    e.preventDefault();
     e.stopPropagation();
 
     if (row?.id == null) {
@@ -399,6 +273,9 @@ export default function Notice() {
     try {
       await setNoticePin(row.id, nextPinned, token);
       await loadList();
+      setSelected((prev) =>
+        prev?.id === row.id ? { ...prev, pinned: nextPinned } : prev,
+      );
     } catch (err) {
       console.error("[PIN API ERROR]", err);
       alert(err?.message || "핀 토글 실패");
@@ -406,6 +283,7 @@ export default function Notice() {
   }
 
   function onEdit(e, row) {
+    e.preventDefault();
     e.stopPropagation();
     if (row?.id == null) {
       alert("id가 없어서 수정 페이지로 이동할 수 없습니다.");
@@ -415,6 +293,7 @@ export default function Notice() {
   }
 
   async function onDelete(e, row) {
+    e.preventDefault();
     e.stopPropagation();
     if (row?.id == null) {
       alert("id가 없어서 삭제할 수 없습니다.");
@@ -427,33 +306,60 @@ export default function Notice() {
     try {
       await deleteNotice(row.id, token);
       await loadList();
+      if (selected?.id === row.id) closeModal();
     } catch (err) {
       console.error("[DELETE API ERROR]", err);
       alert(err?.message || "삭제 실패");
     }
   }
 
-  const pinnedNotices = React.useMemo(
+  function goWrite() {
+    router.push("/notice-write");
+  }
+
+  // 검색(프론트 필터)
+  const q = safeLower(query).trim();
+  const filtered = useMemo(() => {
+    if (!q) return notices || [];
+    return (notices || []).filter((n) => {
+      const t = safeLower(n?.title);
+      const c = safeLower(n?.content ?? n?.description);
+      const w = safeLower(getWriter(n));
+      return t.includes(q) || c.includes(q) || w.includes(q);
+    });
+  }, [notices, q]);
+
+  const pinnedNotices = useMemo(
     () =>
-      (notices || [])
+      (filtered || [])
         .filter((n) => n.pinned)
         .sort((a, b) =>
           String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
         ),
-    [notices],
+    [filtered],
   );
 
-  const normalNotices = React.useMemo(
+  const normalNotices = useMemo(
     () =>
-      (notices || [])
+      (filtered || [])
         .filter((n) => !n.pinned)
         .sort((a, b) =>
           String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
         ),
-    [notices],
+    [filtered],
   );
 
-  const [page, setPage] = React.useState(1);
+  // ✅ "내 공지"가 하나라도 있는지(헤더 '관리' vs '-')
+  const hasMine = useMemo(() => {
+    if (!meId) return false;
+    const all = [...(pinnedNotices || []), ...(normalNotices || [])];
+    return all.some(
+      (r) => r?.__writerId && String(r.__writerId) === String(meId),
+    );
+  }, [meId, pinnedNotices, normalNotices]);
+
+  // pagination (일반만 페이징)
+  const [page, setPage] = useState(1);
   const pageSize = 10;
 
   const pinnedCount = pinnedNotices.length;
@@ -479,14 +385,17 @@ export default function Notice() {
     setPage((p) => Math.min(pageCount, p + 1));
   }
 
-  function goWrite() {
-    router.push("/notice-write");
-  }
-
-  const GRID = "grid grid-cols-[80px_1fr_100px_120px_50px_120px]";
+  // styles
+  const GRID = "grid grid-cols-[72px_1fr_120px_120px_78px_140px]";
 
   const TABLE_WRAP =
-    "w-full bg-white border-t-2 border-b-2 border-indigo-500 overflow-hidden";
+    "w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+
+  const HEADER_ROW =
+    GRID +
+    " px-6 h-11 items-center " +
+    "border-b border-slate-100 " +
+    "text-[11px] font-extrabold tracking-wide text-slate-500";
 
   const ROW_BASE =
     "w-full text-left " +
@@ -495,101 +404,130 @@ export default function Notice() {
     "border-b border-slate-100 " +
     "hover:bg-slate-50 transition cursor-pointer group";
 
-  const ROW_PINNED = "bg-indigo-50/30";
+  const ROW_PINNED = "bg-indigo-50/40 hover:bg-indigo-50/70";
 
   const CELL_TITLE =
-    "min-w-0 truncate text-[14px] font-semibold text-slate-700 " +
+    "min-w-0 truncate text-[14px] font-bold text-slate-800 " +
     "group-hover:text-indigo-600 transition-colors";
 
   const CELL_TEXT = "truncate text-[12px] text-slate-700 whitespace-nowrap";
   const CELL_DATE = "truncate text-[12px] text-slate-600 whitespace-nowrap";
 
-  // 조회(눈+숫자) 칸: 항상 같은 사이즈/정렬
   const VIEW_CELL =
-    "flex items-center justify-start gap-1 pl-2 text-[12px] text-slate-700 whitespace-nowrap";
+    "flex items-center justify-start gap-1 text-[12px] text-slate-700 whitespace-nowrap";
 
-  // 관리(수정/삭제) 칸: 오른쪽 끝까지 붙이기
-  const ACTION_CELL = "flex items-center justify-end gap-2 pr-2";
+  const ACTION_CELL = "flex items-center justify-end gap-1";
 
   const total = pinnedNotices.length + normalNotices.length;
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="공지사항">
-      {/* */}
       <div className="h-full w-full overflow-hidden">
-        <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
-          {/* 왼쪽: 제목 */}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Pin className="w-5 h-5 text-indigo-600" />
-              <div className="text-2xl font-semibold tracking-tight text-slate-900">
-                공지사항
+        {/* 상단 헤더 */}
+        <div className="pt-4 pb-5">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 bg-white/80 backdrop-blur">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-4">
+                    <div className="h-13 w-13 rounded-xl bg-indigo-600 grid place-items-center shadow-sm">
+                      <Pin className="w-7 h-7 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold tracking-tight text-slate-900">
+                        공지사항
+                      </div>
+                      <p className="mt-1 text-[12px] text-slate-500 font-medium">
+                        최신 공지/중요 공지를 확인하세요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="제목/내용/작성자 검색"
+                      className="
+                        h-10 w-[320px] rounded-xl border border-slate-200 bg-white
+                        pl-9 pr-3 text-[13px]
+                        outline-none transition
+                        focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                        placeholder:text-[12px]
+                      "
+                    />
+                  </div>
+
+                  {canWriteNotice && (
+                    <button
+                      type="button"
+                      onClick={goWrite}
+                      className="
+                        h-10 px-4 rounded-xl
+                        flex items-center gap-2 justify-center
+                        text-[13px] font-extrabold
+                        bg-indigo-600 text-white
+                        hover:bg-indigo-500 active:bg-indigo-700
+                        active:scale-[0.98]
+                        shadow-sm
+                        focus:outline-none focus:ring-2 focus:ring-indigo-200
+                        cursor-pointer
+                      "
+                    >
+                      <Plus className="w-4 h-4" />
+                      공지 작성
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
-              최신 공지/중요 공지를 확인하세요.
-            </p>
-          </div>
 
-          {/* 오른쪽: 검색창 */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            {/* 요약 라인 */}
+            <div className="px-6 py-2 flex items-center justify-between">
+              <div className="text-xs text-slate-500">
+                총{" "}
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {total}
+                </span>
+                건
+                {q ? (
+                  <span className="ml-2 text-slate-400">
+                    (검색:{" "}
+                    <span className="text-slate-600 font-semibold">
+                      {query}
+                    </span>
+                    )
+                  </span>
+                ) : null}
+              </div>
 
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearch();
-                }}
-                placeholder="제목 검색"
-                className="
-      h-9 w-[300px] rounded-md border border-slate-200
-      pl-9 pr-3 text-sm
-      outline-none
-      transition
-      focus:border-indigo-500
-      focus:ring-2 focus:ring-indigo-100 placeholder:text-[12px]
-    "
-              />
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                  고정{" "}
+                  <span className="tabular-nums text-slate-800">
+                    {pinnedNotices.length}
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                  일반{" "}
+                  <span className="tabular-nums text-slate-800">
+                    {normalNotices.length}
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="px-10 py-3 flex items-center justify-between">
-          <div className="text-xs text-neutral-500">
-            총 <span className="font-semibold text-neutral-700">{total}</span>건
-          </div>
-
-          {canWriteNotice && (
-            <button
-              type="button"
-              onClick={goWrite}
-              className={`
-    h-9 px-5 rounded-md border
-    flex items-center gap-2 justify-center
-    text-sm font-semibold
-    transition-all duration-200
-    focus:outline-none
-
-    bg-indigo-600 text-white border-indigo-600
-    hover:bg-indigo-500
-    active:bg-indigo-700
-    active:scale-[0.97]
-    cursor-pointer
-    shadow-sm
-    focus:ring-2 focus:ring-indigo-200
-  `}
-            >
-              <Plus className="w-4 h-4" />
-              공지 작성
-            </button>
-          )}
         </div>
 
         {loading && (
-          <div className="px-10 py-10 text-sm text-neutral-500">
+          <div className="px-10 py-10 text-sm text-slate-500">
             불러오는 중...
           </div>
         )}
@@ -598,127 +536,92 @@ export default function Notice() {
         )}
 
         {!loading && !error && (
-          <div className="px-10">
+          <div className="pb-10">
             <div className={TABLE_WRAP}>
+              {/* 컬럼 헤더 */}
+              <div className={HEADER_ROW}>
+                <div className="flex items-center justify-center">고정</div>
+                <div className="pl-2">제목</div>
+                <div className="pl-2">작성자</div>
+                <div className="pl-2">작성일</div>
+                <div>조회</div>
+                <div className="text-right pr-7">{hasMine ? "관리" : "-"}</div>
+              </div>
+
               {/* pinned */}
-              {pinnedNotices.map((r, idx) => (
-                <button
-                  key={getRowKey(r, idx)}
-                  type="button"
-                  onClick={() => openModal(r)}
-                  className={[ROW_BASE, ROW_PINNED].join(" ")}
-                >
-                  {/* 1) 번호/핀 */}
-                  <div className="flex items-center justify-center">
-                    {r.id != null ? (
-                      <button
-                        type="button"
-                        onClick={(e) => onTogglePin(e, r)}
-                        className="h-7 w-7 grid place-items-center"
-                        title="상단 고정 해제"
-                      >
-                        📌
-                      </button>
-                    ) : null}
-                  </div>
+              {pinnedNotices.map((r, idx) => {
+                const isMineNotice =
+                  meId &&
+                  r?.__writerId &&
+                  String(r.__writerId) === String(meId);
 
-                  {/* 2) 제목 */}
-                  <div className="min-w-0 pl-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
-                        고정
-                      </span>
-                      <span className={CELL_TITLE}>{r.title}</span>
-                    </div>
-                  </div>
-
-                  {/* 3) 작성자 */}
-                  <div className={"pl-2 " + CELL_TEXT}>{getWriter(r)}</div>
-
-                  {/* 4) 작성일 */}
-                  <div className={"pl-2 " + CELL_DATE}>
-                    {fmtDate(r.createdAt || r.date)}
-                  </div>
-
-                  {/* 5) 조회 */}
-                  <div className={VIEW_CELL}>
-                    <Eye className="w-4 h-4 shrink-0 text-slate-400" />
-                    <span className="tabular-nums">{getViews(r)}</span>
-                  </div>
-
-                  {/* 6) 수정/삭제 */}
-                  <div className={ACTION_CELL}>
-                    {canWriteNotice ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => onEdit(e, r)}
-                          className="h-8 w-8 grid place-items-center text-gray-400 hover:text-black"
-                          title="수정"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => onDelete(e, r)}
-                          className="h-8 w-8 grid place-items-center text-gray-400 hover:text-red-600"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-xs text-neutral-400">-</span>
-                    )}
-                  </div>
-                </button>
-              ))}
-
-              {/* normal */}
-              {pageRows.length === 0 ? (
-                <div className="px-6 py-14 text-center text-sm text-slate-500">
-                  공지사항이 없습니다.
-                </div>
-              ) : (
-                pageRows.map((r, idx) => (
-                  <button
-                    key={getRowKey(r, pinnedNotices.length + start + idx)}
-                    type="button"
+                return (
+                  <div
+                    key={getRowKey(r, idx)}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openModal(r)}
-                    className={ROW_BASE}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") openModal(r);
+                    }}
+                    className={[ROW_BASE, ROW_PINNED].join(" ")}
                   >
-                    {/* 1) 번호 */}
-                    <div className="flex items-center justify-center text-[13px] text-slate-500">
-                      {pinnedNotices.length + start + idx + 1}
+                    <div className="flex items-center justify-center">
+                      {r.pinned ? (
+                        canWriteNotice && r.id != null ? (
+                          // ✅ admin/planner만 토글 가능
+                          <button
+                            type="button"
+                            onClick={(e) => onTogglePin(e, r)}
+                            className="h-8 w-8 grid place-items-center rounded-lg hover:bg-indigo-100/70 transition"
+                            title="상단 고정 해제"
+                          >
+                            📌
+                          </button>
+                        ) : (
+                          // ✅ 권한 없으면 아이콘만 표시(클릭 불가)
+                          <span
+                            className="h-8 w-8 grid place-items-center text-indigo-600"
+                            title="상단 고정"
+                            aria-label="상단 고정"
+                          >
+                            📌
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
                     </div>
 
-                    {/* 2) 제목 */}
                     <div className="min-w-0 pl-2">
-                      <span className={CELL_TITLE}>{r.title}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 inline-flex items-center text-[11px] font-medium px-3 py-0.5 rounded-md bg-indigo-600 text-white">
+                          고정
+                        </span>
+                        <span className={CELL_TITLE}>{r.title}</span>
+                      </div>
                     </div>
 
-                    {/* 3) 작성자 */}
                     <div className={"pl-2 " + CELL_TEXT}>{getWriter(r)}</div>
 
-                    {/* 4) 작성일 */}
                     <div className={"pl-2 " + CELL_DATE}>
                       {fmtDate(r.createdAt || r.date)}
                     </div>
 
-                    {/* 5) 조회 */}
                     <div className={VIEW_CELL}>
                       <Eye className="w-4 h-4 shrink-0 text-slate-400" />
-                      <span className="tabular-nums">{getViews(r)}</span>
+                      <span className="tabular-nums font-medium">
+                        {getViews(r)}
+                      </span>
                     </div>
 
-                    {/* 6) 수정/삭제 */}
                     <div className={ACTION_CELL}>
-                      {canWriteNotice ? (
+                      {canWriteNotice && isMineNotice ? (
                         <>
                           <button
                             type="button"
                             onClick={(e) => onEdit(e, r)}
-                            className="h-8 w-8 grid place-items-center text-gray-400 hover:text-black"
+                            className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
                             title="수정"
                           >
                             <Pencil className="w-4 h-4" />
@@ -726,26 +629,102 @@ export default function Notice() {
                           <button
                             type="button"
                             onClick={(e) => onDelete(e, r)}
-                            className="h-8 w-8 grid place-items-center text-gray-400 hover:text-red-600"
+                            className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                             title="삭제"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </>
                       ) : (
-                        <span className="text-xs text-neutral-400">-</span>
+                        <span className="text-xs text-slate-300">-</span>
                       )}
                     </div>
-                  </button>
-                ))
+                  </div>
+                );
+              })}
+
+              {/* normal */}
+              {pageRows.length === 0 ? (
+                <div className="px-6 py-14 text-center text-sm text-slate-500">
+                  공지사항이 없습니다.
+                </div>
+              ) : (
+                pageRows.map((r, idx) => {
+                  const isMineNotice =
+                    meId &&
+                    r?.__writerId &&
+                    String(r.__writerId) === String(meId);
+
+                  return (
+                    <div
+                      key={getRowKey(r, pinnedNotices.length + start + idx)}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openModal(r)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") openModal(r);
+                      }}
+                      className={ROW_BASE}
+                    >
+                      <div className="flex items-center justify-center text-[13px] font-semibold text-slate-500 tabular-nums">
+                        {pinnedNotices.length + start + idx + 1}
+                      </div>
+
+                      <div className="min-w-0 pl-2">
+                        <span className={CELL_TITLE}>{r.title}</span>
+                      </div>
+
+                      <div className={"pl-2 " + CELL_TEXT}>{getWriter(r)}</div>
+
+                      <div className={"pl-2 " + CELL_DATE}>
+                        {fmtDate(r.createdAt || r.date)}
+                      </div>
+
+                      <div className={VIEW_CELL}>
+                        <Eye className="w-4 h-4 shrink-0 text-slate-400" />
+                        <span className="tabular-nums font-medium">
+                          {getViews(r)}
+                        </span>
+                      </div>
+
+                      <div className={ACTION_CELL}>
+                        {canWriteNotice && isMineNotice ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => onEdit(e, r)}
+                              className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
+                              title="수정"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => onDelete(e, r)}
+                              className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-300">-</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
             {/* 페이지네이션 */}
-            <div className="py-3 flex items-center">
-              <div className="ml-auto flex items-center gap-6">
-                <div className="text-xs text-neutral-500">
-                  {safePage} / {pageCount} 페이지
+            <div className="mt-4 flex items-center">
+              <div className="ml-auto flex items-center gap-3">
+                <div className="text-xs text-slate-500">
+                  <span className="font-extrabold text-slate-800 tabular-nums">
+                    {safePage}
+                  </span>{" "}
+                  / <span className="tabular-nums">{pageCount}</span> 페이지
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -753,7 +732,13 @@ export default function Notice() {
                     type="button"
                     onClick={goPrev}
                     disabled={safePage <= 1}
-                    className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
+                    className="
+                      h-9 px-3 rounded-xl border border-slate-200 bg-white
+                      text-[12px] font-semibold text-slate-700
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      hover:bg-slate-50
+                      flex items-center gap-1 cursor-pointer
+                    "
                   >
                     <ChevronLeft className="w-4 h-4" />
                     이전
@@ -763,7 +748,13 @@ export default function Notice() {
                     type="button"
                     onClick={goNext}
                     disabled={safePage >= pageCount}
-                    className="h-8 px-3 rounded-md border border-neutral-200 bg-white text-[11px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 flex items-center gap-1 cursor-pointer"
+                    className="
+                      h-9 px-3 rounded-xl border border-slate-200 bg-white
+                      text-[12px] font-semibold text-slate-700
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      hover:bg-slate-50
+                      flex items-center gap-1 cursor-pointer
+                    "
                   >
                     다음
                     <ChevronRight className="w-4 h-4" />
@@ -774,7 +765,12 @@ export default function Notice() {
           </div>
         )}
 
-        <NoticeModal open={open} onClose={closeModal} notice={selected} />
+        <NoticeModal
+          open={open}
+          onClose={closeModal}
+          notice={selected}
+          token={token}
+        />
       </div>
     </DashboardShell>
   );

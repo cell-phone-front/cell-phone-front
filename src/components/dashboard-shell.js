@@ -56,7 +56,7 @@ export default function DashboardShell({
         </header>
 
         {/* 컨텐츠 공통 영역(대시보드와 동일 여백/폭) */}
-        <main className="flex-1 min-h-0 px-6 pb-6 pt-3">
+        <main className="flex-1 min-h-0 px-6 pb-6 pt-2">
           <div className="mx-auto max-w-8xl w-full h-full min-h-0">
             {children}
           </div>

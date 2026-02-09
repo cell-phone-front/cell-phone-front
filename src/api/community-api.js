@@ -32,7 +32,7 @@ export async function getCommunityById(communityId, token) {
   return response.json();
 }
 
-// (3) 커뮤니티 글 작성 (Auth: planner, worker)  body: { title, description }
+// (3) 커뮤니티 글 작성 body: { title, content }
 export async function postCommunity(payload, token) {
   const response = await fetch(`${serverAddr}/api/community`, {
     method: "POST",
@@ -40,17 +40,18 @@ export async function postCommunity(payload, token) {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
-    body: JSON.stringify(payload), // { title, description }
+    body: JSON.stringify({
+      title: payload?.title ?? "",
+      content: payload?.content ?? payload?.description ?? "", // ✅ 방어
+    }),
   });
 
   const data = await safeJson(response);
-  if (!response.ok) {
-    throw new Error(data?.message || "커뮤니티 글 작성 실패");
-  }
-  return data; // 서버가 주는 응답이 없으면 null일 수 있음
+  if (!response.ok) throw new Error(data?.message || "커뮤니티 글 작성 실패");
+  return data;
 }
 
-// (4) 커뮤니티 글 수정 (Auth: planner, worker)  body: { title, description }
+// (4) 커뮤니티 글 수정 body: { title, content }
 export async function putCommunity(communityId, payload, token) {
   const response = await fetch(`${serverAddr}/api/community/${communityId}`, {
     method: "PUT",
@@ -58,13 +59,14 @@ export async function putCommunity(communityId, payload, token) {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
-    body: JSON.stringify(payload), // { title, description }
+    body: JSON.stringify({
+      title: payload?.title ?? "",
+      content: payload?.content ?? payload?.description ?? "", // ✅ 방어
+    }),
   });
 
   const data = await safeJson(response);
-  if (!response.ok) {
-    throw new Error(data?.message || "커뮤니티 글 수정 실패");
-  }
+  if (!response.ok) throw new Error(data?.message || "커뮤니티 글 수정 실패");
   return data;
 }
 

@@ -1,5 +1,5 @@
-// pages/board/index.js (자유게시판을 공지사항 틀로 변경한 버전)
-import { useEffect, useMemo, useState } from "react";
+// pages/board/index.js
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
   Plus,
@@ -8,6 +8,7 @@ import {
   MessageSquareText,
   Pencil,
   Trash2,
+  Search,
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
@@ -17,16 +18,68 @@ import {
   deleteCommunity,
 } from "@/api/community-api";
 
+/* ===============================
+   utils
+=============================== */
 function fmtDate(v) {
-  if (!v) return "-";
-  let d = String(v);
+  if (!v) return "";
+  const s = String(v);
+  let d = s;
   if (d.includes("T")) d = d.split("T")[0];
   else if (d.includes(" ")) d = d.split(" ")[0];
   else d = d.slice(0, 10);
-  const [y, m, day] = d.split("-");
-  return `${y}.${Number(m)}.${Number(day)}`;
+  return d.replaceAll("-", ".");
 }
 
+function safeLower(v) {
+  return String(v ?? "").toLowerCase();
+}
+
+function getId(n) {
+  if (!n) return null;
+  return n.id ?? n.communityId ?? n.community_id ?? n._id ?? null;
+}
+
+function getRowKey(n, idx) {
+  const id = getId(n);
+  if (id != null) return `community-${id}`;
+  return `community-x-${n?.createdAt ?? "noDate"}-${n?.title ?? "noTitle"}-${idx}`;
+}
+
+function getWriter(n) {
+  return (
+    n?.memberName ||
+    n?.writer ||
+    n?.author ||
+    n?.name ||
+    n?.member?.name ||
+    n?.authorName ||
+    n?.writerName ||
+    "익명"
+  );
+}
+
+// ✅ 글 작성자 id 추출(서버 응답 키가 제각각이라 방어)
+function getWriterId(n) {
+  if (!n) return null;
+  const v =
+    n.memberId ??
+    n.member_id ??
+    n.writerId ??
+    n.writer_id ??
+    n.authorId ??
+    n.author_id ??
+    n.member?.id ??
+    n.author?.id ??
+    n.writer?.id ??
+    null;
+
+  return v != null ? String(v) : null;
+}
+
+/* ===============================
+   page
+=============================== */
 export default function Board() {
   const router = useRouter();
   const { account } = useAccount();
@@ -35,23 +88,45 @@ export default function Board() {
   const role = String(account?.role || "").toLowerCase();
   const canWriteCommunity = role === "planner" || role === "worker";
 
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState("latest");
-  const [page, setPage] = useState(1);
-  const pageSize = 8;
+  // ✅ 내 id
+  const meId = account?.id != null ? String(account.id) : null;
 
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("latest"); // latest | comments
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState("");
 
-  // ✅ grid/row 스타일 상수 (중복 제거)
-  const GRID = "grid grid-cols-[80px_1fr_100px_110px_40px_130px]";
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // pagination
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  // styles
+  const GRID = "grid grid-cols-[72px_1fr_120px_120px_90px_140px]";
+  const TABLE_WRAP =
+    "w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+  const HEADER_ROW =
+    GRID +
+    " px-6 h-11 items-center " +
+    "border-b border-slate-100 " +
+    "text-[11px] font-extrabold tracking-wide text-slate-500";
   const ROW_BASE =
     "w-full text-left " +
     GRID +
-    " px-6 h-12 items-center border-b border-neutral-100 hover:bg-neutral-100 transition cursor-pointer";
+    " px-6 h-12 items-center " +
+    "border-b border-slate-100 " +
+    "hover:bg-slate-50 transition cursor-pointer group";
 
-  // 글쓰기
+  const CELL_TITLE =
+    "min-w-0 truncate text-[14px] font-bold text-slate-800 " +
+    "group-hover:text-indigo-600 transition-colors";
+  const CELL_TEXT = "truncate text-[12px] text-slate-700 whitespace-nowrap";
+  const CELL_DATE = "truncate text-[12px] text-slate-600 whitespace-nowrap";
+  const COUNT_CELL =
+    "text-right text-[12px] text-slate-700 whitespace-nowrap tabular-nums font-semibold";
+  const ACTION_CELL = "flex items-center justify-end gap-1";
+
   function goWrite() {
     router.push("/board-write");
   }
@@ -61,87 +136,104 @@ export default function Board() {
     router.push(`/board-view?id=${id}`);
   }
 
-  // 서버 목록 + 댓글 수
-  useEffect(() => {
+  async function loadList() {
     if (!token) return;
 
-    let alive = true;
     setLoading(true);
-    setLoadError("");
+    setError("");
 
-    (async () => {
-      try {
-        const json = await getCommunities(token);
-        if (!alive) return;
+    try {
+      const json = await getCommunities(token);
+      const list =
+        json?.communities || json?.communityList || json?.items || json || [];
+      const arr = Array.isArray(list) ? list : [];
 
-        const list =
-          json?.communities || json?.communityList || json?.items || json || [];
-        const arr = Array.isArray(list) ? list : [];
+      const ids = arr
+        .map((r) => getId(r))
+        .filter((v) => v != null)
+        .map(String);
 
-        const ids = arr
-          .map((r) => r.id ?? r.communityId ?? r.community_id)
-          .filter((v) => v != null);
+      // 댓글 수 병합
+      const pairs = await Promise.all(
+        ids.map(async (cid) => {
+          try {
+            const res = await getCommunityCommentCount(cid, token);
+            const cnt =
+              res?.count ??
+              res?.commentCount ??
+              res?.data ??
+              (typeof res === "number" ? res : 0);
+            return [cid, Number(cnt) || 0];
+          } catch {
+            return [cid, 0];
+          }
+        }),
+      );
 
-        const pairs = await Promise.all(
-          ids.map(async (cid) => {
-            try {
-              const res = await getCommunityCommentCount(cid, token);
-              const cnt =
-                res?.count ??
-                res?.commentCount ??
-                res?.data ??
-                (typeof res === "number" ? res : 0);
-              return [String(cid), Number(cnt) || 0];
-            } catch {
-              return [String(cid), 0];
-            }
-          }),
-        );
+      const countMap = Object.fromEntries(pairs);
 
-        const countMap = Object.fromEntries(pairs);
+      const merged = arr.map((r) => {
+        const cid = getId(r);
+        const serverCnt =
+          r.comments ?? r.commentCount ?? r.comment_count ?? r.commentCnt;
+        const apiCnt = countMap[String(cid)] ?? 0;
 
-        const merged = arr.map((r) => {
-          const cid = r.id ?? r.communityId ?? r.community_id;
-          const serverCnt =
-            r.comments ?? r.commentCount ?? r.comment_count ?? r.commentCnt;
-          const apiCnt = countMap[String(cid)] ?? 0;
+        return {
+          ...r,
+          id: cid != null ? String(cid) : null,
+          __commentCount:
+            typeof serverCnt === "number" ? serverCnt : Number(apiCnt) || 0,
+        };
+      });
 
-          return {
-            ...r,
-            __commentCount:
-              typeof serverCnt === "number" ? serverCnt : Number(apiCnt) || 0,
-          };
-        });
+      setData(merged);
+      setPage(1);
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || "목록을 불러오지 못했습니다.");
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-        setData(merged);
-        setPage(1);
-      } catch (e) {
-        if (!alive) return;
-        setLoadError(e?.message || "목록을 불러오지 못했어요.");
-        setData([]);
-      } finally {
-        if (!alive) return;
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
+  useEffect(() => {
+    if (!token) return;
+    loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // 화면용 row
-  const rows = useMemo(() => {
+  function onEdit(e, row) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row?.id == null) return alert("id가 없어서 수정할 수 없습니다.");
+    router.push(`/board-write?id=${row.id}`);
+  }
+
+  async function onDelete(e, row) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row?.id == null) return alert("id가 없어서 삭제할 수 없습니다.");
+
+    const ok = window.confirm("정말 삭제할까요?");
+    if (!ok) return;
+
+    try {
+      await deleteCommunity(row.id, token);
+      await loadList();
+    } catch (err) {
+      console.error("[DELETE API ERROR]", err);
+      alert(err?.message || "삭제 실패");
+    }
+  }
+
+  const q = safeLower(query).trim();
+
+  const filtered = useMemo(() => {
     const mapped = (data || []).map((r) => {
-      const id = r.id ?? r.communityId ?? r.community_id;
+      const id = r.id ?? getId(r);
       const title = r.title ?? "";
-      const author =
-        r.author?.name ??
-        r.writer?.name ??
-        r.member?.name ??
-        r.authorName ??
-        r.writerName ??
-        "익명";
+      const author = getWriter(r);
       const createdAt =
         r.createdAt ?? r.created_at ?? r.createdDate ?? r.createdDateTime ?? "";
       const comments =
@@ -151,196 +243,320 @@ export default function Board() {
         r.comment_count ??
         r.commentCnt ??
         0;
-      const pinned = r.pinned ?? r.isPinned ?? false;
 
-      return { id, title, author, createdAt, comments, pinned };
+      return {
+        ...r,
+        id: id != null ? String(id) : null,
+        title,
+        author,
+        createdAt,
+        comments: Number(comments) || 0,
+        pinned: Boolean(r.pinned),
+        __writerId: getWriterId(r), // ✅ 작성자 id 보관
+      };
     });
 
-    const keyword = q.trim().toLowerCase();
-    let filtered = mapped.filter((r) => {
-      if (!keyword) return true;
-      return (
-        (r.title || "").toLowerCase().includes(keyword) ||
-        (r.author || "").toLowerCase().includes(keyword)
-      );
-    });
+    const arr = !q
+      ? mapped
+      : mapped.filter((r) => {
+          const t = safeLower(r.title);
+          const w = safeLower(r.author);
+          return t.includes(q) || w.includes(q);
+        });
 
-    const pinned = filtered.filter((r) => r.pinned);
-    const normal = filtered.filter((r) => !r.pinned);
+    const pinned = arr.filter((r) => r.pinned);
+    const normal = arr.filter((r) => !r.pinned);
 
     const sorter = (a, b) => {
       if (sort === "comments") return (b.comments || 0) - (a.comments || 0);
       const at = Date.parse(a.createdAt || "") || 0;
       const bt = Date.parse(b.createdAt || "") || 0;
       if (bt !== at) return bt - at;
-      return (b.id || 0) - (a.id || 0);
+      return String(b.id || "").localeCompare(String(a.id || ""));
     };
 
     pinned.sort(sorter);
     normal.sort(sorter);
 
-    return [...pinned, ...normal];
+    return { pinned, normal };
   }, [data, q, sort]);
 
-  const total = rows.length;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pinnedRows = filtered.pinned || [];
+  const normalRows = filtered.normal || [];
+  const total = pinnedRows.length + normalRows.length;
+  // ✅ 현재 화면에서 "내 글"이 하나라도 있는지
+  const hasMine = useMemo(() => {
+    if (!meId) return false;
+    const all = [...(pinnedRows || []), ...(normalRows || [])];
+    return all.some(
+      (r) => r?.__writerId && String(r.__writerId) === String(meId),
+    );
+  }, [meId, pinnedRows, normalRows]);
+
+  const pinnedCount = pinnedRows.length;
+  const normalPageSize = Math.max(1, pageSize - pinnedCount);
+
+  const pageCount = Math.max(1, Math.ceil(normalRows.length / normalPageSize));
   const safePage = Math.min(Math.max(1, page), pageCount);
-  const start = (safePage - 1) * pageSize;
-  const pageRows = rows.slice(start, start + pageSize);
+  const start = (safePage - 1) * normalPageSize;
+  const pageRows = normalRows.slice(start, start + normalPageSize);
 
-  function onEdit(e, row) {
-    e.stopPropagation();
-    if (row?.id == null) {
-      alert("id가 없어서 수정 페이지로 이동할 수 없어요.");
-      return;
-    }
-    router.push(`/board-write?id=${row.id}`);
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  function goPrev() {
+    setPage((p) => Math.max(1, p - 1));
   }
-
-  async function onDelete(e, row) {
-    e.stopPropagation();
-    if (row?.id == null) {
-      alert("id가 없어서 삭제할 수 없어요.");
-      return;
-    }
-    const ok = window.confirm("정말 삭제할까요?");
-    if (!ok) return;
-
-    try {
-      await deleteCommunity(row.id, token);
-    } catch (err) {
-      console.error("[DELETE API ERROR]", err);
-      alert(err?.message || "삭제 실패");
-    }
+  function goNext() {
+    setPage((p) => Math.min(pageCount, p + 1));
   }
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="자유게시판">
-      <div className="h-full w-full bg-white rounded-xl overflow-hidden">
-        <div className="px-10 py-6 border-neutral-200 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <MessageSquareText className="w-5 h-5 text-neutral-600" />
-              <h1 className="text-2xl font-semibold text-neutral-900">
-                자유게시판
-              </h1>
-            </div>
-            <p className="mt-1 text-xs text-neutral-500">
-              업무 공유 / 질문 / 팁 까지 편하게 올려주세요.
-            </p>
-          </div>
-        </div>
-
-        <div className="px-10 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center justify-between md:justify-end gap-3">
-            <div className="text-xs text-neutral-500">
-              총 <span className="font-semibold text-neutral-700">{total}</span>
-              건
-            </div>
-
-            <input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
-              placeholder="제목/작성자 검색"
-              className="h-7 w-55 px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
-            />
-
-            <select
-              value={sort}
-              onChange={(e) => {
-                setSort(e.target.value);
-                setPage(1);
-              }}
-              className="h-7 px-3 rounded-md border border-neutral-200 bg-white text-[11px] outline-none"
-            >
-              <option value="latest">최신순</option>
-              <option value="comments">댓글순</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            onClick={goWrite}
-            className="shrink-0 h-8 px-3 rounded-md bg-slate-900 text-white text-sm font-medium
-                       hover:bg-slate-800 active:scale-[0.99] flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            글쓰기
-          </button>
-        </div>
-
-        {!loading && pageRows.length === 0 && (
-          <div className="px-5 py-16 text-center text-sm text-neutral-500">
-            게시글이 없어요.
-          </div>
-        )}
-
-        {!loading && pageRows.length > 0 && (
-          <div className="px-10">
-            <div
-              className={
-                GRID +
-                " px-6 h-12 items-center bg-neutral-200 text-neutral-700 text-sm font-semibold"
-              }
-            >
-              <div className="text-center pr-2">번호</div>
-              <div className="pl-2">제목</div>
-              <div className="pl-2">작성자</div>
-              <div className="pl-2">작성일</div>
-              <div className="text-right pr-2">댓글</div>
-              <div className="text-center">수정 · 삭제</div>
-            </div>
-            {pageRows.map((r, idx) => (
-              <button
-                key={r.id}
-                type="button"
-                className={ROW_BASE}
-                onClick={() => openPost(r.id)}
-              >
-                <div className="flex items-center justify-center text-sm text-neutral-500 pr-2">
-                  {start + idx + 1}
+      <div className="h-full w-full overflow-hidden">
+        {/* 상단 헤더 */}
+        <div className="pt-4 pb-5">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 bg-white/80 backdrop-blur">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-4">
+                    <div className="h-13 w-13 rounded-xl bg-indigo-600 grid place-items-center shadow-sm">
+                      <MessageSquareText className="w-7 h-7 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold tracking-tight text-slate-900">
+                        자유게시판
+                      </div>
+                      <p className="mt-1 text-[12px] text-slate-500 font-medium">
+                        업무 공유 / 질문 / 팁까지 편하게 올려주세요.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0 pl-2">
-                  <span className="truncate text-sm text-neutral-900 font-medium">
-                    {r.title}
-                  </span>
-                </div>
-                <div className="text-sm text-neutral-700 truncate pl-2">
-                  {r.author}
-                </div>
-                <div className="text-sm text-neutral-500 truncate pl-2">
-                  {fmtDate(r.createdAt)}
-                </div>
-                <div className="text-sm text-neutral-600 text-right pr-2">
-                  {r.comments}
-                </div>
-                <div className="flex items-center justify-center gap-2 pr-2">
-                  {canWriteCommunity ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(e) => onEdit(e, r)}
-                        className="h-8 px-2 text-xs text-gray-400 hover:text-black flex items-center cursor-pointer gap-1"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => onDelete(e, r)}
-                        className="h-8 px-2 text-xs text-gray-400 hover:text-red-600 flex items-center cursor-pointer gap-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-xs text-neutral-400">-</span>
+
+                <div className="flex items-center gap-3">
+                  {/* 검색 */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="제목/작성자 검색"
+                      className="
+                        h-10 w-[320px] rounded-xl border border-slate-200 bg-white
+                        pl-9 pr-3 text-[13px]
+                        outline-none transition
+                        focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                        placeholder:text-[12px]
+                      "
+                    />
+                  </div>
+
+                  {/* 정렬 */}
+                  <select
+                    value={sort}
+                    onChange={(e) => {
+                      setSort(e.target.value);
+                      setPage(1);
+                    }}
+                    className="
+                      h-10 px-3 rounded-xl border border-slate-200 bg-white
+                      text-[12px] font-semibold text-slate-700 outline-none
+                      focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                    "
+                  >
+                    <option value="latest">최신순</option>
+                    <option value="comments">댓글순</option>
+                  </select>
+
+                  {/* 작성 버튼 */}
+                  {canWriteCommunity && (
+                    <button
+                      type="button"
+                      onClick={goWrite}
+                      className="
+                        h-10 px-4 rounded-xl
+                        flex items-center gap-2 justify-center
+                        text-[13px] font-extrabold
+                        bg-indigo-600 text-white
+                        hover:bg-indigo-500 active:bg-indigo-700
+                        active:scale-[0.98]
+                        shadow-sm
+                        focus:outline-none focus:ring-2 focus:ring-indigo-200
+                        cursor-pointer
+                      "
+                    >
+                      <Plus className="w-4 h-4" />
+                      글쓰기
+                    </button>
                   )}
                 </div>
-              </button>
-            ))}
+              </div>
+            </div>
+
+            {/* 요약 라인 */}
+            <div className="px-6 py-3 flex items-center justify-between">
+              <div className="text-xs text-slate-500">
+                총{" "}
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {total}
+                </span>
+                건
+                {q ? (
+                  <span className="ml-2 text-slate-400">
+                    (검색:{" "}
+                    <span className="text-slate-600 font-semibold">
+                      {query}
+                    </span>
+                    )
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {loading && (
+          <div className="px-10 py-10 text-sm text-slate-500">
+            불러오는 중...
+          </div>
+        )}
+        {!loading && error && (
+          <div className="px-10 py-10 text-sm text-red-600">{error}</div>
+        )}
+
+        {!loading && !error && (
+          <div className="pb-10">
+            <div className={TABLE_WRAP}>
+              <div className={HEADER_ROW}>
+                <div className="flex items-center justify-center">번호</div>
+                <div className="pl-2">제목</div>
+                <div className="pl-2">작성자</div>
+                <div className="pl-2">작성일</div>
+                <div className="text-right pr-2">댓글</div>
+                <div className="text-right pr-7">{hasMine ? "관리" : "-"}</div>
+              </div>
+
+              {pageRows.length === 0 ? (
+                <div className="px-6 py-14 text-center text-sm text-slate-500">
+                  게시글이 없습니다.
+                </div>
+              ) : (
+                pageRows.map((r, idx) => {
+                  const isMinePost =
+                    meId &&
+                    r.__writerId &&
+                    String(r.__writerId) === String(meId);
+
+                  return (
+                    <div
+                      key={getRowKey(r, pinnedRows.length + start + idx)}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openPost(r.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") openPost(r.id);
+                      }}
+                      className={ROW_BASE}
+                    >
+                      <div className="flex items-center justify-center text-[13px] font-semibold text-slate-500 tabular-nums">
+                        {pinnedRows.length + start + idx + 1}
+                      </div>
+
+                      <div className="min-w-0 pl-2">
+                        <span className={CELL_TITLE}>{r.title}</span>
+                      </div>
+
+                      <div className={"pl-2 " + CELL_TEXT}>{r.author}</div>
+
+                      <div className={"pl-2 " + CELL_DATE}>
+                        {fmtDate(r.createdAt)}
+                      </div>
+
+                      <div className={COUNT_CELL}>{r.comments}</div>
+
+                      <div className={ACTION_CELL}>
+                        {/* ✅ 본인 글만 수정/삭제 */}
+                        {canWriteCommunity && isMinePost ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => onEdit(e, r)}
+                              className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
+                              title="수정"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => onDelete(e, r)}
+                              className="h-9 w-9 grid place-items-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-300" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* 페이지네이션 */}
+            <div className="mt-4 flex items-center">
+              <div className="ml-auto flex items-center gap-3">
+                <div className="text-xs text-slate-500">
+                  <span className="font-extrabold text-slate-800 tabular-nums">
+                    {safePage}
+                  </span>{" "}
+                  / <span className="tabular-nums">{pageCount}</span> 페이지
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={safePage <= 1}
+                    className="
+                      h-9 px-3 rounded-xl border border-slate-200 bg-white
+                      text-[12px] font-semibold text-slate-700
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      hover:bg-slate-50
+                      flex items-center gap-1 cursor-pointer
+                    "
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    이전
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={safePage >= pageCount}
+                    className="
+                      h-9 px-3 rounded-xl border border-slate-200 bg-white
+                      text-[12px] font-semibold text-slate-700
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      hover:bg-slate-50
+                      flex items-center gap-1 cursor-pointer
+                    "
+                  >
+                    다음
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
