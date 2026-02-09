@@ -50,7 +50,7 @@ export const ceilToStep = (date, minutes) => {
 export const buildTicks = (start, end, stepMin) => {
   const stepMs = stepMin * 60 * 1000;
   const out = [];
-  for (let t = start.getTime(); t <= end.getTime(); t += stepMs) {
+  for (let t = start.getTime(); t < end.getTime(); t += stepMs) {
     out.push(new Date(t));
   }
   return out;
