@@ -9,11 +9,69 @@ import {
   updateNotice,
   uploadNoticeFiles,
 } from "@/api/notice-api";
-import { ta } from "date-fns/locale";
+import {
+  Pin,
+  Paperclip,
+  X,
+  Upload,
+  Save,
+  ArrowLeft,
+  AlertTriangle,
+} from "lucide-react";
 
 function canEdit(role) {
   const r = String(role || "").toLowerCase();
   return r === "admin" || r === "planner";
+}
+
+function normalizeExistingFiles(item) {
+  const raw =
+    item?.attachments ||
+    item?.files ||
+    item?.attachedFiles ||
+    item?.attachmentsList ||
+    [];
+
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((f) => {
+      if (!f) return null;
+      if (typeof f === "string") {
+        return { id: null, name: f.split("/").pop(), url: f };
+      }
+      return {
+        id: f.id ?? f.fileId ?? f._id ?? null,
+        name:
+          f.name ??
+          f.filename ??
+          f.originalName ??
+          f.fileName ??
+          (f.url ? f.url.split("/").pop() : "파일"),
+        url: f.url ?? f.path ?? f.fileUrl ?? null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function pickFirst(obj, keys) {
+  for (const k of keys) {
+    if (obj && obj[k] != null) return obj[k];
+  }
+  return null;
+}
+
+function pickNoticeId(created) {
+  const base = created?.notice || created?.data || created?.result || created;
+  const id = pickFirst(base, [
+    "id",
+    "noticeId",
+    "notice_id",
+    "noticeNo",
+    "notice_no",
+    "_id",
+  ]);
+  return id != null ? String(id) : null;
 }
 
 export default function NoticeWrite() {
@@ -27,7 +85,6 @@ export default function NoticeWrite() {
   );
   const allowed = canEdit(role);
 
-  //  query id (수정 모드)
   const noticeId = router.query?.id ? String(router.query.id) : null;
   const isEdit = Boolean(noticeId);
 
@@ -38,9 +95,10 @@ export default function NoticeWrite() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+
   const [files, setFiles] = useState([]);
-  const [existingFiles, setExistingFiles] = useState([]); // 기존 업로드된 파일 표시
-  const [removedAttachments, setRemovedAttachments] = useState([]); // 화면에서 제거된 기존 파일 id/url
+  const [existingFiles, setExistingFiles] = useState([]);
+  const [removedAttachments, setRemovedAttachments] = useState([]);
   const [pinned, setPinned] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -49,14 +107,13 @@ export default function NoticeWrite() {
   const MAX_DESC = 255;
   const memberId = account?.id;
 
-  // ✅ 권한 체크
   useEffect(() => {
     if (!hydrated) return;
     if (!token) router.replace("/login");
-    else if (!allowed) router.replace("/notice"); // 권한 없으면 리스트로
+    else if (!allowed) router.replace("/notice");
   }, [hydrated, token, allowed, router]);
 
-  // ✅ 수정 모드면 상세 불러와서 폼 채우기
+  // 수정 모드면 상세 불러오기
   useEffect(() => {
     if (!hydrated) return;
     if (!token) return;
@@ -76,45 +133,16 @@ export default function NoticeWrite() {
 
         setTitle(String(item?.title || ""));
         setContent(String(item?.content || item?.description || ""));
+
         const p =
           item?.pinned ??
           item?.isPinned ??
           item?.pin ??
           item?.pinnedYn ??
           item?.pinned_yn;
-        setPinned(p === true || p === 1 || String(p).toLowerCase() === "y");
-        const rawFiles =
-          item?.attachments ||
-          item?.files ||
-          item?.attachedFiles ||
-          item?.attachmentsList ||
-          [];
 
-        if (Array.isArray(rawFiles) && rawFiles.length > 0) {
-          const norm = rawFiles
-            .map((f) => {
-              if (!f) return null;
-              if (typeof f === "string") {
-                // 그냥 URL만 있는 경우
-                return { id: null, name: f.split("/").pop(), url: f };
-              }
-              // 객체 형태
-              return {
-                id: f.id ?? f.fileId ?? f._id ?? null,
-                name:
-                  f.name ??
-                  f.filename ??
-                  f.originalName ??
-                  f.fileName ??
-                  (f.url ? f.url.split("/").pop() : "파일"),
-                url: f.url ?? f.path ?? f.fileUrl ?? null,
-              };
-            })
-            .filter(Boolean);
-          setExistingFiles(norm);
-        } else {
-          setExistingFiles([]);
-        }
+        setPinned(p === true || p === 1 || String(p).toLowerCase() === "y");
+        setExistingFiles(normalizeExistingFiles(item));
       } catch (e) {
         console.error(e);
         if (alive) setError(e?.message || "공지 상세를 불러오지 못했습니다.");
@@ -135,7 +163,7 @@ export default function NoticeWrite() {
   const isValid = title.trim().length > 0 && content.trim().length > 0;
 
   function onCancel() {
-    if (title.trim() || content.trim()) {
+    if (title.trim() || content.trim() || files.length > 0) {
       const ok = window.confirm(
         "작성/수정 중인 내용이 사라집니다. 취소할까요?",
       );
@@ -154,11 +182,8 @@ export default function NoticeWrite() {
     if (!t) return setError("제목을 입력해주세요.");
     if (!c) return setError("내용을 입력해주세요.");
     if (!token) return setError("토큰이 없습니다. 다시 로그인 해주세요.");
-
-    // 작성일 때만 memberId 필수로 묶고 싶으면 이렇게:
-    if (!memberId && !isEdit) {
+    if (!memberId && !isEdit)
       return setError("memberId가 없습니다. 로그인 정보를 확인해주세요.");
-    }
 
     setSaving(true);
 
@@ -166,8 +191,8 @@ export default function NoticeWrite() {
       const payload = {
         title: t,
         content: c,
-        // 백이 memberId를 수정에서도 요구하면 isEdit이어도 넣어줘
-        memberId: memberId,
+        memberId,
+        pinned,
         isPinned: pinned,
       };
 
@@ -175,28 +200,24 @@ export default function NoticeWrite() {
 
       if (isEdit) {
         await updateNotice(noticeId, payload, token);
-        targetId = noticeId;
-        alert("수정 완료!");
+        targetId = String(noticeId);
       } else {
-        const createdNotice = await createNotice(payload, token);
-        targetId = createdNotice?.id ?? null;
-        alert("등록 완료!");
+        const created = await createNotice(payload, token);
+        targetId = pickNoticeId(created);
       }
 
-      if (files.length > 0 && targetId) {
-        try {
-          // debug: 로그 추가
-          // eslint-disable-next-line no-console
-          console.log("[NOTICE WRITE] uploading files", {
-            targetId,
-            filesCount: files.length,
-          });
-          await uploadNoticeFiles(targetId, files, token);
-        } catch (upErr) {
-          console.error("[파일 업로드 중 에러가 발생했습니다.]", upErr);
-        }
+      if (!targetId) {
+        throw new Error(
+          "공지 저장 후 id를 찾지 못했습니다. createNotice 응답을 확인해주세요.",
+        );
       }
 
+      // ✅ 파일 업로드는 이동 전에
+      if (Array.isArray(files) && files.length > 0) {
+        await uploadNoticeFiles(targetId, files, token);
+      }
+
+      alert(isEdit ? "수정 완료!" : "등록 완료!");
       router.push("/notice");
     } catch (err) {
       console.error(err);
@@ -206,149 +227,312 @@ export default function NoticeWrite() {
     }
   }
 
+  const pageTitle = isEdit ? "공지사항 수정" : "공지사항 작성";
+  const pageDesc = isEdit
+    ? "공지 내용을 수정하고 첨부파일을 관리합니다."
+    : "공지사항 제목/내용을 작성하고 첨부파일을 추가합니다.";
+
+  const fileCountLabel =
+    files.length > 0 ? `${files.length}개 선택됨` : "파일을 선택하세요";
+
   return (
-    <DashboardShell
-      crumbTop="게시판"
-      crumbCurrent={isEdit ? "공지사항 수정" : "공지사항 작성"}
-    >
-      <div className="w-full h-full flex flex-col gap-4">
-        <div className="bg-white rounded-xl px-10 py-5">
-          <h1 className="text-xl font-bold">
-            {isEdit ? "공지사항 수정" : "공지사항 작성"}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isEdit
-              ? "공지 내용을 수정해주세요."
-              : "공지사항 제목과 내용을 작성해주세요."}
-          </p>
-        </div>
-
-        <form
-          onSubmit={onSubmit}
-          className="bg-white rounded-xl px-10 py-10 flex-1 flex flex-col gap-5"
-        >
-          {loading ? (
-            <div className="text-sm text-gray-500">불러오는 중...</div>
-          ) : null}
-
-          <div className="flex items-center gap-2">
-            <input
-              id="pinned"
-              type="checkbox"
-              checked={pinned}
-              onChange={(e) => setPinned(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <label htmlFor="pinned" className="text-sm text-gray-700">
-              상단 고정(📌)
-            </label>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700">제목</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="공지사항 제목을 입력하세요"
-              className="h-10 px-3 border rounded-md text-sm outline-none"
-              maxLength={80}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 flex-1">
-            <label className="text-sm font-semibold text-gray-700">내용</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="공지사항 내용을 입력하세요"
-              className="min-h-60 flex-1 px-3 py-3 border rounded-md text-sm outline-none resize-none"
-              maxLength={MAX_DESC}
-            />
-            <div className="flex flex-col gap-2">
-              {" "}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-gray-700">
-                  첨부파일
-                </label>
-
-                {existingFiles.length > 0 && (
-                  <div className="mb-2">
-                    <div className="text-xs text-neutral-500 mb-1">
-                      기존 첨부파일
+    <DashboardShell crumbTop="게시판" crumbCurrent={pageTitle}>
+      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden">
+        <div className="w-full py-5 min-w-0">
+          {/* 상단 헤더 카드 */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden w-full min-w-0">
+            <div className="px-6 py-5 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-4 min-w-0">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-4">
+                    <div className="h-13 w-13 rounded-xl bg-indigo-100 grid place-items-center shadow-sm">
+                      <Pin className="w-7 h-7 text-indigo-600" />
                     </div>
-                    <ul className="text-sm space-y-1">
-                      {existingFiles.map((f) => (
-                        <li
-                          key={f.id ?? f.url}
-                          className="flex items-center justify-between gap-3"
-                        >
-                          <a
-                            href={f.url ?? "#"}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 underline truncate"
-                          >
-                            {f.name}
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExistingFiles((prev) =>
-                                prev.filter(
-                                  (x) => (x.id ?? x.url) !== (f.id ?? f.url),
-                                ),
-                              );
-                              setRemovedAttachments((prev) =>
-                                prev.concat(f.id ?? f.url),
-                              );
-                            }}
-                            className="text-xs text-red-500 hover:underline"
-                          >
-                            제거
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold tracking-tight text-slate-900">
+                        공지사항
+                      </div>
+                      <p className="mt-1 text-[12px] text-slate-500 font-medium">
+                        {pageDesc}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
 
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setFiles(Array.from(e.target.files))}
-                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="
+                      h-9 px-4 rounded-lg border border-slate-200 bg-white
+                      text-sm font-semibold text-slate-700
+                      hover:bg-slate-50 active:bg-slate-100 transition
+                      inline-flex items-center gap-2
+                    "
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    목록
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPinned((p) => !p)}
+                    className={[
+                      "h-9 px-4 rounded-lg border text-sm font-semibold transition inline-flex items-center gap-2",
+                      pinned
+                        ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 active:bg-indigo-800"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 active:bg-slate-100",
+                    ].join(" ")}
+                    title="상단 고정 토글"
+                  >
+                    <Pin className="h-4 w-4" />
+                    고정
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex justify-end text-xs text-gray-400">
-              {content.length}/{MAX_DESC}자
+
+            {(loading || error) && (
+              <div className="px-6 py-4">
+                {loading ? (
+                  <div className="text-sm text-slate-500">불러오는 중...</div>
+                ) : null}
+                {error ? (
+                  <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span className="break-words">{error}</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          {/* 폼 카드 */}
+          <form
+            onSubmit={onSubmit}
+            className="
+              mt-5 rounded-2xl border border-slate-200 bg-white shadow-sm
+              overflow-hidden w-full min-w-0
+            "
+          >
+            <div className="px-6 py-4">
+              {/* 제목 */}
+              <div className="space-y-2">
+                <div className="flex items-end justify-between gap-3">
+                  <label className="text-[12px] font-black text-slate-700">
+                    제목
+                  </label>
+                  <div className="text-[11px] text-slate-400 tabular-nums">
+                    80자 이내
+                  </div>
+                </div>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="공지사항 제목을 입력하세요"
+                  className="
+                    h-11 w-full rounded-xl border border-slate-200 bg-white px-4
+                    text-sm text-slate-900
+                    outline-none transition
+                    hover:border-slate-300
+                    focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                    placeholder:text-slate-400
+                  "
+                  maxLength={80}
+                />
+              </div>
+
+              {/* 내용 */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-end justify-between gap-3">
+                  <label className="text-[12px] font-black text-slate-700">
+                    내용
+                  </label>
+                  <div className="text-[11px] text-slate-400 tabular-nums">
+                    {content.length}/{MAX_DESC}자
+                  </div>
+                </div>
+
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="공지사항 내용을 입력하세요"
+                  className="
+                    h-[150px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3
+                    text-sm text-slate-900
+                    outline-none transition
+                    hover:border-slate-300
+                    focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                    placeholder:text-slate-400
+                    resize-none
+                  "
+                  maxLength={MAX_DESC}
+                />
+              </div>
+
+              {/* 첨부파일 */}
+              <div className="mt-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-9 w-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                      <Paperclip className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-black text-slate-700">
+                        첨부파일
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        새 파일을 추가하거나 기존 파일을 제거할 수 있습니다.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-[12px] font-semibold text-slate-700">
+                      {fileCountLabel}
+                    </div>
+                    <label
+                      className="
+                      h-9 px-4 rounded-lg border border-slate-200 bg-white
+                      text-sm font-semibold text-slate-700
+                      hover:bg-slate-50 active:bg-slate-100 transition
+                      cursor-pointer inline-flex items-center gap-2 shrink-0
+                    "
+                    >
+                      <Upload className="h-4 w-4" />
+                      파일 선택
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) =>
+                          setFiles(Array.from(e.target.files || []))
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div
+                  className="
+    mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 min-w-0
+    max-h-[130px] overflow-y-auto pr-1
+  "
+                >
+                  {files.length > 0 ? (
+                    <div className="mt- grid grid-cols-1 md:grid-cols-5 gap-2">
+                      {files.map((f) => (
+                        <div
+                          key={f.name + String(f.size)}
+                          className="flex items-center justify-between gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 min-w-0"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-semibold text-slate-800 truncate">
+                              {f.name}
+                            </div>
+                            <div className="text-[11px] text-slate-400 tabular-nums">
+                              {(f.size / 1024).toFixed(1)} KB
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFiles((prev) => prev.filter((x) => x !== f))
+                            }
+                            className="h-8 w-8 rounded-lg grid place-items-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0"
+                            title="제거"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                {existingFiles.length > 0 ? (
+                  <div className="mt-3 min-w-0">
+                    <div className="text-[12px] font-black text-slate-700">
+                      기존 첨부파일
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-5 gap-2">
+                      {existingFiles.map((f) => {
+                        const key = f.id ?? f.url ?? f.name;
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 min-w-0"
+                          >
+                            <a
+                              href={f.url ?? "#"}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="min-w-0 text-[12px] font-semibold text-indigo-700 hover:underline truncate"
+                              title={f.name}
+                            >
+                              {f.name}
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExistingFiles((prev) =>
+                                  prev.filter(
+                                    (x) => (x.id ?? x.url) !== (f.id ?? f.url),
+                                  ),
+                                );
+                                setRemovedAttachments((prev) =>
+                                  prev.concat(f.id ?? f.url),
+                                );
+                              }}
+                              className="h-8 px-3 rounded-lg border border-rose-200 bg-white text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition shrink-0"
+                              title="화면에서 제거"
+                            >
+                              제거
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {removedAttachments.length > 0 ? (
+                      <div className="mt-2 text-[11px] text-slate-400">
+                        제거 표시: {removedAttachments.length}개
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          {error ? <div className="text-sm text-red-500">{error}</div> : null}
+            <div className="border-t border-slate-100 bg-white px-6 mb-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="
+                  h-10 px-5 rounded-xl border border-slate-200 bg-white
+                  text-sm font-black text-slate-700
+                  hover:bg-slate-50 active:bg-slate-100 transition
+                "
+              >
+                취소
+              </button>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="h-9 px-4 border rounded-md text-sm hover:bg-gray-50"
-            >
-              취소
-            </button>
-
-            <button
-              type="submit"
-              disabled={saving || !isValid || loading}
-              className={`h-9 px-4 rounded-md text-sm transition
-                ${
+              <button
+                type="submit"
+                disabled={saving || !isValid || loading}
+                className={[
+                  "h-10 px-5 rounded-xl text-sm font-black transition inline-flex items-center gap-2",
                   saving || !isValid || loading
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-black text-white hover:bg-gray-900 cursor-pointer"
-                }`}
-            >
-              {saving ? "저장중..." : isEdit ? "수정" : "등록"}
-            </button>
-          </div>
-        </form>
+                    ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 cursor-pointer",
+                ].join(" ")}
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "저장중..." : isEdit ? "수정" : "등록"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </DashboardShell>
   );
