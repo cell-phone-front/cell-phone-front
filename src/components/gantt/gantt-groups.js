@@ -47,6 +47,7 @@ export function buildGroupsByProductOperation(scheduleList = []) {
           id: opKey,
           operationId,
           operationName,
+          operationSeq: Number(s.operationSeq) || 0,
           plannerName: plannerName || "",
           tasks: [],
         });
@@ -81,9 +82,7 @@ export function buildGroupsByProductOperation(scheduleList = []) {
     });
 
     // operation 정렬(원하면 operationName 기준으로 바꿔도 됨)
-    operations.sort((a, b) =>
-      String(a.operationId).localeCompare(String(b.operationId)),
-    );
+    operations.sort((a, b) => (a.operationSeq ?? 0) - (b.operationSeq ?? 0));
 
     return {
       id: productName,
@@ -95,5 +94,15 @@ export function buildGroupsByProductOperation(scheduleList = []) {
   // product 정렬
   groups.sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
-  return groups;
+  // ✅ groups 만들고 난 뒤, 빈 operation/product 제거(안전장치)
+  const cleaned = groups
+    .map((g) => ({
+      ...g,
+      operations: (g.operations || [])
+        .map((op) => ({ ...op, tasks: op.tasks || [] }))
+        .filter((op) => op.tasks.length > 0),
+    }))
+    .filter((g) => g.operations.length > 0);
+
+  return cleaned;
 }
