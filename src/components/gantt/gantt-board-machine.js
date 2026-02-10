@@ -1,16 +1,16 @@
-// src/components/gantt-test/gantt-board.js
+// src/components/gantt-test/gantt-board-machine.js
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 import GanttHeaderRow from "./gantt-header-row";
-import GanttLeftPanel from "./gantt-left-panel";
-import GanttRightPanel from "./gantt-right-panel";
+import GanttLeftPanelMachine from "./gantt-left-panel-machine";
+import GanttRightPanelMachine from "./gantt-right-panel-machine";
 
 import { buildTicks, ceilToStep, floorToStep, toMs } from "./gantt-utils";
 
-export default function GanttBoard({ groups = [] }) {
+export default function GanttBoardMachine({ groups = [] }) {
   // ====== CONFIG ======
   const stepMinutes = 60;
   const colWidth = 120;
@@ -21,7 +21,6 @@ export default function GanttBoard({ groups = [] }) {
   const bottomScrollHeight = 16;
 
   const [collapsed, setCollapsed] = useState({});
-  const [opCollapsed, setOpCollapsed] = useState({});
 
   useEffect(() => {
     setCollapsed((prev) => {
@@ -31,34 +30,21 @@ export default function GanttBoard({ groups = [] }) {
       });
       return next;
     });
-
-    setOpCollapsed((prev) => {
-      const next = { ...prev };
-      (groups || []).forEach((g) => {
-        (g.operations || []).forEach((op) => {
-          if (next[op.id] === undefined) next[op.id] = false;
-        });
-      });
-      return next;
-    });
   }, [groups]);
 
   const toggleGroup = (id) =>
     setCollapsed((p) => ({ ...p, [id]: !(p[id] ?? false) }));
-  const toggleOperation = (opKey) =>
-    setOpCollapsed((p) => ({ ...p, [opKey]: !(p[opKey] ?? false) }));
 
   // ====== scrollX ======
   const [scrollLeft, setScrollLeft] = useState(0);
 
   // ====== refs ======
-  const leftScrollRef = useRef(null); // 왼쪽은 스크롤바는 숨기되, scrollTop 동기화용으로만 씀
-  const rightScrollYRef = useRef(null); // 오른쪽 세로 스크롤(유일)
-  const rightScrollXRef = useRef(null); // 오른쪽 가로 스크롤(실제 내용)
-  const bottomXRef = useRef(null); // ✅ 하단 고정 가로 스크롤바
+  const leftScrollRef = useRef(null);
+  const rightScrollYRef = useRef(null);
+  const rightScrollXRef = useRef(null);
+  const bottomXRef = useRef(null);
   const syncingRef = useRef(false);
 
-  // ✅ X 스크롤 싱크: 오른쪽 내용 <-> 하단 고정바
   const syncX = (x) => {
     if (rightScrollXRef.current && rightScrollXRef.current.scrollLeft !== x) {
       rightScrollXRef.current.scrollLeft = x;
@@ -66,7 +52,7 @@ export default function GanttBoard({ groups = [] }) {
     if (bottomXRef.current && bottomXRef.current.scrollLeft !== x) {
       bottomXRef.current.scrollLeft = x;
     }
-    setScrollLeft(x); // 헤더 translateX 용
+    setScrollLeft(x);
   };
 
   const onRightScrollX = (e) => {
@@ -83,23 +69,18 @@ export default function GanttBoard({ groups = [] }) {
     syncingRef.current = false;
   };
 
-  // ✅ Y 스크롤: 오른쪽만 스크롤, 왼쪽은 따라가기
   const onRightScrollY = (e) => {
     if (syncingRef.current) return;
     syncingRef.current = true;
-
     if (leftScrollRef.current) {
       leftScrollRef.current.scrollTop = e.currentTarget.scrollTop;
     }
-
     syncingRef.current = false;
   };
 
-  // ✅ range (데이터의 최소 startAt ~ 최대 endAt 기준)
+  // ✅ range: 데이터 min startAt ~ max endAt 기준 (09:00 강제 없음)
   const { rangeStart, rangeEnd, ticks } = useMemo(() => {
-    const allTasks = (groups || []).flatMap((g) =>
-      (g.operations || []).flatMap((op) => op.tasks || []),
-    );
+    const allTasks = (groups || []).flatMap((g) => g.tasks || []);
 
     let min = Infinity;
     let max = -Infinity;
@@ -111,13 +92,11 @@ export default function GanttBoard({ groups = [] }) {
       if (Number.isFinite(e)) max = Math.max(max, e);
     }
 
-    // ✅ 데이터가 없으면 "지금 ~ +9시간" (원하시면 다른 기본값으로 변경 가능)
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
       const start = new Date();
       const end = new Date(start.getTime() + 9 * 60 * 60 * 1000);
-
-      const startAligned = floorToStep(start, stepMinutes); // ✅ 시작은 floor
-      const endAligned = ceilToStep(end, stepMinutes); // ✅ 끝은 ceil
+      const startAligned = floorToStep(start, stepMinutes);
+      const endAligned = ceilToStep(end, stepMinutes);
 
       return {
         rangeStart: startAligned,
@@ -126,13 +105,9 @@ export default function GanttBoard({ groups = [] }) {
       };
     }
 
-    // ✅ 시작: 데이터 최소 startAt을 stepMinutes 기준으로 "내림(floor)"
     const startAligned = floorToStep(new Date(min), stepMinutes);
-
-    // ✅ 끝: 데이터 최대 endAt을 stepMinutes 기준으로 "올림(ceil)"
     let endAligned = ceilToStep(new Date(max), stepMinutes);
 
-    // end가 start보다 작으면 최소 9시간은 보여주기
     if (endAligned.getTime() <= startAligned.getTime()) {
       endAligned = new Date(startAligned.getTime() + 9 * 60 * 60 * 1000);
       endAligned = ceilToStep(endAligned, stepMinutes);
@@ -173,32 +148,24 @@ export default function GanttBoard({ groups = [] }) {
             scrollLeft={scrollLeft}
           />
 
-          {/* ✅ 본문: 아래 고정 스크롤바 자리(bottomScrollHeight)만큼 빼서 높이 확보 */}
           <div
             className="flex flex-1 min-h-0 min-w-0"
             style={{ paddingBottom: bottomScrollHeight }}
           >
-            <GanttLeftPanel
+            <GanttLeftPanelMachine
               groups={groups}
               collapsed={collapsed}
               toggleGroup={toggleGroup}
-              opCollapsed={opCollapsed}
-              toggleOperation={toggleOperation}
               leftWidth={leftWidth}
               groupHeaderHeight={groupHeaderHeight}
               rowHeight={rowHeight}
               leftScrollRef={leftScrollRef}
               bottomScrollHeight={bottomScrollHeight}
-              rangeStart={rangeStart}
-              gridWidthPx={gridWidthPx}
-              colWidth={colWidth}
-              stepMinutes={stepMinutes}
             />
 
-            <GanttRightPanel
+            <GanttRightPanelMachine
               groups={groups}
               collapsed={collapsed}
-              opCollapsed={opCollapsed}
               pickBarClass={pickBarClass}
               gridWidthPx={gridWidthPx}
               colWidth={colWidth}
@@ -215,7 +182,6 @@ export default function GanttBoard({ groups = [] }) {
             />
           </div>
 
-          {/* ✅ 하단 “고정” 가로 스크롤바 */}
           <div
             className="shrink-0 border-t border-slate-200/70 bg-white"
             style={{ height: bottomScrollHeight }}
