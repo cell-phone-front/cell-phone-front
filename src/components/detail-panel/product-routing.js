@@ -1,4 +1,4 @@
-// src/components/detail-panel/operation.js
+// src/components/detail-panel/product-routing.js
 import { ChevronRight } from "lucide-react";
 
 function Field({ label, value }) {
@@ -18,7 +18,7 @@ function StatusText(flag) {
   return "Saved";
 }
 
-export default function OperationDetailPanel({ open, row, onToggle }) {
+export default function ProductRoutingDetailPanel({ open, row, onToggle }) {
   if (!open) {
     return (
       <div className="hidden lg:flex h-full min-h-0">
@@ -33,6 +33,7 @@ export default function OperationDetailPanel({ open, row, onToggle }) {
             transition
           "
           aria-label="open detail"
+          title="상세 열기"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -63,8 +64,11 @@ export default function OperationDetailPanel({ open, row, onToggle }) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              <Field label="Id" value={row.id} />
+              <Field label="Routing Id" value={row.id} />
               <Field label="Name" value={row.name} />
+              <Field label="Product Id" value={row.productId} />
+              <Field label="Operation Id" value={row.operationId} />
+              <Field label="Seq" value={row.operationSeq} />
               <Field label="Description" value={row.description} />
               <Field label="Status" value={StatusText(row.flag)} />
             </div>

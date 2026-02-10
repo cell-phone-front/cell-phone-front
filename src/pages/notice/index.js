@@ -1,4 +1,3 @@
-// pages/notice/index.js
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
@@ -80,6 +79,11 @@ function getRowKey(n, idx) {
   return `notice-x-${n?.createdAt ?? "noDate"}-${n?.title ?? "noTitle"}-${idx}`;
 }
 
+/**
+ * ✅ 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
+ * raw attachments 예:
+ * { fileSize, fileType, fileUri: "15b5...jpg", id: "a0f093" }
+ */
 function normalizeFiles(n) {
   const raw =
     n?.attachments ||
@@ -97,25 +101,41 @@ function normalizeFiles(n) {
   return raw
     .map((f) => {
       if (!f) return null;
-      if (typeof f === "string")
+
+      if (typeof f === "string") {
         return { id: null, name: f.split("/").pop(), url: f };
+      }
+
+      const id =
+        f.id ??
+        f.noticeAttachmentId ??
+        f.attachmentId ??
+        f.fileId ??
+        f._id ??
+        null;
+
+      // ✅ url 후보 + fileUri까지
+      const url =
+        f.url ??
+        f.path ??
+        f.fileUrl ??
+        f.downloadUrl ??
+        f.fileUri ??
+        f.fileURI ??
+        null;
+
+      const name =
+        f.name ??
+        f.originalName ??
+        f.filename ??
+        f.fileName ??
+        f.storedName ??
+        (url ? String(url).split("/").pop() : "파일");
 
       return {
-        id:
-          f.id ??
-          f.noticeAttachmentId ??
-          f.attachmentId ??
-          f.fileId ??
-          f._id ??
-          null,
-        name:
-          f.name ??
-          f.originalName ??
-          f.filename ??
-          f.fileName ??
-          f.storedName ??
-          (f.url ? f.url.split("/").pop() : "파일"),
-        url: f.url ?? f.path ?? f.fileUrl ?? f.downloadUrl ?? null,
+        id: id != null ? String(id) : null,
+        name: String(name || "파일"),
+        url: url ? String(url) : null,
       };
     })
     .filter(Boolean);
@@ -175,7 +195,7 @@ function normalizeRow(n) {
     id: id != null ? String(id) : null,
     pinned: isPinned(n),
     files: normalizeFiles(n),
-    __writerId: getWriterId(n), // ✅ 작성자 id 보관
+    __writerId: getWriterId(n),
   };
 }
 
@@ -188,10 +208,8 @@ export default function Notice() {
   const { token } = useToken();
 
   const role = String(account?.role || "").toLowerCase();
-  // ✅ 공지는 admin/planner만 "관리 가능"이지만, 표시 자체는 "내 글"일 때만
   const canWriteNotice = role === "admin" || role === "planner";
 
-  // ✅ 내 id
   const meId = account?.id != null ? String(account.id) : null;
 
   const [query, setQuery] = useState("");
@@ -224,7 +242,6 @@ export default function Notice() {
   const [selected, setSelected] = useState(null);
 
   async function openModal(row) {
-    // 낙관적 조회수 +1
     setNotices((prev) =>
       prev.map((n) =>
         n.id === row.id ? { ...n, views: (Number(getViews(n)) || 0) + 1 } : n,
@@ -239,7 +256,18 @@ export default function Notice() {
     try {
       const detail = await getNoticeById(row.id, token);
       const item = detail?.notice || detail?.data || detail;
+
       const normalized = normalizeRow(item || {});
+
+      // ✅ 확인용 로그
+      console.log("files from detail =", normalized.files);
+      console.log(
+        "raw attachments =",
+        item?.attachments,
+        item?.attachmentList,
+        item?.noticeAttachmentList,
+      );
+
       const merged = {
         ...row,
         ...normalized,
@@ -317,7 +345,6 @@ export default function Notice() {
     router.push("/notice-write");
   }
 
-  // 검색(프론트 필터)
   const q = safeLower(query).trim();
   const filtered = useMemo(() => {
     if (!q) return notices || [];
@@ -349,7 +376,6 @@ export default function Notice() {
     [filtered],
   );
 
-  // ✅ "내 공지"가 하나라도 있는지(헤더 '관리' vs '-')
   const hasMine = useMemo(() => {
     if (!meId) return false;
     const all = [...(pinnedNotices || []), ...(normalNotices || [])];
@@ -569,7 +595,6 @@ export default function Notice() {
                     <div className="flex items-center justify-center">
                       {r.pinned ? (
                         canWriteNotice && r.id != null ? (
-                          // ✅ admin/planner만 토글 가능
                           <button
                             type="button"
                             onClick={(e) => onTogglePin(e, r)}
@@ -579,7 +604,6 @@ export default function Notice() {
                             📌
                           </button>
                         ) : (
-                          // ✅ 권한 없으면 아이콘만 표시(클릭 불가)
                           <span
                             className="h-8 w-8 grid place-items-center text-indigo-600"
                             title="상단 고정"

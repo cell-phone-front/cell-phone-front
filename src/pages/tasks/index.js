@@ -2,10 +2,18 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp, Search } from "lucide-react";
-import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
+import {
+  ArrowDownToLine,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Search,
+  Maximize2,
+} from "lucide-react";
 
+import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
 import TaskDetailPanel from "@/components/detail-panel/tasks";
+import TaskFullModal from "@/components/table-modal/tasks";
 
 /* ===============================
    util
@@ -39,6 +47,7 @@ function normalizeTaskList(payload, flag) {
     let duration = t.duration ?? 0;
     let description = t.description ?? "";
 
+    // duration이 description으로 잘못 들어온 케이스 보정
     if ((!duration || Number(duration) === 0) && isNumericString(description)) {
       duration = Number(description);
       description = "";
@@ -73,7 +82,10 @@ export default function TasksPage() {
 
   const fileRef = useRef(null);
 
-  // detail (Product/Operation과 동일 동작)
+  // 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
+
+  // detail
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -94,7 +106,6 @@ export default function TasksPage() {
           setDirty(false);
           setLoadError("");
 
-          // 검색/조회로 리스트가 바뀌면 상세는 닫기
           setSelectedRow(null);
           setDetailOpen(false);
         })
@@ -153,15 +164,13 @@ export default function TasksPage() {
     setData((prev) =>
       prev.map((r) => {
         if (r._rid !== rowRid) return r;
-        if (key === "duration") {
-          return { ...r, duration: Number(value) || 0 };
-        }
+        if (key === "duration") return { ...r, duration: Number(value) || 0 };
         return { ...r, [key]: value };
       }),
     );
     setDirty(true);
 
-    // 상세에 떠있는 행을 수정하면 상세도 같이 갱신
+    // 상세패널도 동기화
     setSelectedRow((prev) =>
       prev && prev._rid === rowRid
         ? key === "duration"
@@ -171,21 +180,35 @@ export default function TasksPage() {
     );
   };
 
+  // ✅ COLS (duration/status 작게, 나머지 균등)
+  const FIX_CHECK = 44;
+  const FIX_DURATION = 80;
+  const FIX_STATUS = 80;
+
+  const FLEX_COLS = ["id", "operationId", "machineId", "name", "desc"];
+  const FLEX_W = `calc((100% - ${FIX_CHECK}px - ${FIX_DURATION}px - ${FIX_STATUS}px) / ${FLEX_COLS.length})`;
+
   const COLS = [
-    { key: "check", w: "4%" },
-    { key: "id", w: "13%" },
-    { key: "operationId", w: "14%" },
-    { key: "machineId", w: "14%" },
-    { key: "name", w: "14%" },
-    { key: "desc", w: "20%" },
-    { key: "duration", w: "7%" },
-    { key: "status", w: "7%" },
+    { key: "check", w: `${FIX_CHECK}px` },
+    { key: "id", w: FLEX_W, min: "130px" },
+    { key: "operationId", w: FLEX_W, min: "130px" },
+    { key: "machineId", w: FLEX_W, min: "130px" },
+    { key: "name", w: FLEX_W, min: "120px" },
+    { key: "desc", w: FLEX_W, min: "140px" },
+    { key: "duration", w: `${FIX_DURATION}px` },
+    { key: "status", w: `${FIX_STATUS}px` },
   ];
 
   const ColGroup = () => (
     <colgroup>
       {COLS.map((c) => (
-        <col key={c.key} style={{ width: c.w }} />
+        <col
+          key={c.key}
+          style={{
+            width: c.w,
+            minWidth: c.min,
+          }}
+        />
       ))}
     </colgroup>
   );
@@ -206,8 +229,6 @@ export default function TasksPage() {
     setSelected(new Set());
     setPageIndex(0);
     setDirty(true);
-
-    // 요구사항: 행추가로는 상세 자동 오픈 X
   };
 
   const deleteSelected = () => {
@@ -218,7 +239,6 @@ export default function TasksPage() {
     setPageIndex(0);
     setDirty(true);
 
-    // 상세가 삭제된 행을 보고 있었다면 닫기
     setSelectedRow((prev) => {
       if (!prev) return prev;
       return selected.has(prev._rid) ? null : prev;
@@ -249,8 +269,6 @@ export default function TasksPage() {
         setSelected(new Set());
         setDirty(true);
         setLoadError("");
-
-        // 요구사항: 업로드로는 상세 자동 오픈 X
       })
       .catch((err) => {
         console.error(err);
@@ -293,7 +311,7 @@ export default function TasksPage() {
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="tasks">
       <div className="px-4 pt-4 h-[calc(100vh-120px)] flex flex-col gap-4">
-        {/* ===== 상단 카드 ===== */}
+        {/* ===== 상단 ===== */}
         <div>
           <div className="flex justify-between items-end">
             <div className="flex flex-col gap-1">
@@ -354,10 +372,11 @@ export default function TasksPage() {
             </div>
           </div>
 
+          {/* ===== 카드 + 액션 ===== */}
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* 총 데이터 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+            {/* 카드 4개 */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-stretch">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     총 데이터
@@ -371,8 +390,7 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* 선택됨 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     선택됨
@@ -386,18 +404,15 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* 변경 사항 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm  ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     변경 사항
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     dirty
                   </span>
                 </div>
-
                 <div className="mt-2 text-2xl font-extrabold">
                   {dirty ? (
                     <span className="text-indigo-600">작업 중</span>
@@ -406,6 +421,42 @@ export default function TasksPage() {
                   )}
                 </div>
               </div>
+
+              {/* 전체 보기 */}
+              <button
+                type="button"
+                onClick={() => setFullOpen(true)}
+                className="
+                  h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5
+                  text-left transition
+                  hover:border-indigo-200 hover:bg-indigo-50/30
+                  focus:outline-none focus:ring-2 focus:ring-indigo-200
+                  flex flex-col justify-between
+                "
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    전체 보기
+                  </div>
+                  <span className="items-center text-[11px] text-slate-400">
+                    modal
+                  </span>
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-900">
+                      표 전체 열기
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      전체 데이터 확인
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
 
             {/* 액션 패널 */}
@@ -421,7 +472,6 @@ export default function TasksPage() {
                 </div>
 
                 <div className="mt-2 flex items-center gap-2 w-full">
-                  {/* 선택 삭제 */}
                   <button
                     type="button"
                     onClick={deleteSelected}
@@ -438,7 +488,6 @@ export default function TasksPage() {
                     선택 삭제
                   </button>
 
-                  {/* XLS */}
                   <button
                     type="button"
                     onClick={uploadHandle}
@@ -446,8 +495,7 @@ export default function TasksPage() {
                       "h-10 w-[110px] px-3",
                       "text-[12px] font-semibold text-slate-700",
                       "inline-flex items-center justify-center gap-2",
-                      "transition cursor-pointer",
-                      "whitespace-nowrap",
+                      "transition cursor-pointer whitespace-nowrap",
                     ].join(" ")}
                   >
                     <FileUp size={15} />
@@ -462,7 +510,6 @@ export default function TasksPage() {
                     onChange={fileChangeHandle}
                   />
 
-                  {/* 행 추가 */}
                   <button
                     type="button"
                     onClick={addRow}
@@ -478,7 +525,6 @@ export default function TasksPage() {
                     + 행 추가
                   </button>
 
-                  {/* 저장 */}
                   <button
                     type="button"
                     onClick={saveHandle}
@@ -510,19 +556,19 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* ===== 테이블 + 상세패널 ===== */}
+        {/* ===== 테이블 + 상세 ===== */}
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
             {/* ===== 테이블 카드 ===== */}
             <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
-              {/* 헤더 */}
+              {/* ✅ 헤더(고정) */}
               <div className="shrink-0">
                 <table className="w-full table-fixed border-collapse">
                   <ColGroup />
                   <thead>
                     <tr className="text-left text-sm">
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
-                        <div className="flex justify-center">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-0 py-3 text-white">
+                        <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
                             className="h-4 w-4 accent-white"
@@ -535,6 +581,7 @@ export default function TasksPage() {
                           />
                         </div>
                       </th>
+
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
                         Task Id
                       </th>
@@ -561,8 +608,16 @@ export default function TasksPage() {
                 </table>
               </div>
 
-              {/* 바디 */}
-              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+              {/* ✅ 바디만 스크롤 */}
+              <div
+                className="
+      flex-1 min-h-0
+      overflow-y-auto overflow-x-hidden
+      pretty-scroll
+      [scrollbar-gutter:stable]
+    
+    "
+              >
                 <table className="w-full table-fixed border-collapse">
                   <ColGroup />
                   <tbody className="text-sm">
@@ -578,12 +633,16 @@ export default function TasksPage() {
 
                       const isActive = selectedRow?._rid === row._rid;
 
+                      const tdBase = "border-b border-slate-100";
+                      const tdState = isActive
+                        ? "bg-gray-200"
+                        : "bg-transparent group-hover:bg-gray-200";
+
                       return (
                         <tr
                           key={row._rid}
                           className={[
-                            "transition-colors cursor-pointer",
-                            isActive ? "bg-gray-200" : "hover:bg-gray-200",
+                            "cursor-pointer transition-colors group",
                             rowBg,
                           ].join(" ")}
                           onClick={() => {
@@ -591,10 +650,11 @@ export default function TasksPage() {
                             setDetailOpen(true);
                           }}
                         >
-                          {/* check */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-0 py-2"].join(" ")}
+                          >
                             <div
-                              className="flex justify-center"
+                              className="flex items-center justify-center"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <input
@@ -608,21 +668,23 @@ export default function TasksPage() {
                             </div>
                           </td>
 
-                          {/* task id */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={row.id ?? ""}
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) =>
                                 updateCell(row._rid, "id", e.target.value)
                               }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 overflow-hidden text-ellipsis whitespace-nowrap"
                               placeholder="Task Id"
                             />
                           </td>
 
-                          {/* operation id */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={row.operationId ?? ""}
                               onClick={(e) => e.stopPropagation()}
@@ -633,13 +695,14 @@ export default function TasksPage() {
                                   e.target.value,
                                 )
                               }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 overflow-hidden text-ellipsis whitespace-nowrap"
                               placeholder="Operation Id"
                             />
                           </td>
 
-                          {/* machine id */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={row.machineId ?? ""}
                               onClick={(e) => e.stopPropagation()}
@@ -650,26 +713,28 @@ export default function TasksPage() {
                                   e.target.value,
                                 )
                               }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 overflow-hidden text-ellipsis whitespace-nowrap"
                               placeholder="Machine Id"
                             />
                           </td>
 
-                          {/* name */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={row.name ?? ""}
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) =>
                                 updateCell(row._rid, "name", e.target.value)
                               }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 overflow-hidden text-ellipsis whitespace-nowrap"
                               placeholder="Name"
                             />
                           </td>
 
-                          {/* description */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={row.description ?? ""}
                               onClick={(e) => e.stopPropagation()}
@@ -680,13 +745,14 @@ export default function TasksPage() {
                                   e.target.value,
                                 )
                               }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 overflow-hidden text-ellipsis whitespace-nowrap"
                               placeholder="Description"
                             />
                           </td>
 
-                          {/* duration */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <input
                               value={String(row.duration ?? 0)}
                               onClick={(e) => e.stopPropagation()}
@@ -698,19 +764,20 @@ export default function TasksPage() {
                             />
                           </td>
 
-                          {/* status */}
-                          <td className="border-b border-slate-100 px-3 py-2">
+                          <td
+                            className={[tdBase, tdState, "px-3 py-2"].join(" ")}
+                          >
                             <div className="flex items-center">
                               {isUploaded ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
                                   Imported
                                 </span>
                               ) : isNew ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
                                   New
                                 </span>
                               ) : (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
                                   Saved
                                 </span>
                               )}
@@ -741,7 +808,7 @@ export default function TasksPage() {
               </div>
             </div>
 
-            {/* ===== 상세 패널 ===== */}
+            {/* ✅ 상세 패널 */}
             <TaskDetailPanel
               open={detailOpen}
               row={selectedRow}
@@ -749,19 +816,20 @@ export default function TasksPage() {
             />
           </div>
 
-          {/* 페이지네이션 */}
-          <div className="flex items-center justify-end gap-1 px-1 py-5">
+          {/* ✅ 페이지네이션 */}
+          <div className="shrink-0 flex items-center justify-end px-1 py-4">
             <button
               type="button"
               onClick={goPrev}
               disabled={pageIndex === 0}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex === 0
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
+              <ChevronLeft className="h-4 w-4" />
               이전
             </button>
 
@@ -775,17 +843,25 @@ export default function TasksPage() {
               onClick={goNext}
               disabled={pageIndex >= pageCount - 1}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex >= pageCount - 1
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
               다음
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
+
+      {/* ✅ 전체보기 모달은 DashboardShell 바로 아래 */}
+      <TaskFullModal
+        open={fullOpen}
+        onClose={() => setFullOpen(false)}
+        token={token}
+      />
     </DashboardShell>
   );
 }

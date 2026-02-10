@@ -1,15 +1,23 @@
-// src/pages/operation/index.js
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp, Search } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Search,
+  Maximize2,
+} from "lucide-react";
 
 import {
   getOperations,
   parseOperationXLS,
   postOperations,
 } from "@/api/operation-api";
+
 import OperationDetailPanel from "@/components/detail-panel/operation";
+import OperationFullModal from "@/components/table-modal/operation";
 
 /* ===============================
    util
@@ -41,9 +49,12 @@ export default function OperationPage() {
 
   const fileRef = useRef(null);
 
-  // detail (Product 템플릿과 동일 동작)
+  // detail
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+
+  // ✅ 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -67,7 +78,7 @@ export default function OperationPage() {
         setLoadError("");
         setDirty(false);
 
-        // 검색/조회로 리스트가 바뀌면 상세는 닫기
+        // 리스트 바뀌면 상세 닫기
         setSelectedRow(null);
         setDetailOpen(false);
       })
@@ -91,7 +102,7 @@ export default function OperationPage() {
     return data.slice(start, start + pageSize);
   }, [data, pageIndex, pageSize, pageCount]);
 
-  // selection calc
+  // selection
   const selectedCount = selected.size;
 
   const isAllPageSelected =
@@ -126,7 +137,7 @@ export default function OperationPage() {
     );
     setDirty(true);
 
-    // 상세에 떠있는 행을 수정하면 상세도 같이 갱신
+    // 상세 갱신
     setSelectedRow((prev) =>
       prev && prev._rid === rowRid ? { ...prev, [key]: value } : prev,
     );
@@ -161,8 +172,6 @@ export default function OperationPage() {
     setPageIndex(0);
     setSelected(new Set());
     setDirty(true);
-
-    // 요구사항: 행추가로는 상세 자동 오픈 X
   };
 
   const deleteSelected = () => {
@@ -173,7 +182,6 @@ export default function OperationPage() {
     setPageIndex(0);
     setDirty(true);
 
-    // 상세가 삭제된 행을 보고 있었다면 닫기
     setSelectedRow((prev) => {
       if (!prev) return prev;
       return selected.has(prev._rid) ? null : prev;
@@ -228,8 +236,6 @@ export default function OperationPage() {
         setPageIndex(0);
         setSelected(new Set());
         setDirty(true);
-
-        // 요구사항: 업로드로는 상세 자동 오픈 X
       })
       .catch((err) => {
         console.error(err);
@@ -245,7 +251,7 @@ export default function OperationPage() {
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="operation">
       <div className="px-4 pt-4 h-[calc(100vh-120px)] flex flex-col gap-4">
-        {/* ===== 상단 카드 ===== */}
+        {/* ===== 상단 ===== */}
         <div>
           <div className="flex justify-between items-end">
             <div className="flex flex-col gap-1">
@@ -306,55 +312,47 @@ export default function OperationPage() {
             </div>
           </div>
 
+          {/* ===== 카드 + 작업패널 (Product 템플릿과 동일) ===== */}
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* 총 데이터 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+            {/* 카드 4개 */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-stretch">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     총 데이터
                   </div>
-
-                  {/* 오른쪽 위 뱃지 */}
                   <span className="items-center text-[11px] text-slate-400">
                     rows
                   </span>
                 </div>
-
                 <div className="mt-1 text-3xl font-extrabold text-slate-900">
                   {totalRows.toLocaleString()}
                 </div>
               </div>
 
-              {/* 선택 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     선택
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     rows
                   </span>
                 </div>
-
                 <div className="mt-1 text-3xl font-extrabold text-indigo-700">
                   {selectedCount.toLocaleString()}
                 </div>
               </div>
 
-              {/* 변경 사항 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm  ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     변경 사항
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     dirty
                   </span>
                 </div>
-
                 <div className="mt-2 text-2xl font-extrabold">
                   {dirty ? (
                     <span className="text-indigo-600">작업 중</span>
@@ -363,9 +361,45 @@ export default function OperationPage() {
                   )}
                 </div>
               </div>
+
+              {/* ✅ 전체 보기 카드 */}
+              <button
+                type="button"
+                onClick={() => setFullOpen(true)}
+                className="
+                  h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5
+                  text-left transition
+                  hover:border-indigo-200 hover:bg-indigo-50/30
+                  focus:outline-none focus:ring-2 focus:ring-indigo-200
+                  flex flex-col justify-between
+                "
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    전체 보기
+                  </div>
+                  <span className="items-center text-[11px] text-slate-400">
+                    modal
+                  </span>
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-900">
+                      표 전체 열기
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      전체 데이터 확인
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
 
-            {/* 액션 패널 */}
+            {/* 작업 패널 */}
             <div className="lg:col-span-4">
               <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                 <div className="flex items-start justify-between gap-3">
@@ -378,7 +412,6 @@ export default function OperationPage() {
                 </div>
 
                 <div className="mt-2 flex items-center gap-2 w-full">
-                  {/* 선택 삭제 */}
                   <button
                     type="button"
                     onClick={deleteSelected}
@@ -389,22 +422,20 @@ export default function OperationPage() {
                       "inline-flex items-center justify-center whitespace-nowrap",
                       selectedCount === 0
                         ? "text-slate-300 cursor-not-allowed"
-                        : "text-red-600  cursor-pointer",
+                        : "text-red-600 cursor-pointer",
                     ].join(" ")}
                   >
                     선택 삭제
                   </button>
 
-                  {/* XLS */}
                   <button
                     type="button"
                     onClick={uploadHandle}
                     className={[
-                      "h-10 w-[110px]  px-3",
+                      "h-10 w-[110px] px-3",
                       "text-[12px] font-semibold text-slate-700",
                       "inline-flex items-center justify-center gap-2",
-                      "transition cursor-pointer",
-                      "whitespace-nowrap",
+                      "transition cursor-pointer whitespace-nowrap",
                     ].join(" ")}
                   >
                     <FileUp size={15} />
@@ -419,7 +450,6 @@ export default function OperationPage() {
                     onChange={fileChangeHandle}
                   />
 
-                  {/* 행 추가 */}
                   <button
                     type="button"
                     onClick={addRow}
@@ -435,7 +465,6 @@ export default function OperationPage() {
                     + 행 추가
                   </button>
 
-                  {/* 저장 */}
                   <button
                     type="button"
                     onClick={saveHandle}
@@ -470,7 +499,7 @@ export default function OperationPage() {
         {/* ===== 테이블 + 상세패널 ===== */}
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-            {/* ===== 테이블 카드 ===== */}
+            {/* 테이블 카드 */}
             <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
               {/* 헤더 */}
               <div className="shrink-0">
@@ -517,7 +546,6 @@ export default function OperationPage() {
                     {pageRows.map((row) => {
                       const isUploaded = row.flag === "pre";
                       const isNew = row.flag === "new";
-
                       const rowBg = isUploaded
                         ? "bg-green-900/10"
                         : isNew
@@ -539,7 +567,6 @@ export default function OperationPage() {
                             setDetailOpen(true);
                           }}
                         >
-                          {/* check */}
                           <td className="border-b border-slate-100 px-3 py-2">
                             <div
                               className="flex justify-center"
@@ -556,7 +583,6 @@ export default function OperationPage() {
                             </div>
                           </td>
 
-                          {/* id */}
                           <td className="border-b border-slate-100 px-3 py-2">
                             <input
                               value={row.id ?? ""}
@@ -569,7 +595,6 @@ export default function OperationPage() {
                             />
                           </td>
 
-                          {/* name */}
                           <td className="border-b border-slate-100 px-3 py-2">
                             <input
                               value={row.name ?? ""}
@@ -582,7 +607,6 @@ export default function OperationPage() {
                             />
                           </td>
 
-                          {/* desc */}
                           <td className="border-b border-slate-100 px-3 py-2">
                             <input
                               value={row.description ?? ""}
@@ -599,19 +623,18 @@ export default function OperationPage() {
                             />
                           </td>
 
-                          {/* status */}
                           <td className="border-b border-slate-100 px-3 py-2">
                             <div className="flex items-center">
                               {isUploaded ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
                                   Imported
                                 </span>
                               ) : isNew ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
                                   New
                                 </span>
                               ) : (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
+                                <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
                                   Saved
                                 </span>
                               )}
@@ -642,27 +665,29 @@ export default function OperationPage() {
               </div>
             </div>
 
-            {/* ===== 상세 패널 ===== */}
+            {/* 상세 패널 */}
             <OperationDetailPanel
               open={detailOpen}
               row={selectedRow}
               onToggle={() => setDetailOpen((v) => !v)}
+              onEdit={updateCell}
             />
           </div>
 
           {/* 페이지네이션 */}
-          <div className="flex items-center justify-end gap-1 px-1 py-5">
+          <div className="shrink-0 flex items-center justify-end px-1 py-4">
             <button
               type="button"
               onClick={goPrev}
               disabled={pageIndex === 0}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex === 0
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
+              <ChevronLeft className="h-4 w-4" />
               이전
             </button>
 
@@ -676,17 +701,25 @@ export default function OperationPage() {
               onClick={goNext}
               disabled={pageIndex >= pageCount - 1}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex >= pageCount - 1
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
               다음
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
+
+      {/* ✅ 전체보기 모달 */}
+      <OperationFullModal
+        open={fullOpen}
+        onClose={() => setFullOpen(false)}
+        token={token}
+      />
     </DashboardShell>
   );
 }

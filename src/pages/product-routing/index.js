@@ -1,4 +1,4 @@
-// src/pages/machine/index.js
+// src/pages/product-routing/index.js
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
@@ -10,10 +10,15 @@ import {
   Search,
   Maximize2,
 } from "lucide-react";
-import { getMachine, postMachine, parseMachineXLS } from "@/api/machine-api";
 
-import MachineDetailPanel from "@/components/detail-panel/machine";
-import MachineFullModal from "@/components/table-modal/machine";
+import {
+  getProductRoutings,
+  parseProductRoutingXLS,
+  postProductRoutings,
+} from "@/api/product-routing-api";
+
+import ProductRoutingFullModal from "@/components/table-modal/product-routing";
+import ProductRoutingDetailPanel from "@/components/detail-panel/product-routing";
 
 /* ===============================
    util
@@ -28,7 +33,7 @@ function cryptoId() {
   }
 }
 
-export default function MachinePage() {
+export default function ProductRoutingPage() {
   const token = useToken((s) => s.token);
 
   const [data, setData] = useState([]);
@@ -45,25 +50,50 @@ export default function MachinePage() {
 
   const fileRef = useRef(null);
 
-  // detail
+  // 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
+
+  // 상세 패널
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [fullOpen, setFullOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
 
-    getMachine(token, query)
+    getProductRoutings(token, query)
       .then((json) => {
         if (!alive) return;
 
-        const list = json.machineList || json.items || json.data || [];
+        const list =
+          json.routingList ||
+          json.productRoutingList ||
+          json.items ||
+          json.data ||
+          [];
+
         const rows = (list || []).map((r) => ({
           ...r,
           _rid: r._rid || cryptoId(),
-          flag: r.flag ?? "Y",
+          flag: r.flag ?? "saved",
+
+          id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
+          name: r.name ?? r.routingName ?? "",
+
+          productId: r.productId ?? r.product_id ?? r.prodId ?? "",
+          operationId: r.operationId ?? r.operation_id ?? r.opId ?? "",
+
+          // operationSeq로 통일
+          operationSeq:
+            r.operationSeq ??
+            r.operation_seq ??
+            r.seq ??
+            r.sequence ??
+            r.step ??
+            "",
+
+          description: r.description ?? r.desc ?? "",
         }));
 
         setData(rows);
@@ -72,13 +102,12 @@ export default function MachinePage() {
         setLoadError("");
         setDirty(false);
 
-        // 검색/조회로 리스트가 바뀌면 상세는 닫기
         setSelectedRow(null);
         setDetailOpen(false);
       })
       .catch((err) => {
         console.error(err);
-        setLoadError(err?.message || "Machine 불러오기 실패");
+        setLoadError(err?.message || "Product Routing 불러오기 실패");
       });
 
     return () => {
@@ -131,7 +160,6 @@ export default function MachinePage() {
     );
     setDirty(true);
 
-    // 상세에 떠있는 행을 수정하면 상세도 같이 갱신
     setSelectedRow((prev) =>
       prev && prev._rid === rowRid ? { ...prev, [key]: value } : prev,
     );
@@ -139,9 +167,12 @@ export default function MachinePage() {
 
   const COLS = [
     { key: "check", w: "6%" },
-    { key: "id", w: "20%" },
-    { key: "name", w: "22%" },
-    { key: "desc", w: "42%" },
+    { key: "id", w: "14%" },
+    { key: "name", w: "16%" },
+    { key: "productId", w: "18%" },
+    { key: "operationId", w: "18%" },
+    { key: "operationSeq", w: "10%" },
+    { key: "description", w: "18%" },
     { key: "status", w: "10%" },
   ];
 
@@ -159,7 +190,9 @@ export default function MachinePage() {
       flag: "new",
       id: "",
       name: "",
-      koreanName: "",
+      productId: "",
+      operationId: "",
+      operationSeq: "",
       description: "",
     };
 
@@ -167,8 +200,6 @@ export default function MachinePage() {
     setPageIndex(0);
     setSelected(new Set());
     setDirty(true);
-
-    // 요구사항: 행추가로는 상세 자동 오픈 X
   };
 
   const deleteSelected = () => {
@@ -179,15 +210,10 @@ export default function MachinePage() {
     setPageIndex(0);
     setDirty(true);
 
-    // 상세가 삭제된 행을 보고 있었다면 닫기
     setSelectedRow((prev) => {
       if (!prev) return prev;
       return selected.has(prev._rid) ? null : prev;
     });
-
-    if (selectedRow && selected.has(selectedRow._rid)) {
-      setDetailOpen(false);
-    }
   };
 
   const saveHandle = () => {
@@ -196,9 +222,10 @@ export default function MachinePage() {
       return;
     }
 
+    // 백에 올릴 payload (내부용 _rid/flag 제거)
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
-    postMachine(payload, token)
+    postProductRoutings(payload, token)
       .then(() => {
         window.alert("저장 완료");
         setDirty(false);
@@ -221,21 +248,37 @@ export default function MachinePage() {
     const file = e?.target?.files?.[0];
     if (!file || !token) return;
 
-    parseMachineXLS(file, token)
+    parseProductRoutingXLS(file, token)
       .then((json) => {
-        const list = json.machineList || json.items || json.data || [];
+        const list =
+          json.routingList ||
+          json.productRoutingList ||
+          json.items ||
+          json.data ||
+          [];
+
         const items = (list || []).map((r) => ({
           ...r,
           _rid: cryptoId(),
           flag: "pre",
+          id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
+          name: r.name ?? r.routingName ?? "",
+          productId: r.productId ?? r.product_id ?? r.prodId ?? "",
+          operationId: r.operationId ?? r.operation_id ?? r.opId ?? "",
+          operationSeq:
+            r.operationSeq ??
+            r.operation_seq ??
+            r.seq ??
+            r.sequence ??
+            r.step ??
+            "",
+          description: r.description ?? r.desc ?? "",
         }));
 
         setData((prev) => [...items, ...prev]);
         setPageIndex(0);
         setSelected(new Set());
         setDirty(true);
-
-        // 요구사항: 업로드로는 상세 자동 오픈 X
       })
       .catch((err) => {
         console.error(err);
@@ -248,15 +291,228 @@ export default function MachinePage() {
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
+  const renderTable = () => (
+    <div className="h-full flex flex-col min-h-0">
+      {/* 헤더 */}
+      <div className="shrink-0">
+        <table className="w-full table-fixed border-collapse">
+          <ColGroup />
+          <thead>
+            <tr className="text-left text-sm">
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+                <div className="flex justify-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-white"
+                    checked={isAllPageSelected}
+                    ref={(el) => {
+                      if (!el) return;
+                      el.indeterminate = isSomePageSelected;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                  />
+                </div>
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Id
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Name
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Product Id
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Operation Id
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white whitespace-nowrap">
+                Seq
+              </th>
+
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Description
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Status
+              </th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+
+      {/* 바디 */}
+      <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+        <table className="w-full table-fixed border-collapse">
+          <ColGroup />
+          <tbody className="text-sm">
+            {pageRows.map((row) => {
+              const isUploaded = row.flag === "pre";
+              const isNew = row.flag === "new";
+              const rowBg = isUploaded
+                ? "bg-green-900/10"
+                : isNew
+                  ? "bg-indigo-900/10"
+                  : "";
+
+              const isActive = selectedRow?._rid === row._rid;
+
+              return (
+                <tr
+                  key={row._rid}
+                  className={[
+                    "transition-colors cursor-pointer",
+                    isActive ? "bg-gray-200" : "hover:bg-gray-200",
+                    rowBg,
+                  ].join(" ")}
+                  onClick={() => {
+                    setSelectedRow(row);
+                    setDetailOpen(true);
+                  }}
+                >
+                  {/* check */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <div
+                      className="flex justify-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        checked={selected.has(row._rid)}
+                        onChange={(e) => toggleOne(row._rid, e.target.checked)}
+                      />
+                    </div>
+                  </td>
+
+                  {/* id */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.id ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "id", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Id"
+                    />
+                  </td>
+                  {/* name */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.name ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "name", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Name"
+                    />
+                  </td>
+
+                  {/* productId */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.productId ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "productId", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="ProductId"
+                    />
+                  </td>
+
+                  {/* operationId */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.operationId ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "operationId", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="OperationId"
+                    />
+                  </td>
+
+                  {/* operationSeq */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.operationSeq ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "operationSeq", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Seq"
+                    />
+                  </td>
+                  {/* description */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.description ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "description", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Description"
+                    />
+                  </td>
+
+                  {/* status */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <div className="flex items-center">
+                      {isUploaded ? (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
+                          Imported
+                        </span>
+                      ) : isNew ? (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
+                          New
+                        </span>
+                      ) : (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
+                          Saved
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="p-0">
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="w-full px-4 py-16 text-center text-[12px] text-slate-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
+                  >
+                    <span className="font-extrabold text-indigo-700">
+                      클릭해서 행 추가
+                    </span>{" "}
+                    또는 XLS 업로드 해주세요.
+                  </button>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
-    <DashboardShell crumbTop="테이블" crumbCurrent="machine">
+    <DashboardShell crumbTop="테이블" crumbCurrent="product-routing">
       <div className="px-4 pt-4 h-[calc(100vh-120px)] flex flex-col gap-4">
         {/* ===== 상단 카드 ===== */}
         <div>
           <div className="flex justify-between items-end">
             <div className="flex flex-col gap-1">
               <h2 className="text-4xl font-bold tracking-tight text-slate-900">
-                Machine
+                Product Routing
               </h2>
               <p className="text-[12px] text-slate-500">
                 행 추가/ 파일 업로드 후 저장됩니다.
@@ -272,7 +528,7 @@ export default function MachinePage() {
                     setQuery(e.target.value);
                     setPageIndex(0);
                   }}
-                  placeholder="검색 (ID/Name/Description)"
+                  placeholder="검색 (Id/ProductId/OperationId/Description)"
                   className="
                     h-10 w-full rounded-xl border
                     pl-9 pr-9 text-[12px]
@@ -313,8 +569,8 @@ export default function MachinePage() {
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
+            {/* 카드 4개 */}
             <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-stretch">
-              {/* 총 데이터 */}
               <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
@@ -329,8 +585,7 @@ export default function MachinePage() {
                 </div>
               </div>
 
-              {/* 선택됨 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     선택
@@ -344,13 +599,11 @@ export default function MachinePage() {
                 </div>
               </div>
 
-              {/* 변경 사항 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm  ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     변경 사항
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     dirty
                   </span>
@@ -364,17 +617,17 @@ export default function MachinePage() {
                   )}
                 </div>
               </div>
-              {/* ✅ 전체 보기 */}
+
               <button
                 type="button"
                 onClick={() => setFullOpen(true)}
                 className="
-    h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5
-    text-left transition
-    hover:border-indigo-200 hover:bg-indigo-50/30
-    focus:outline-none focus:ring-2 focus:ring-indigo-200
-    flex flex-col justify-between
-  "
+                  h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5
+                  text-left transition
+                  hover:border-indigo-200 hover:bg-indigo-50/30
+                  focus:outline-none focus:ring-2 focus:ring-indigo-200
+                  flex flex-col justify-between
+                "
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
@@ -414,7 +667,6 @@ export default function MachinePage() {
                 </div>
 
                 <div className="mt-2 flex items-center gap-2 w-full">
-                  {/* 선택 삭제 */}
                   <button
                     type="button"
                     onClick={deleteSelected}
@@ -431,7 +683,6 @@ export default function MachinePage() {
                     선택 삭제
                   </button>
 
-                  {/* XLS */}
                   <button
                     type="button"
                     onClick={uploadHandle}
@@ -439,8 +690,7 @@ export default function MachinePage() {
                       "h-10 w-[110px] px-3",
                       "text-[12px] font-semibold text-slate-700",
                       "inline-flex items-center justify-center gap-2",
-                      "transition cursor-pointer",
-                      "whitespace-nowrap",
+                      "transition cursor-pointer whitespace-nowrap",
                     ].join(" ")}
                   >
                     <FileUp size={15} />
@@ -455,7 +705,6 @@ export default function MachinePage() {
                     onChange={fileChangeHandle}
                   />
 
-                  {/* 행 추가 */}
                   <button
                     type="button"
                     onClick={addRow}
@@ -471,7 +720,6 @@ export default function MachinePage() {
                     + 행 추가
                   </button>
 
-                  {/* 저장 */}
                   <button
                     type="button"
                     onClick={saveHandle}
@@ -506,181 +754,11 @@ export default function MachinePage() {
         {/* ===== 테이블 + 상세패널 ===== */}
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-            {/* ===== 테이블 카드 ===== */}
             <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
-              {/* 헤더 */}
-              <div className="shrink-0">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <thead>
-                    <tr className="text-left text-sm">
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-white"
-                            checked={isAllPageSelected}
-                            ref={(el) => {
-                              if (!el) return;
-                              el.indeterminate = isSomePageSelected;
-                            }}
-                            onChange={(e) => toggleAllPage(e.target.checked)}
-                          />
-                        </div>
-                      </th>
-
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Id
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Name
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Description
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-
-              {/* 바디 */}
-              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <tbody className="text-sm">
-                    {pageRows.map((row) => {
-                      const isUploaded = row.flag === "pre";
-                      const isNew = row.flag === "new";
-
-                      const rowBg = isUploaded
-                        ? "bg-green-900/10"
-                        : isNew
-                          ? "bg-indigo-900/10"
-                          : "";
-
-                      const isActive = selectedRow?._rid === row._rid;
-
-                      return (
-                        <tr
-                          key={row._rid}
-                          className={[
-                            "transition-colors cursor-pointer",
-                            isActive ? "bg-gray-200" : "hover:bg-gray-200",
-                            rowBg,
-                          ].join(" ")}
-                          onClick={() => {
-                            setSelectedRow(row);
-                            setDetailOpen(true);
-                          }}
-                        >
-                          {/* check */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <div
-                              className="flex justify-center"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                checked={selected.has(row._rid)}
-                                onChange={(e) =>
-                                  toggleOne(row._rid, e.target.checked)
-                                }
-                              />
-                            </div>
-                          </td>
-
-                          {/* id */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.id ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(row._rid, "id", e.target.value)
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Machine Id"
-                            />
-                          </td>
-
-                          {/* name */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.name ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(row._rid, "name", e.target.value)
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Name"
-                            />
-                          </td>
-
-                          {/* description */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.description ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(
-                                  row._rid,
-                                  "description",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Description"
-                            />
-                          </td>
-
-                          {/* status */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <div className="flex items-center">
-                              {isUploaded ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
-                                  Imported
-                                </span>
-                              ) : isNew ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
-                                  New
-                                </span>
-                              ) : (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
-                                  Saved
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {pageRows.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-0">
-                          <button
-                            type="button"
-                            onClick={addRow}
-                            className="w-full px-4 py-16 text-center text-[12px] text-slate-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
-                          >
-                            <span className="font-extrabold text-indigo-700">
-                              클릭해서 행 추가
-                            </span>{" "}
-                            또는 XLS 업로드 해주세요.
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {renderTable()}
             </div>
 
-            {/* ===== 상세 패널 ===== */}
-            <MachineDetailPanel
+            <ProductRoutingDetailPanel
               open={detailOpen}
               row={selectedRow}
               onToggle={() => setDetailOpen((v) => !v)}
@@ -688,7 +766,7 @@ export default function MachinePage() {
           </div>
 
           {/* 페이지네이션 */}
-          <div className="shrink-0 flex items-center justify-end  px-1 py-4">
+          <div className="shrink-0 flex items-center justify-end px-1 py-4">
             <button
               type="button"
               onClick={goPrev}
@@ -726,7 +804,8 @@ export default function MachinePage() {
           </div>
         </div>
       </div>
-      <MachineFullModal
+
+      <ProductRoutingFullModal
         open={fullOpen}
         onClose={() => setFullOpen(false)}
         token={token}
