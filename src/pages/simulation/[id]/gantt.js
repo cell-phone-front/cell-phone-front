@@ -180,119 +180,113 @@ export default function SimulationGanttPage() {
   return (
     <DashboardShell>
       <div className="p-3 h-[calc(100vh-120px)] min-h-0 flex flex-col gap-3">
-        {/* ===== 상단 헤더 + 탭 버튼 ===== */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="px-5 py-4 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                  {tab === "PRODUCT" ? (
-                    <Boxes className="h-5 w-5" />
-                  ) : (
-                    <Cpu className="h-5 w-5" />
-                  )}
+        {/* ===== 상단 헤더 (슬림 바) ===== */}
+        <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* 왼쪽 */}
+            <div className="flex items-center gap-4 min-w-0">
+              {/* 아이콘 */}
+              <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                {tab === "PRODUCT" ? (
+                  <Boxes className="h-5 w-5" />
+                ) : (
+                  <Cpu className="h-5 w-5" />
+                )}
+              </div>
+
+              {/* 타이틀 */}
+              <div className="min-w-0">
+                <div className="text-[14px] font-bold text-slate-900 truncate">
+                  시뮬레이션 간트
+                  <span className="ml-2 text-[12px] text-slate-400">#{id}</span>
                 </div>
-                <div>
-                  <div className="text-[15px] font-black text-slate-900">
-                    시뮬레이션 간트
-                    <span className="ml-2 text-[12px] font-extrabold text-slate-400">
-                      #{id}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[12px] font-semibold text-slate-500">
-                    {tab === "PRODUCT"
-                      ? "Product → Operation → Task (3단)"
-                      : "Machine → Task (2단)"}
-                  </div>
+
+                <div className="text-[11px] text-slate-500">
+                  {tab === "PRODUCT"
+                    ? "Product → Operation → Task"
+                    : "Machine → Task"}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* 탭 */}
+              <div className="ml-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                 <button
-                  type="button"
-                  onClick={() => setAiOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 hover:bg-slate-50"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  AI Summary
-                  <span className="ml-1 rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-black text-indigo-700 border border-indigo-100">
-                    {aiBadgeCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={fetchData}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 hover:bg-slate-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  새로고침
-                </button>
-              </div>
-            </div>
-
-            {/* 요약 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-                <div className="text-[11px] font-extrabold text-slate-500">
-                  Total Tasks
-                </div>
-                <div className="mt-1 text-[18px] font-black text-slate-900">
-                  {summary.total}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-                <div className="text-[11px] font-extrabold text-slate-500">
-                  Products
-                </div>
-                <div className="mt-1 text-[18px] font-black text-slate-900">
-                  {summary.productCount}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-                <div className="text-[11px] font-extrabold text-slate-500">
-                  Machines
-                </div>
-                <div className="mt-1 text-[18px] font-black text-slate-900">
-                  {summary.machineCount}
-                </div>
-              </div>
-            </div>
-
-            {/* 탭 버튼 */}
-            <div className="flex items-center justify-between gap-3 pt-1">
-              <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
                   onClick={() => setTab("PRODUCT")}
                   className={cx(
-                    "px-3 py-2 rounded-xl text-[12px] font-extrabold transition",
+                    "px-5 py-1.5 rounded-md text-[11px] font-semibold",
                     tab === "PRODUCT"
-                      ? "bg-indigo-600 text-white shadow-sm"
+                      ? "bg-indigo-600 text-white"
                       : "text-slate-600 hover:bg-white",
                   )}
                 >
-                  Product (3단)
+                  Product
                 </button>
+
                 <button
-                  type="button"
                   onClick={() => setTab("MACHINE")}
                   className={cx(
-                    "px-3 py-2 rounded-xl text-[12px] font-extrabold transition",
+                    "px-5 py-1.5 rounded-md text-[11px] font-semibold",
                     tab === "MACHINE"
-                      ? "bg-indigo-600 text-white shadow-sm"
+                      ? "bg-indigo-600 text-white"
                       : "text-slate-600 hover:bg-white",
                   )}
                 >
-                  Machine (2단)
+                  Machine
                 </button>
               </div>
+              {/* AI */}
+              <button
+                onClick={() => setAiOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-[11px] font-semibold hover:bg-slate-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Summary
+                {aiBadgeCount > 0 && (
+                  <span className="ml-1 rounded bg-indigo-100 px-1.5 text-indigo-700">
+                    {aiBadgeCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
-              <div className="text-[11px] font-semibold text-slate-400">
-                {tab === "PRODUCT"
-                  ? `그룹 ${productGroups.length}개`
-                  : `그룹 ${machineGroups.length}개`}
+            {/* 오른쪽 */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 요약 */}
+              <div className="hidden sm:flex items-center gap-2 text-[12px] font-semibold text-slate-600">
+                <span>
+                  Tasks{" "}
+                  <span className="font-bold text-slate-900">
+                    {summary.total}
+                  </span>
+                </span>
+
+                <span className="text-slate-300">|</span>
+
+                <span>
+                  Products{" "}
+                  <span className="font-bold text-slate-900">
+                    {summary.productCount}
+                  </span>
+                </span>
+
+                <span className="text-slate-300">|</span>
+
+                <span>
+                  Machines{" "}
+                  <span className="font-bold text-slate-900">
+                    {summary.machineCount}
+                  </span>
+                </span>
               </div>
+
+              {/* 새로고침 */}
+              <button
+                onClick={fetchData}
+                className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold hover:bg-slate-50"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                새로고침
+              </button>
             </div>
           </div>
         </div>
