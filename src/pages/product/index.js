@@ -2,9 +2,17 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp, Search } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Search,
+  Maximize2,
+} from "lucide-react";
 
 import { getProducts, parseProductXLS, postProducts } from "@/api/product-api";
+import ProductFullModal from "@/components/table-modal/product";
 import ProductDetailPanel from "@/components/detail-panel/product";
 
 /* ===============================
@@ -37,7 +45,10 @@ export default function ProductPage() {
 
   const fileRef = useRef(null);
 
-  //  상세 패널: 처음엔 닫힘 + "행 클릭시에만" 열리도록
+  // ✅ 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
+
+  // ✅ 상세 패널
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -63,7 +74,7 @@ export default function ProductPage() {
         setLoadError("");
         setDirty(false);
 
-        // 검색/조회로 리스트가 바뀌면 상세는 닫기
+        // ✅ 목록이 바뀌면 상세 닫기
         setSelectedRow(null);
         setDetailOpen(false);
       })
@@ -122,11 +133,12 @@ export default function ProductPage() {
     );
     setDirty(true);
 
-    // 상세에 떠있는 행을 수정하면 상세도 같이 갱신
+    // ✅ 상세에 떠있는 행이면 상세도 같이 갱신
     setSelectedRow((prev) =>
       prev && prev._rid === rowRid ? { ...prev, [key]: value } : prev,
     );
   };
+
   const COLS = [
     { key: "check", w: "6%" },
     { key: "id", w: "18%" },
@@ -158,8 +170,6 @@ export default function ProductPage() {
     setPageIndex(0);
     setSelected(new Set());
     setDirty(true);
-
-    //  요구사항: 행추가로는 상세 자동 오픈 X
   };
 
   const deleteSelected = () => {
@@ -170,16 +180,11 @@ export default function ProductPage() {
     setPageIndex(0);
     setDirty(true);
 
-    //  상세가 삭제된 행을 보고 있었다면 닫기
+    // ✅ 삭제된 행 상세 보고 있었다면 닫기
     setSelectedRow((prev) => {
       if (!prev) return prev;
       return selected.has(prev._rid) ? null : prev;
     });
-
-    // selectedRow는 비동기라 안전하게: 삭제 후에는 닫아버리는 쪽이 깔끔
-    if (selectedRow && selected.has(selectedRow._rid)) {
-      setDetailOpen(false);
-    }
   };
 
   const saveHandle = () => {
@@ -226,8 +231,6 @@ export default function ProductPage() {
         setPageIndex(0);
         setSelected(new Set());
         setDirty(true);
-
-        // 요구사항: 업로드로는 상세 자동 오픈 X
       })
       .catch((err) => {
         console.error(err);
@@ -240,11 +243,194 @@ export default function ProductPage() {
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
 
+  // ✅ 페이지 테이블 렌더(세로 스크롤만)
+  const renderTable = () => (
+    <div className="h-full flex flex-col min-h-0">
+      {/* 헤더 */}
+      <div className="shrink-0">
+        <table className="w-full table-fixed border-collapse">
+          <ColGroup />
+          <thead>
+            <tr className="text-left text-sm">
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+                <div className="flex justify-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-white"
+                    checked={isAllPageSelected}
+                    ref={(el) => {
+                      if (!el) return;
+                      el.indeterminate = isSomePageSelected;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                  />
+                </div>
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Id
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Brand
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Name
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Description
+              </th>
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                Status
+              </th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+
+      {/* 바디 (세로 스크롤만) */}
+      <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+        <table className="w-full table-fixed border-collapse">
+          <ColGroup />
+          <tbody className="text-sm">
+            {pageRows.map((row) => {
+              const isUploaded = row.flag === "pre";
+              const isNew = row.flag === "new";
+              const rowBg = isUploaded
+                ? "bg-green-900/10"
+                : isNew
+                  ? "bg-indigo-900/10"
+                  : "";
+
+              const isActive = selectedRow?._rid === row._rid;
+
+              return (
+                <tr
+                  key={row._rid}
+                  className={[
+                    "transition-colors cursor-pointer",
+                    isActive ? "bg-gray-200" : "hover:bg-gray-200",
+                    rowBg,
+                  ].join(" ")}
+                  onClick={() => {
+                    setSelectedRow(row);
+                    setDetailOpen(true);
+                  }}
+                >
+                  {/* check */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <div
+                      className="flex justify-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        checked={selected.has(row._rid)}
+                        onChange={(e) => toggleOne(row._rid, e.target.checked)}
+                      />
+                    </div>
+                  </td>
+
+                  {/* id */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.id ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "id", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Id"
+                    />
+                  </td>
+
+                  {/* brand */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.brand ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "brand", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Brand"
+                    />
+                  </td>
+
+                  {/* name */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.name ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "name", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Name"
+                    />
+                  </td>
+
+                  {/* desc */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <input
+                      value={row.description ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        updateCell(row._rid, "description", e.target.value)
+                      }
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Description"
+                    />
+                  </td>
+
+                  {/* status */}
+                  <td className="border-b border-slate-100 px-3 py-2">
+                    <div className="flex items-center">
+                      {isUploaded ? (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
+                          Imported
+                        </span>
+                      ) : isNew ? (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
+                          New
+                        </span>
+                      ) : (
+                        <span className="inline-flex justify-center min-w-[65px] text-[9px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
+                          Saved
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-0">
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="w-full px-4 py-16 text-center text-[12px] text-slate-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
+                  >
+                    <span className="font-extrabold text-indigo-700">
+                      클릭해서 행 추가
+                    </span>{" "}
+                    또는 XLS 업로드 해주세요.
+                  </button>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="product">
       <div className="px-4 pt-4 h-[calc(100vh-120px)] flex flex-col gap-4">
         {/* ===== 상단 카드 ===== */}
-        <div className="">
+        <div>
           <div className="flex justify-between items-end">
             <div className="flex flex-col gap-1">
               <h2 className="text-4xl font-bold tracking-tight text-slate-900">
@@ -254,6 +440,7 @@ export default function ProductPage() {
                 행 추가/ 파일 업로드 후 저장됩니다.
               </p>
             </div>
+
             <div className="w-[340px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -265,14 +452,14 @@ export default function ProductPage() {
                   }}
                   placeholder="검색 (ID/Brand/Name/Description)"
                   className="
-                          h-10 w-full rounded-xl border
-                          pl-9 pr-9 text-[12px]
-                          outline-none transition
-                          hover:border-slate-300
-                          focus:ring-2 focus:ring-indigo-200
-                          placeholder:text-[11px]
-                          placeholder:text-slate-400
-                        "
+                    h-10 w-full rounded-xl border
+                    pl-9 pr-9 text-[12px]
+                    outline-none transition
+                    hover:border-slate-300
+                    focus:ring-2 focus:ring-indigo-200
+                    placeholder:text-[11px]
+                    placeholder:text-slate-400
+                  "
                 />
                 {query ? (
                   <button
@@ -282,12 +469,12 @@ export default function ProductPage() {
                       setPageIndex(0);
                     }}
                     className="
-                            absolute right-2 top-1/2 -translate-y-1/2
-                            h-7 w-7 rounded-lg
-                            text-slate-400 transition
-                            hover:bg-slate-100 hover:text-indigo-700
-                            active:bg-slate-200
-                          "
+                      absolute right-2 top-1/2 -translate-y-1/2
+                      h-7 w-7 rounded-lg
+                      text-slate-400 transition
+                      hover:bg-slate-100 hover:text-indigo-700
+                      active:bg-slate-200
+                    "
                     aria-label="clear"
                   >
                     ✕
@@ -304,49 +491,44 @@ export default function ProductPage() {
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* 카드 4개 */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-4 gap-4 items-stretch">
               {/* 총 데이터 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     총 데이터
                   </div>
-
-                  {/* 오른쪽 위 뱃지 */}
                   <span className="items-center text-[11px] text-slate-400">
                     rows
                   </span>
                 </div>
-
                 <div className="mt-1 text-3xl font-extrabold text-slate-900">
                   {totalRows.toLocaleString()}
                 </div>
               </div>
 
               {/* 선택 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     선택
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     rows
                   </span>
                 </div>
-
                 <div className="mt-1 text-3xl font-extrabold text-indigo-700">
                   {selectedCount.toLocaleString()}
                 </div>
               </div>
 
               {/* 변경 사항 */}
-              <div className="rounded-2xl border bg-white p-4 shadow-sm  ring-black/5">
+              <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[11px] font-semibold text-slate-500">
                     변경 사항
                   </div>
-
                   <span className="items-center text-[11px] text-slate-400">
                     dirty
                   </span>
@@ -360,6 +542,42 @@ export default function ProductPage() {
                   )}
                 </div>
               </div>
+
+              {/* 전체 보기 */}
+              <button
+                type="button"
+                onClick={() => setFullOpen(true)}
+                className="
+                  h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5
+                  text-left transition
+                  hover:border-indigo-200 hover:bg-indigo-50/30
+                  focus:outline-none focus:ring-2 focus:ring-indigo-200
+                  flex flex-col justify-between
+                "
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    전체 보기
+                  </div>
+                  <span className="items-center text-[11px] text-slate-400">
+                    modal
+                  </span>
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-900">
+                      표 전체 열기
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      전체 데이터 확인
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
 
             {/* 액션 패널 */}
@@ -375,7 +593,6 @@ export default function ProductPage() {
                 </div>
 
                 <div className="mt-2 flex items-center gap-2 w-full">
-                  {/* 선택 삭제 */}
                   <button
                     type="button"
                     onClick={deleteSelected}
@@ -386,22 +603,20 @@ export default function ProductPage() {
                       "inline-flex items-center justify-center whitespace-nowrap",
                       selectedCount === 0
                         ? "text-slate-300 cursor-not-allowed"
-                        : "text-red-600  cursor-pointer",
+                        : "text-red-600 cursor-pointer",
                     ].join(" ")}
                   >
                     선택 삭제
                   </button>
 
-                  {/* XLS */}
                   <button
                     type="button"
                     onClick={uploadHandle}
                     className={[
-                      "h-10 w-[110px]  px-3",
+                      "h-10 w-[110px] px-3",
                       "text-[12px] font-semibold text-slate-700",
                       "inline-flex items-center justify-center gap-2",
-                      "transition cursor-pointer",
-                      "whitespace-nowrap",
+                      "transition cursor-pointer whitespace-nowrap",
                     ].join(" ")}
                   >
                     <FileUp size={15} />
@@ -416,7 +631,6 @@ export default function ProductPage() {
                     onChange={fileChangeHandle}
                   />
 
-                  {/* 행 추가 */}
                   <button
                     type="button"
                     onClick={addRow}
@@ -432,7 +646,6 @@ export default function ProductPage() {
                     + 행 추가
                   </button>
 
-                  {/* 저장 */}
                   <button
                     type="button"
                     onClick={saveHandle}
@@ -465,196 +678,14 @@ export default function ProductPage() {
         </div>
 
         {/* ===== 테이블 + 상세패널 ===== */}
-        <div className="flex-1 min-h-0 flex flex-col ">
+        <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-            {/* ===== 테이블 카드 ===== */}
+            {/* 테이블 */}
             <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
-              {/* 헤더 */}
-              <div className="shrink-0">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <thead>
-                    <tr className="text-left text-sm">
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-white"
-                            checked={isAllPageSelected}
-                            ref={(el) => {
-                              if (!el) return;
-                              el.indeterminate = isSomePageSelected;
-                            }}
-                            onChange={(e) => toggleAllPage(e.target.checked)}
-                          />
-                        </div>
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Id
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Brand
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Name
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Description
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-
-              {/* 바디: 세로 스크롤만 (가로 스크롤 제거) */}
-              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <tbody className="text-sm">
-                    {pageRows.map((row) => {
-                      const isUploaded = row.flag === "pre";
-                      const isNew = row.flag === "new";
-                      const rowBg = isUploaded
-                        ? "bg-green-900/10"
-                        : isNew
-                          ? "bg-indigo-900/10"
-                          : "";
-
-                      const isActive = selectedRow?._rid === row._rid;
-
-                      return (
-                        <tr
-                          key={row._rid}
-                          className={[
-                            "transition-colors cursor-pointer",
-                            isActive ? "bg-gray-200" : "hover:bg-gray-200",
-                            rowBg,
-                          ].join(" ")}
-                          onClick={() => {
-                            setSelectedRow(row);
-                            setDetailOpen(true);
-                          }}
-                        >
-                          {/* check */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <div
-                              className="flex justify-center"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                checked={selected.has(row._rid)}
-                                onChange={(e) =>
-                                  toggleOne(row._rid, e.target.checked)
-                                }
-                              />
-                            </div>
-                          </td>
-
-                          {/* id */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.id ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(row._rid, "id", e.target.value)
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Id"
-                            />
-                          </td>
-
-                          {/* brand */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.brand ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(row._rid, "brand", e.target.value)
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Brand"
-                            />
-                          </td>
-
-                          {/* name */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.name ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(row._rid, "name", e.target.value)
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Name"
-                            />
-                          </td>
-
-                          {/* desc */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <input
-                              value={row.description ?? ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                updateCell(
-                                  row._rid,
-                                  "description",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-9 w-full rounded-xl border px-3 bg-white text-sm outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                              placeholder="Description"
-                            />
-                          </td>
-
-                          {/* status */}
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <div className="flex items-center">
-                              {isUploaded ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
-                                  Imported
-                                </span>
-                              ) : isNew ? (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
-                                  New
-                                </span>
-                              ) : (
-                                <span className="inline-flex justify-center min-w-[74px] text-[11px] px-2 py-1 rounded-full bg-gray-100 text-slate-600 border border-slate-200 font-semibold">
-                                  Saved
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {pageRows.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-0">
-                          <button
-                            type="button"
-                            onClick={addRow}
-                            className="w-full px-4 py-16 text-center text-[12px] text-slate-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
-                          >
-                            <span className="font-extrabold text-indigo-700">
-                              클릭해서 행 추가
-                            </span>{" "}
-                            또는 XLS 업로드 해주세요.
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {renderTable()}
             </div>
 
-            {/* ===== 상세 패널(분리된 컴포넌트) ===== */}
+            {/* 상세 패널 */}
             <ProductDetailPanel
               open={detailOpen}
               row={selectedRow}
@@ -663,18 +694,19 @@ export default function ProductPage() {
           </div>
 
           {/* 페이지네이션 */}
-          <div className="flex items-center justify-end gap-1 px-1 py-5 ">
+          <div className="shrink-0 flex items-center justify-end px-1 py-4">
             <button
               type="button"
               onClick={goPrev}
               disabled={pageIndex === 0}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex === 0
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
+              <ChevronLeft className="h-4 w-4" />
               이전
             </button>
 
@@ -688,17 +720,25 @@ export default function ProductPage() {
               onClick={goNext}
               disabled={pageIndex >= pageCount - 1}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex >= pageCount - 1
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
               다음
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
+
+      {/* ✅ 모달은 컴포넌트 파일로 분리된 것만 사용 */}
+      <ProductFullModal
+        open={fullOpen}
+        onClose={() => setFullOpen(false)}
+        token={token}
+      />
     </DashboardShell>
   );
 }

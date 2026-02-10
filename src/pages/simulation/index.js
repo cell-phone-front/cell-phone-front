@@ -11,13 +11,25 @@ import {
   deleteSimulation,
   getSimulationMetaJson,
 } from "@/api/simulation-api";
-import SimulationCreateDrawer from "@/components/simulation/simulation-create-drawer";
 
 import { getProducts } from "@/api/product-api";
+import SimulationCreateDrawer from "@/components/simulation/simulation-create-drawer";
 
 import { Spinner } from "@/components/ui/spinner";
-import { Play, Check, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Play,
+  Check,
+  Plus,
+  Search,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  FileSearch,
+} from "lucide-react";
 
+/* ===============================
+   util
+=============================== */
 function fmtDate(v) {
   if (!v) return "-";
   const s = String(v);
@@ -33,6 +45,16 @@ function roleOk(role) {
   return r === "admin" || r === "planner";
 }
 
+function buildStartDateTime(dateStr, timeStr) {
+  const d = (dateStr || "").trim();
+  const t = (timeStr || "00:00").trim();
+  if (!d) return "";
+  return `${d}T${t}:00`;
+}
+
+/* ===============================
+   UI pieces
+=============================== */
 function StatusPill({ status, clickable, onClick }) {
   const st = String(status || "").toUpperCase();
 
@@ -44,7 +66,8 @@ function StatusPill({ status, clickable, onClick }) {
         disabled={!clickable}
         className={[
           "inline-flex items-center gap-1.5 min-w-[92px] justify-center",
-          "text-[11px] px-2 py-0.5 rounded-full border",
+          "text-[11px] px-2 py-1 rounded-full border font-semibold",
+          "transition",
           clickable
             ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
             : "bg-white text-slate-400 border-slate-200 cursor-not-allowed opacity-60",
@@ -58,7 +81,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "PENDING") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[84px] justify-center text-[11px] px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+      <span className="inline-flex items-center gap-1.5 min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200 font-semibold">
         PENDING <Spinner className="h-3.5 w-3.5" />
       </span>
     );
@@ -66,7 +89,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "OPTIMAL") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[84px] justify-center text-[11px] px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+      <span className="inline-flex items-center gap-1.5 min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
         OPTIMAL <Check className="h-3.5 w-3.5" />
       </span>
     );
@@ -74,37 +97,73 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (!st || st === "-") {
     return (
-      <span className="inline-flex items-center min-w-[84px] justify-center text-[11px] px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200">
+      <span className="inline-flex items-center min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-semibold">
         -
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center min-w-[84px] justify-center text-[11px] px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200">
+    <span className="inline-flex items-center min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-semibold">
       {st}
     </span>
   );
 }
 
-function StatCard({ label, value, sub, right }) {
+function StatCard({ label, value, sub, tone = "slate", icon }) {
+  const toneMap = {
+    slate: "text-slate-900",
+    indigo: "text-indigo-700",
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+  };
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">
-              {label}
-            </div>
-            <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-              {value}
-            </div>
-            {sub ? (
-              <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>
-            ) : null}
-          </div>
-          {right ? <div className="pt-0.5">{right}</div> : null}
+    <div className="relative rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
+      <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+
+      {icon ? (
+        <div className="absolute right-4 top-4 h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+          {icon}
         </div>
+      ) : null}
+
+      <div
+        className={[
+          "mt-1 text-3xl font-extrabold leading-tight",
+          toneMap[tone] || toneMap.slate,
+        ].join(" ")}
+      >
+        {value}
+      </div>
+
+      {sub ? (
+        <div className="mt-0.5 text-[11px] leading-tight text-slate-500">
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ✅ Field 카드가 "카드 안 카드"가 되어서 높이 먹던 부분을 정리 (1겹만)
+function Field({ label, value, mono, right, pill }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+        {right ? (
+          <div className="text-[11px] text-slate-400">{right}</div>
+        ) : null}
+      </div>
+
+      <div
+        className={[
+          "mt-1 text-[13px] font-semibold text-slate-900 leading-snug",
+          mono ? "font-mono" : "",
+        ].join(" ")}
+      >
+        {pill ? pill : value == null || value === "" ? "-" : String(value)}
       </div>
     </div>
   );
@@ -115,9 +174,6 @@ export default function SimulationPage() {
   const token = useToken((s) => s.token);
   const account = useAccount((s) => s.account);
   const canEdit = roleOk(account?.role);
-
-  // ✅ 두 패널 높이(동일)
-  const PANEL_H = "h-[calc(100vh-360px)]";
 
   // products 목록
   const [products, setProducts] = useState([]);
@@ -136,7 +192,7 @@ export default function SimulationPage() {
   // 선택은 id로
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  // ✅ 오른쪽 상세 패널용 “활성 행”
+  // 오른쪽 상세 패널용 활성 행
   const [activeId, setActiveId] = useState("");
 
   // 생성 Drawer
@@ -156,13 +212,6 @@ export default function SimulationPage() {
     await refresh();
     await new Promise((r) => setTimeout(r, 800));
     await refresh();
-  }
-
-  function buildStartDateTime(dateStr, timeStr) {
-    const d = (dateStr || "").trim();
-    const t = (timeStr || "00:00").trim();
-    if (!d) return "";
-    return `${d}T${t}:00`;
   }
 
   async function enrichRowsWithMeta(baseRows) {
@@ -484,178 +533,185 @@ export default function SimulationPage() {
     [filtered],
   );
 
+  const selectedCount = selectedIds.size;
+
+  const COLS = [
+    { key: "check", w: "5%" },
+    { key: "id", w: "15%" },
+    { key: "title", w: "35%" },
+    { key: "prod", w: "10%" },
+    { key: "status", w: "15%" },
+    { key: "start", w: "10%" },
+  ];
+
+  const ColGroup = () => (
+    <colgroup>
+      {COLS.map((c) => (
+        <col key={c.key} style={{ width: c.w }} />
+      ))}
+    </colgroup>
+  );
+
   return (
-    <DashboardShell crumbTop="시뮬레이션" crumbCurrent="Simulation">
-      {/* 대시보드 헤더 */}
-      <div className="px-4 pt-5 pb-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Simulation
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              생성 · 실행 · 결과(스케줄) 확인
-            </p>
+    <DashboardShell crumbTop="시뮬레이션" crumbCurrent="simulation">
+      {/* ✅ 핵심: 높이 고정(h-...) 제거하고 min-h로 변경 + 페이지네이션이 아래에서 절대 안 잘리게 구조 변경 */}
+      <div className="px-4 pt-4 min-h-[calc(100vh-120px)] flex flex-col gap-4">
+        {/* ===== 상단 타이틀 + 검색 ===== */}
+        <div className="shrink-0">
+          <div className="flex justify-between items-end gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-4xl font-bold tracking-tight text-slate-900">
+                Simulation
+              </h2>
+              <p className="text-[12px] text-slate-500">
+                생성 · 실행 · 결과(스케줄) 확인
+              </p>
+            </div>
+
+            <div className="w-[380px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <input
+                  value={q}
+                  onChange={(e) => {
+                    setQ(e.target.value);
+                    setPageIndex(0);
+                  }}
+                  placeholder="검색 (제목/설명/작성자/상태/제품)"
+                  className="
+                    h-10 w-full rounded-xl border
+                    pl-9 pr-9 text-[12px]
+                    outline-none transition
+                    hover:border-slate-300
+                    focus:ring-2 focus:ring-indigo-200
+                    placeholder:text-[11px]
+                    placeholder:text-slate-400
+                  "
+                />
+                {q ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQ("");
+                      setPageIndex(0);
+                    }}
+                    className="
+                      absolute right-2 top-1/2 -translate-y-1/2
+                      h-7 w-7 rounded-lg
+                      text-slate-400 transition
+                      hover:bg-slate-100 hover:text-indigo-700
+                      active:bg-slate-200
+                    "
+                    aria-label="clear"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+            </div>
           </div>
 
-          {/* 검색 */}
-          <div className="relative w-[420px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPageIndex(0);
-              }}
-              placeholder="검색 (제목/설명/작성자/상태/제품)"
-              className="
-                h-10 w-full rounded-lg border border-slate-200 bg-white
-                pl-9 pr-9 text-[12px]
-                outline-none transition
-                hover:border-slate-300
-                focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
-                placeholder:text-[11px] placeholder:text-slate-400
-              "
-            />
-            {q ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setQ("");
-                  setPageIndex(0);
-                }}
-                className="
-                  absolute right-2 top-1/2 -translate-y-1/2
-                  text-slate-400 transition
-                  hover:text-indigo-600 active:text-indigo-800
-                "
-                aria-label="clear"
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
-        </div>
+          {/* ===== KPI + 작업 패널 ===== */}
+          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <StatCard
+                label="총 데이터"
+                value={totalRows.toLocaleString()}
+                sub="검색/필터 반영"
+                tone="slate"
+                icon={<FileSearch className="h-4 w-4" />}
+              />
+              <StatCard
+                label="선택됨"
+                value={selectedCount.toLocaleString()}
+                sub="선택된 항목 수"
+                tone="indigo"
+                icon={<Check className="h-4 w-4" />}
+              />
+              <StatCard
+                label="상태"
+                value={`${optimalCount}/${pendingCount}/${readyCount}`}
+                sub="OPTIMAL / PENDING / READY"
+                tone="slate"
+                icon={<span className="text-[11px] font-black">O/P/R</span>}
+              />
+            </div>
 
-        {/*  KPI 카드 */}
-        <div className="mt-4 grid grid-cols-4 gap-3">
-          <StatCard
-            label="Total"
-            value={totalRows.toLocaleString()}
-            sub="검색/필터 반영"
-            right={
-              <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 font-black">
-                Σ
-              </div>
-            }
-          />
-          <StatCard
-            label="Selected"
-            value={selectedIds.size.toLocaleString()}
-            sub="선택된 항목 수"
-            right={
-              <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-700 font-black">
-                ✓
-              </div>
-            }
-          />
-          <StatCard
-            label="Status"
-            value={`${optimalCount}/${pendingCount}/${readyCount}`}
-            sub="OPTIMAL / PENDING / READY"
-            right={
-              <div className="h-9 px-3 rounded-lg bg-slate-100 flex items-center justify-center text-[11px] font-black text-slate-700">
-                O/P/R
-              </div>
-            }
-          />
-          <StatCard
-            label="Active"
-            value={activeRow?.id ? `#${activeRow.id}` : "-"}
-            sub={
-              activeRow?.title ? String(activeRow.title) : "선택된 항목 없음"
-            }
-            right={
-              <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-black">
-                i
-              </div>
-            }
-          />
-        </div>
-      </div>
-
-      {/* 2패널 본문 */}
-      <div className="px-3 pb-5">
-        <div className="flex gap-5 items-stretch">
-          {/* LEFT */}
-          <div className="flex-1 min-w-0">
-            <div
-              className={[
-                "rounded-xl bg-white shadow-sm  ring-black/5 overflow-hidden",
-                "flex flex-col",
-                PANEL_H,
-              ].join(" ")}
-            >
-              {/* 리스트 카드 헤더(툴바) */}
-              <div className="shrink-0 px-4 py-2 border-b border-slate-100 bg-white">
-                <div className="flex items-center justify-between gap-2">
-                  {/* 좌측: 선택삭제 */}
-                  <div className="flex items-center gap-2">
-                    <div className="text-[11px] text-slate-500">
-                      <span className="font-semibold text-slate-700">
-                        {selectedIds.size.toLocaleString()}
-                      </span>
-                      건 선택
-                    </div>
+            <div className="lg:col-span-4">
+              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    작업
                   </div>
+                  <span className="items-center text-[11px] text-slate-400">
+                    controls
+                  </span>
+                </div>
 
-                  {/* 우측: 생성 */}
-                  <div className="flex gap-3">
+                <div className="mt-4 flex items-center gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={deleteSelectedHandle}
+                    disabled={!canEdit || selectedCount === 0}
+                    className={[
+                      "h-10 w-[110px] px-3",
+                      "text-[12px] font-semibold transition",
+                      "inline-flex items-center justify-center gap-2 whitespace-nowrap",
+                      !canEdit || selectedCount === 0
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-red-600 hover:bg-red-50 rounded-xl cursor-pointer",
+                    ].join(" ")}
+                    title={!canEdit ? "권한 없음" : ""}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    선택 삭제
+                  </button>
+
+                  {canEdit ? (
                     <button
                       type="button"
-                      onClick={deleteSelectedHandle}
-                      disabled={!canEdit || selectedIds.size === 0}
-                      className={[
-                        "h-9 rounded-lg border px-4 text-sm font-semibold transition inline-flex items-center gap-2",
-                        !canEdit || selectedIds.size === 0
-                          ? "bg-white text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
-                          : "bg-white text-red-600 border-red-200 hover:bg-red-50 cursor-pointer",
-                      ].join(" ")}
-                      title={!canEdit ? "권한 없음" : ""}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      선택 삭제
-                    </button>
-                    {canEdit ? (
-                      <button
-                        type="button"
-                        onClick={() => setOpenNew(true)}
-                        className="
-                        h-9 rounded-lg border border-indigo-200 bg-indigo-600 px-5 text-sm font-semibold text-white
-                        transition cursor-pointer
-                        hover:bg-indigo-700 active:bg-indigo-800
-                        focus:outline-none focus:ring-2 focus:ring-indigo-100
-                        inline-flex items-center gap-2
+                      onClick={() => setOpenNew(true)}
+                      className="
+                        h-10 flex-1 rounded-xl px-4
+                        bg-indigo-900 text-white
+                        text-[12px] font-semibold
+                        inline-flex items-center justify-center gap-2
+                        transition hover:bg-indigo-800 active:bg-indigo-950
+                        active:scale-[0.98] cursor-pointer
+                        focus:outline-none focus:ring-2 focus:ring-indigo-300
                       "
-                      >
-                        <Plus className="h-4 w-4" />
-                        생성
-                      </button>
-                    ) : null}
-                  </div>
+                    >
+                      <Plus className="h-4 w-4" />
+                      생성
+                    </button>
+                  ) : (
+                    <div className="flex-1 h-10 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-400 flex items-center justify-center">
+                      권한: Admin/Planner
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
 
-              {/* 테이블 */}
-              <div className="flex-1 overflow-auto">
-                <table className="w-full border-separate border-spacing-0 table-fixed">
-                  <thead className="sticky top-0 z-10 bg-slate-200">
-                    <tr className="text-left text-[12px] text-slate-600">
-                      <th className="w-[44px] border-b border-slate-200 px-3 py-3">
+        {/* ✅ 핵심: 여기만 flex-1로 "남는 높이"를 먹게 해서 페이지네이션이 항상 보이게 */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* 테이블 + 상세패널 */}
+          <div className="h-[485px] min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
+            {/* ===== 테이블 카드 ===== */}
+            <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
+              {/* 헤더 */}
+              <div className="shrink-0">
+                <table className="w-full table-fixed border-collapse">
+                  <ColGroup />
+                  <thead>
+                    <tr className="text-left text-sm">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
                         <div className="flex justify-center">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 accent-indigo-600"
+                            className="h-4 w-4 accent-white"
                             checked={isAllPageSelected}
                             ref={(el) => {
                               if (!el) return;
@@ -665,44 +721,58 @@ export default function SimulationPage() {
                           />
                         </div>
                       </th>
-
-                      <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-semibold">
-                        Id
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                        Sim Id
                       </th>
-                      <th className="w-[300px] border-b border-slate-200 px-3 py-3 font-semibold">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
                         Title
                       </th>
-                      <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-semibold text-right">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white text-right">
                         Product
                       </th>
-                      <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-semibold">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
                         Status
                       </th>
-                      <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-semibold">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
                         Start
                       </th>
                     </tr>
                   </thead>
+                </table>
+              </div>
 
+              {/* 바디 */}
+              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+                <table className="w-full table-fixed border-collapse">
+                  <ColGroup />
                   <tbody className="text-sm">
                     {loading ? (
                       <tr>
                         <td
                           colSpan={6}
-                          className="border-b px-3 py-12 text-center"
+                          className="px-4 py-12 text-center text-[12px] text-slate-500"
                         >
-                          <span className="text-slate-500">불러오는 중...</span>
+                          불러오는 중...
                         </td>
                       </tr>
                     ) : pageRows.length === 0 ? (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="border-b px-3 py-12 text-center"
-                        >
-                          <span className="text-slate-500">
-                            데이터가 없습니다.
-                          </span>
+                        <td colSpan={6} className="p-0">
+                          <div className="px-4 py-16 text-center text-[12px] text-slate-600">
+                            <div className="font-extrabold text-indigo-700">
+                              데이터가 없습니다.
+                            </div>
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => setOpenNew(true)}
+                                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[12px] font-semibold text-indigo-700 hover:bg-indigo-100 cursor-pointer"
+                              >
+                                <Plus className="h-4 w-4" />
+                                시뮬레이션 생성
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -714,50 +784,25 @@ export default function SimulationPage() {
                         const isSelected = selectedIds.has(r.id);
                         const isActive = activeId === r.id;
 
-                        const tdBase = "px-3 py-3 align-middle";
-                        const tdNormal = `border-b border-slate-100 bg-white ${
-                          !isActive && isSelected ? "bg-slate-50" : ""
-                        }`;
-
-                        const tdActiveMid =
-                          "border-y-2 border-indigo-500 bg-indigo-50/40";
-
-                        const tdActiveFirst =
-                          "border-y-2 border-l-[3px] border-indigo-500 bg-indigo-50/40 rounded-l-md";
-
-                        const tdActiveLast =
-                          "border-y-2 border-r-[3px] border-indigo-500 bg-indigo-50/40 rounded-r-md";
-
-                        const tdClass = (pos) => {
-                          if (!isActive) return `${tdBase} ${tdNormal}`;
-                          if (pos === "first")
-                            return `${tdBase} ${tdActiveFirst}`;
-                          if (pos === "last")
-                            return `${tdBase} ${tdActiveLast}`;
-                          return `${tdBase} ${tdActiveMid}`;
-                        };
-
                         return (
                           <tr
                             key={r.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setActiveId(r.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") setActiveId(r.id);
-                            }}
                             className={[
-                              "cursor-pointer transition",
-                              !isActive ? "hover:bg-slate-50" : "",
+                              "transition-colors cursor-pointer",
+                              isActive ? "bg-gray-200" : "hover:bg-gray-200",
                             ].join(" ")}
+                            onClick={() => setActiveId(r.id)}
                           >
-                            <td className={tdClass("first")}>
-                              <div className="flex justify-center">
+                            {/* check */}
+                            <td className="border-b border-slate-100 px-3 py-2">
+                              <div
+                                className="flex justify-center"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <input
                                   type="checkbox"
-                                  className="h-4 w-4 accent-indigo-600"
+                                  className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
                                   checked={isSelected}
-                                  onClick={(e) => e.stopPropagation()}
                                   onChange={(e) =>
                                     toggleOne(r.id, e.target.checked)
                                   }
@@ -765,13 +810,18 @@ export default function SimulationPage() {
                               </div>
                             </td>
 
-                            <td className={tdClass("mid")}>
+                            {/* id */}
+                            <td className="border-b border-slate-100 px-3 py-2">
                               <div className="font-mono text-xs text-slate-700 truncate">
                                 {r.id}
                               </div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                {r.memberName || "-"}
+                              </div>
                             </td>
 
-                            <td className={tdClass("mid")}>
+                            {/* title */}
+                            <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="font-semibold text-slate-900 truncate"
                                 title={r.title || ""}
@@ -786,14 +836,14 @@ export default function SimulationPage() {
                               </div>
                             </td>
 
-                            <td
-                              className={`${tdClass("mid")} text-right tabular-nums`}
-                            >
+                            {/* product count */}
+                            <td className="border-b border-slate-100 px-3 py-2 text-right tabular-nums">
                               {Number(r.productCount ?? 0)}
                             </td>
 
+                            {/* status */}
                             <td
-                              className={tdClass("mid")}
+                              className="border-b border-slate-100 px-3 py-2"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <StatusPill
@@ -803,8 +853,9 @@ export default function SimulationPage() {
                               />
                             </td>
 
-                            <td className={tdClass("last")}>
-                              <span className="text-slate-700">
+                            {/* start */}
+                            <td className="border-b border-slate-100 px-3 py-2">
+                              <span className="text-slate-700 tabular-nums">
                                 {fmtDate(r.simulationStartDate)}
                               </span>
                             </td>
@@ -815,198 +866,159 @@ export default function SimulationPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              {/* footer pagination */}
-              <div className="shrink-0 border-t border-slate-100 px-3 py-3 flex items-center justify-end gap-2 bg-white">
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  disabled={pageIndex === 0}
-                  className={[
-                    "h-8 px-3 text-[12px] rounded-lg transition",
-                    pageIndex === 0
-                      ? "text-slate-300 cursor-not-allowed"
-                      : "text-slate-700 hover:bg-slate-100 cursor-pointer",
-                  ].join(" ")}
-                >
-                  이전
-                </button>
+            {/* ===== 상세 패널 ===== */}
+            <div className="w-full lg:w-[445px] shrink-0 min-h-0">
+              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col h-full">
+                <div className="shrink-0 px-4 py-4 bg-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col">
+                      <div className="text-[14px] font-extrabold text-slate-900">
+                        상세 정보
+                      </div>
+                    </div>
 
-                <div className="min-w-20 text-center text-[13px]">
-                  <span className="font-semibold text-slate-800">
-                    {pageIndex + 1}
-                  </span>
-                  <span className="text-slate-400"> / {pageCount}</span>
+                    <div className="text-[11px] font-black text-slate-400">
+                      {activeRow?.id ? `#${activeRow.id}` : ""}
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={goNext}
-                  disabled={pageIndex >= pageCount - 1}
-                  className={[
-                    "h-8 px-3 text-[12px] rounded-lg transition",
-                    pageIndex >= pageCount - 1
-                      ? "text-slate-300 cursor-not-allowed"
-                      : "text-slate-700 hover:bg-slate-100 cursor-pointer",
-                  ].join(" ")}
-                >
-                  다음
-                </button>
+                <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
+                  {!activeRow ? (
+                    <div className="rounded-xl border bg-slate-50 p-6 text-[12px] text-slate-500">
+                      선택된 항목이 없습니다.
+                    </div>
+                  ) : (
+                    <>
+                      <Field label="Title" value={activeRow.title || "-"} />
+                      <Field
+                        label="Description"
+                        value={activeRow.description || "-"}
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field
+                          label="Member"
+                          value={activeRow.memberName || "-"}
+                        />
+                        <Field
+                          label="Status"
+                          value="-"
+                          pill={
+                            <StatusPill
+                              status={activeRow.status}
+                              clickable={false}
+                              onClick={() => {}}
+                            />
+                          }
+                        />
+                        <Field
+                          label="Product Count"
+                          value={Number(activeRow.productCount ?? 0)}
+                          right="ea"
+                        />
+                        <Field
+                          label="Required Staff"
+                          value={Number(activeRow.requiredStaff || 0)}
+                          right="people"
+                        />
+                        <Field
+                          label="Start Date"
+                          value={fmtDate(activeRow.simulationStartDate)}
+                          mono
+                        />
+                        <Field
+                          label="Work Time"
+                          value={Number(activeRow.workTime || 0)}
+                          right="min"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="shrink-0 border-t bg-white p-3 flex gap-2 sticky bottom-0">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => activeRow && onRun(activeRow.id)}
+                      disabled={
+                        !activeRow ||
+                        String(activeRow.status || "").toUpperCase() ===
+                          "PENDING"
+                      }
+                      className={[
+                        "h-10 w-[120px] rounded-xl px-4 text-[12px] font-semibold transition",
+                        !activeRow ||
+                        String(activeRow.status || "").toUpperCase() ===
+                          "PENDING"
+                          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                          : "bg-indigo-900 text-white hover:bg-indigo-800 active:bg-indigo-950",
+                      ].join(" ")}
+                    >
+                      실행
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      activeRow &&
+                      router.push(`/simulation/${activeRow.id}/gantt`)
+                    }
+                    disabled={!activeRow}
+                    className={[
+                      "h-10 flex-1 rounded-xl px-4 text-[12px] font-semibold transition",
+                      activeRow
+                        ? "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50"
+                        : "bg-slate-100 text-slate-300 cursor-not-allowed",
+                    ].join(" ")}
+                  >
+                    결과 보기
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT: 상세 */}
-          <div className="w-[460px] shrink-0">
-            <div
+          {/* ✅ 페이지네이션은 항상 보이게 shrink-0 */}
+          <div className="shrink-0 flex items-center justify-end  px-1 py-4">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={pageIndex === 0}
               className={[
-                "rounded-xl bg-white shadow-lg overflow-hidden",
-                "flex flex-col",
-                "h-[calc(100vh-360px)]",
-                activeRow ? "ring-2 ring-indigo-400" : "ring-1 ring-black/5",
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
+                pageIndex === 0
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-200 cursor-pointer",
               ].join(" ")}
             >
-              <div className="shrink-0 px-4 py-4 border-b bg-white">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-black text-slate-900">
-                      상세 정보
-                    </div>
-                  </div>
+              <ChevronLeft className="h-4 w-4" />
+              이전
+            </button>
 
-                  <div className="text-[11px] font-black text-slate-400">
-                    {activeRow?.id ? `#${activeRow.id}` : ""}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto p-4">
-                {!activeRow ? (
-                  <div className="text-sm text-slate-500">
-                    선택된 항목이 없습니다.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                      <div className="text-[11px] text-slate-500 font-semibold">
-                        Title
-                      </div>
-                      <div className="text-sm text-slate-900 font-semibold break-words">
-                        {activeRow.title || "-"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                      <div className="text-[11px] text-slate-500 font-semibold">
-                        Description
-                      </div>
-                      <div className="text-sm text-slate-700 whitespace-pre-wrap break-words">
-                        {activeRow.description || "-"}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Member
-                        </div>
-                        <div className="text-sm text-slate-900 font-semibold truncate">
-                          {activeRow.memberName || "-"}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Status
-                        </div>
-                        <div className="pt-1">
-                          <StatusPill
-                            status={activeRow.status}
-                            clickable={false}
-                            onClick={() => {}}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Product Count
-                        </div>
-                        <div className="text-sm text-slate-900 font-semibold tabular-nums">
-                          {Number(activeRow.productCount ?? 0)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Required Staff
-                        </div>
-                        <div className="text-sm text-slate-900 font-semibold tabular-nums">
-                          {Number(activeRow.requiredStaff || 0)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Start Date
-                        </div>
-                        <div className="text-sm text-slate-900 font-semibold tabular-nums">
-                          {fmtDate(activeRow.simulationStartDate)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="text-[11px] text-slate-500 font-semibold">
-                          Work Time
-                        </div>
-                        <div className="text-sm text-slate-900 font-semibold tabular-nums">
-                          {Number(activeRow.workTime || 0)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="shrink-0 border-t border-slate-100 p-3 flex gap-2 bg-white">
-                <button
-                  type="button"
-                  onClick={() =>
-                    activeRow &&
-                    router.push(`/simulation/${activeRow.id}/gantt`)
-                  }
-                  disabled={!activeRow}
-                  className={[
-                    "h-9 flex-1 rounded-lg border px-4 text-sm font-black transition",
-                    activeRow
-                      ? "border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 cursor-pointer"
-                      : "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed",
-                  ].join(" ")}
-                >
-                  결과 보기
-                </button>
-
-                {canEdit ? (
-                  <button
-                    type="button"
-                    onClick={() => activeRow && onRun(activeRow.id)}
-                    disabled={
-                      !activeRow ||
-                      String(activeRow.status || "").toUpperCase() === "PENDING"
-                    }
-                    className={[
-                      "h-9 rounded-lg border px-4 text-sm font-black transition",
-                      !activeRow ||
-                      String(activeRow.status || "").toUpperCase() === "PENDING"
-                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 cursor-pointer",
-                    ].join(" ")}
-                  >
-                    실행
-                  </button>
-                ) : null}
-              </div>
+            <div className="min-w-20 text-center text-[13px]">
+              <span className="font-medium">{pageIndex + 1}</span>
+              <span className="text-gray-500"> / {pageCount}</span>
             </div>
+
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={pageIndex >= pageCount - 1}
+              className={[
+                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
+                pageIndex >= pageCount - 1
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-200 cursor-pointer",
+              ].join(" ")}
+            >
+              다음
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>

@@ -80,3 +80,22 @@ export async function postSimulationSummary(
     body: JSON.stringify(payload || {}),
   }).then((r) => r.json());
 }
+
+// (8) 개인 스케줄 조회
+export async function getPersonalSchedule(token) {
+  const res = await fetch(`${serverAddr}/api/simulation/schedule/personal`, {
+    method: "GET",
+    headers: {
+      Authorization: "Bearer " + token,
+    },
+  });
+
+  // 에러면 서버 메시지까지 같이 뱉기
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`개인 스케줄 조회 실패 (${res.status}) ${text}`.trim());
+  }
+
+  // 응답이 json이라고 가정(대부분 그럴 것)
+  return res.json();
+}

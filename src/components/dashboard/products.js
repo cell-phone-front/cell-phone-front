@@ -1,17 +1,34 @@
-// src/components/dashboard/products.js
 import { useEffect, useMemo, useState } from "react";
-import { useToken } from "@/stores/account-store";
+import { useAccount, useToken } from "@/stores/account-store";
 import { getProducts } from "@/api/product-api";
 
 export default function DashboardProducts() {
   const token = useToken((s) => s.token);
+  const { account } = useAccount(); // 있으면 사용
+  const role = String(account?.role || "").toLowerCase();
+  const canSeeProducts = role === "admin" || role === "planner";
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
 
+  // ✅ 훅은 return 위에서 항상 호출
+  const rows = useMemo(() => {
+    return (products || []).slice(0, 6).map((p) => {
+      const desc = p.description ?? p.desc ?? p.productDesc ?? "";
+      return {
+        id: p.id ?? p.productId ?? "",
+        name: p.name ?? p.productName ?? "",
+        model: p.model ?? p.productModel ?? "",
+        rawDesc: desc,
+        description: desc.length > 28 ? desc.slice(0, 28) + "…" : desc,
+      };
+    });
+  }, [products]);
+
   useEffect(() => {
     if (!token) return;
+    if (!canSeeProducts) return; // ✅ fetch만 막아도 됨 (훅 호출 순서는 유지)
 
     let alive = true;
     setLoading(true);
@@ -35,38 +52,21 @@ export default function DashboardProducts() {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, canSeeProducts]);
 
-  const rows = useMemo(() => {
-    return (products || []).slice(0, 6).map((p) => {
-      const desc = p.description ?? p.desc ?? p.productDesc ?? "";
-      return {
-        id: p.id ?? p.productId ?? "",
-        name: p.name ?? p.productName ?? "",
-        model: p.model ?? p.productModel ?? "",
-        rawDesc: desc,
-        description: desc.length > 28 ? desc.slice(0, 28) + "…" : desc,
-      };
-    });
-  }, [products]);
+  // ✅ 여기서 숨김 처리해도 OK (훅은 이미 다 호출됨)
+  if (!canSeeProducts) return null;
 
   return (
     <div className="h-full min-h-0 flex flex-col">
       {/* 헤더 */}
-      {/* 패딩탑2 */}
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            {/* <div className="text-sm font-semibold tracking-tight text-slate-900">
-              생산 대상
-            </div> */}
             <div className="mt-0.5 text-[11px] text-slate-500">
               최신 6개 항목을 표시합니다.
             </div>
           </div>
-          {/* <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
-            {products.length.toLocaleString()}건
-          </span> */}
 
           <div className="flex items-center gap-2">
             <a
@@ -96,8 +96,7 @@ export default function DashboardProducts() {
         ) : (
           <div className="overflow-hidden">
             <table className="w-full text-[10px]">
-              {/* sticky header */}
-              <thead className="sticky top-0 z-10  bg-white/75 backdrop-blur text-[10.5px] text-slate-500">
+              <thead className="sticky top-0 z-10 bg-white/75 backdrop-blur text-[10.5px] text-slate-500">
                 <tr className="text-left">
                   <th className="px-5 py-2 font-medium">ID</th>
                   <th className="px-4 py-2 font-medium">Brand</th>
@@ -142,7 +141,6 @@ export default function DashboardProducts() {
                       >
                         {r.description || "-"}
                       </div>
-                      {/* 포인트: hover 시 작은 힌트 */}
                     </td>
                   </tr>
                 ))}

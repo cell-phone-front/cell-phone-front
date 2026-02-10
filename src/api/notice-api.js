@@ -1,6 +1,5 @@
-const host =
-  typeof window !== "undefined" ? window.location.hostname : "localhost";
-const serverAddr = `http://${host}:8080`;
+// src/api/notice-api.js
+const serverAddr = "http://localhost:8080";
 
 /* =========================
  * (1) 공지 목록 조회
@@ -10,55 +9,53 @@ export async function getNotices(token, keyword = "") {
     ? `${serverAddr}/api/notice?keyword=${encodeURIComponent(keyword)}`
     : `${serverAddr}/api/notice`;
 
-  const res = await fetch(url, {
+  return fetch(url, {
     headers: { Authorization: "Bearer " + token },
-  });
-  return res.json();
+  }).then((r) => r.json());
 }
 
 /* =========================
  * (2) 공지 단건 조회
  * ========================= */
 export async function getNoticeById(id, token) {
-  const res = await fetch(`${serverAddr}/api/notice/${id}`, {
+  return fetch(`${serverAddr}/api/notice/${id}`, {
     method: "GET",
     headers: { Authorization: "Bearer " + token },
-  });
-  return res.json();
+  }).then((r) => r.json());
 }
 
 /* =========================
  * (3) 공지 작성
  * ========================= */
 export async function createNotice(payload, token) {
-  const res = await fetch(`${serverAddr}/api/notice`, {
+  return fetch(`${serverAddr}/api/notice`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
     body: JSON.stringify(payload),
-  });
-  return res.json();
+  }).then((r) => r.json());
 }
 
 /* =========================
  * (4) 공지 수정
  * ========================= */
 export async function updateNotice(id, payload, token) {
-  const res = await fetch(`${serverAddr}/api/notice/${id}`, {
+  return fetch(`${serverAddr}/api/notice/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
     body: JSON.stringify(payload),
-  });
-  return res.json();
+  }).then((r) => r.json());
 }
 
 /* =========================
  * (5) 공지 삭제
+ *  - operation-api처럼 "fetch만 반환"으로 통일하면 호출부에서 ok 체크가 필요해져서
+ *    여기서는 기존처럼 ok 체크 + 응답 파싱을 유지합니다.
  * ========================= */
 export async function deleteNotice(id, token) {
   const res = await fetch(`${serverAddr}/api/notice/${id}`, {
@@ -66,13 +63,12 @@ export async function deleteNotice(id, token) {
     headers: { Authorization: "Bearer " + token },
   });
 
-  const text = await res.text(); // 서버가 주는 에러 메시지 확인용
+  const text = await res.text().catch(() => "");
 
   if (!res.ok) {
     throw new Error(`삭제 실패 (${res.status}) ${text || ""}`.trim());
   }
 
-  // 서버가 json 주면 파싱, 아니면 true 반환
   try {
     return text ? JSON.parse(text) : true;
   } catch {
@@ -84,91 +80,112 @@ export async function deleteNotice(id, token) {
  * (6) 핀 설정
  * ========================= */
 export async function setNoticePin(id, pinned, token) {
-  const res = await fetch(`${serverAddr}/api/notice/${id}/pin`, {
+  return fetch(`${serverAddr}/api/notice/${id}/pin`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
     body: JSON.stringify({ pinned, isPinned: pinned }),
-  });
-  return res.json();
+  }).then((r) => r.json());
 }
 
 /* =========================
- * (7) 공지 파일 첨부 (axios -> fetch)
+ * (7) 공지 파일 첨부
  * ========================= */
 export async function uploadNoticeFiles(noticeId, files = [], token) {
-  noticeId ||
-    (() => {
-      throw new Error("noticeId is required");
-    })();
-  token ||
-    (() => {
-      throw new Error("token is required");
-    })();
-
+  if (!noticeId) throw new Error("noticeId is required");
+  if (!token) throw new Error("token is required");
   if (!files || files.length === 0) return;
 
   const formData = new FormData();
-  files.forEach((file) => formData.append("files", file)); // 서버가 files 기대
+  files.forEach((file) => formData.append("files", file));
 
   const res = await fetch(`${serverAddr}/api/notice/${noticeId}/attachment`, {
     method: "POST",
-    headers: {
-      Authorization: "Bearer " + token,
-      // ⚠️ Content-Type 직접 지정하지 마세요. fetch가 boundary 포함해서 자동으로 넣습니다.
-    },
+    headers: { Authorization: "Bearer " + token },
     body: formData,
   });
 
-  res.ok ||
-    (() => {
-      throw new Error(`파일 업로드 실패 (${res.status})`);
-    })();
+  if (!res.ok) throw new Error(`파일 업로드 실패 (${res.status})`);
 
-  // 서버 응답이 json일 수도/아닐 수도 있어서 안전 처리
+  // 응답이 json일 수도/텍스트일 수도 있어서 안전 처리
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) return res.json();
   return res.text();
 }
 
-/* =========================
- * (8) 공지 첨부파일 다운로드 (fetch)
- * ========================= */
-export async function downloadNoticeAttachment(noticeId, attachmentId, token) {
-  const url = `${serverAddr}/api/notice/${noticeId}/attachment/${attachmentId}`;
+// (8) 공지 첨부파일 다운로드
+function extractFileNameFromCD(cd) {
+  if (!cd) return null;
+  const m = /filename\*?=(?:UTF-8''|")?([^\";]+)\"?/i.exec(cd);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
 
-  console.log("[DOWNLOAD] url =", url);
-  console.log("[DOWNLOAD] ids =", { noticeId, attachmentId });
-  console.log("[DOWNLOAD] token?", Boolean(token));
+/**
+ * ✅ 호출부(NoticeModal)에서 지금처럼:
+ * downloadNoticeAttachment(noticeId, fileObj, token)
+ * 로 쓸 수 있게 시그니처를 맞췄습니다.
+ *
+ * fileObj: { id, url, name } 형태(지금 normalizeFiles 결과)
+ */
+export async function downloadNoticeAttachment(noticeId, file, token) {
+  if (!token) throw new Error("token is required");
+  if (noticeId == null) throw new Error("noticeId is required");
+  if (!file) throw new Error("file is required");
+
+  // 백엔드가 path로 받는 noticeAttachmentId 후보
+  const attachmentId = file?.id ?? file?.url;
+  if (attachmentId == null || attachmentId === "") {
+    throw new Error("첨부파일 id/url이 없습니다.");
+  }
+
+  const url = `${serverAddr}/api/notice/${encodeURIComponent(
+    String(noticeId),
+  )}/attachment/${encodeURIComponent(String(attachmentId))}`;
 
   const res = await fetch(url, {
     method: "GET",
-    headers: { Authorization: "Bearer " + token },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[DOWNLOAD] status:", res.status, "body:", text);
-    throw new Error(`다운로드 실패 (${res.status}) ${text || ""}`.trim());
+    throw new Error(`다운로드 실패 (${res.status}) ${text}`.trim());
   }
 
-  // 아래는 그대로
-  const cd = res.headers.get("content-disposition") || "";
-  const match =
-    cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^"]+)"?/i);
-  const filename = match?.[1] ? decodeURIComponent(match[1]) : "attachment";
-
   const blob = await res.blob();
+
+  const cd = res.headers.get("content-disposition");
+  const nameFromHeader = extractFileNameFromCD(cd);
+
+  // header 없으면 프론트에서 가지고 있는 원래 파일명 사용
+  const filename = nameFromHeader || file?.name || `notice-${noticeId}-file`;
+
+  const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const objectUrl = URL.createObjectURL(blob);
-  a.href = objectUrl;
+  a.href = blobUrl;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(objectUrl);
+  window.URL.revokeObjectURL(blobUrl);
+}
 
-  return true;
+/* =========================
+ * (9) 공지 알림 조회
+ * ========================= */
+export async function getNoticeNotifications(token) {
+  if (!token) throw new Error("token is required");
+
+  return fetch(`${serverAddr}/api/notice/notification`, {
+    headers: {
+      Authorization: "Bearer " + token,
+    },
+  }).then((r) => r.json());
 }

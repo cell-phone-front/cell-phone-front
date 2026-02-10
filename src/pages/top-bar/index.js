@@ -2,9 +2,12 @@ import { Search, LogOut, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { useAccount, useToken } from "@/stores/account-store";
+import { Bell } from "lucide-react";
+import { getNoticeNotifications } from "@/api/notice-api";
 
 export default function TopBar() {
   const router = useRouter();
+  const [alarmCount, setAlarmCount] = useState(0);
 
   const { account, clearAccount } = useAccount();
   const { token, clearToken } = useToken();
@@ -56,6 +59,33 @@ export default function TopBar() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+  useEffect(() => {
+    if (!token) return;
+
+    async function loadAlarm() {
+      try {
+        const res = await getNoticeNotifications(token);
+
+        // unreadCount 기준
+        if (typeof res?.unreadCount === "number") {
+          setAlarmCount(res.unreadCount);
+        } else if (Array.isArray(res)) {
+          // 혹시 배열로 오는 경우 대비
+          const cnt = res.filter((v) => !v.read).length;
+          setAlarmCount(cnt);
+        }
+      } catch (e) {
+        console.error("알림 조회 실패:", e);
+      }
+    }
+
+    loadAlarm();
+
+    // 30초마다 갱신 (선택)
+    const t = setInterval(loadAlarm, 30000);
+
+    return () => clearInterval(t);
+  }, [token]);
 
   return (
     <header className="h-14 fixed top-0 left-0 right-0 z-50 bg-white border-b border-neutral-200 flex items-center">
@@ -84,6 +114,36 @@ export default function TopBar() {
 
         {/* 오른쪽: 유저 메뉴 */}
         <div className="flex items-center gap-3">
+          {/* 🔔 알림 버튼 */}
+          {isLogin && (
+            <button
+              type="button"
+              className="relative w-8 h-8 flex items-center justify-center rounded-md hover:bg-neutral-100"
+              onClick={() => router.push("/notice")} // 필요하면 알림 페이지로 이동
+            >
+              <Bell className="w-5 h-5 text-neutral-600" />
+
+              {/* 빨간 숫자 */}
+              {alarmCount > 0 && (
+                <span
+                  className="
+            absolute -top-1 -right-1
+            min-w-[16px] h-[16px]
+            px-[4px]
+            rounded-full
+            bg-red-500
+            text-white
+            text-[10px]
+            font-bold
+            flex items-center justify-center
+          "
+                >
+                  {alarmCount > 99 ? "99+" : alarmCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {isLogin && (
             <div className="relative" ref={menuRef}>
               {/*  버튼 */}

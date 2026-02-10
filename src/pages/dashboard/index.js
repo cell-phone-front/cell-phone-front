@@ -10,7 +10,7 @@ export default function Page() {
       <div className="h-full min-h-0 px-6 py-3">
         <div className="mx-auto flex h-full min-h-0 max-w-8xl flex-col gap-6">
           {/* 헤더 */}
-          <div className="flex items-start justify-between gap-4">
+          {/* <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="text-2xl font-semibold tracking-tight text-slate-900">
                 대시보드
@@ -18,9 +18,9 @@ export default function Page() {
               <div className="mt-1 text-sm text-slate-500">
                 오늘 일정과 생산/현황을 한눈에 확인하세요.
               </div>
-            </div>
+            </div> */}
 
-            {/* <div className="flex items-center gap-2">
+          {/* <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
                 LIVE
@@ -29,7 +29,7 @@ export default function Page() {
                 새로고침
               </button>
             </div> */}
-          </div>
+          {/* </div> */}
 
           {/* 상단 3카드 */}
           <div className="grid min-h-0 gap-6 md:grid-cols-3">

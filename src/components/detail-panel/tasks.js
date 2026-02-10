@@ -1,9 +1,9 @@
-// src/components/detail-panel/tasks/index.js
+// src/components/detail-panel/task.js
 import { ChevronRight } from "lucide-react";
 
 function Field({ label, value }) {
   return (
-    <div className="rounded-xl border bg-white p-4">
+    <div className="rounded-xl border bg-white p-3">
       <div className="text-[11px] font-semibold text-slate-500">{label}</div>
       <div className="mt-1 text-[12px] font-bold text-slate-800 break-words">
         {value == null || value === "" ? "-" : String(value)}
@@ -12,10 +12,16 @@ function Field({ label, value }) {
   );
 }
 
+function StatusText(flag) {
+  if (flag === "pre") return "Imported";
+  if (flag === "new") return "New";
+  return "Saved";
+}
+
 export default function TaskDetailPanel({ open, row, onToggle }) {
   if (!open) {
     return (
-      <div className="hidden lg:flex h-full min-h-0 ">
+      <div className="hidden lg:flex h-full min-h-0">
         <button
           type="button"
           onClick={onToggle}
@@ -23,33 +29,24 @@ export default function TaskDetailPanel({ open, row, onToggle }) {
             h-full w-12 rounded-xl border bg-white shadow-sm
             ring-black/5
             flex items-center justify-center
-            text-slate-500
-
-            hover:text-indigo-700
-            hover:bg-gray-200
+            text-slate-500 hover:text-indigo-700 hover:bg-indigo-50/40
             transition
-            cursor-pointer
           "
           aria-label="open detail"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="hidden lg:flex min-h-0">
-      <div className="w-[340px] rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex flex-col min-h-0">
-        <div className="shrink-0 h-11 px-4 border-b bg-gray-200 flex items-center justify-between gap-2">
-          <div className="min-w-0 flex gap-2">
-            <div className="text-[13px] font-extrabold text-slate-800 leading-4">
-              상세 정보
-            </div>
-            <div className="text-[11px] text-slate-500 leading-4">
-              행을 클릭하면 여기에서 확인됩니다.
-            </div>
-          </div>
+    <div className="hidden lg:flex h-full min-h-0">
+      <div className="w-[360px] rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex flex-col min-h-0">
+        <div className="shrink-0 px-4 py-1.5 border-b bg-indigo-900 text-white flex items-center justify-between">
+          <div className="text-[13px] font-extrabold">상세 정보</div>
+
+          {/* Operation 패널과 동일한 "접기" 버튼 */}
           <button
             type="button"
             onClick={onToggle}
@@ -61,32 +58,23 @@ export default function TaskDetailPanel({ open, row, onToggle }) {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-auto pretty-scroll p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll p-4">
           {!row ? (
-            <div className="rounded-xl border bg-white p-4 text-[11px] text-slate-500">
-              선택된 행이 없습니다.
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[12px] text-slate-600">
+              행을 선택하면 상세가 표시됩니다.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3">
               <Field label="Task Id" value={row.id} />
               <Field label="Operation Id" value={row.operationId} />
               <Field label="Machine Id" value={row.machineId} />
               <Field label="Name" value={row.name} />
               <Field label="Description" value={row.description} />
-              <Field label="Duration" value={row.duration} />
-
-              <div className="rounded-xl border bg-white p-4">
-                <div className="text-[11px] font-semibold text-slate-500">
-                  Status
-                </div>
-                <div className="mt-2 text-[12px] font-bold text-slate-800">
-                  {row.flag === "pre"
-                    ? "Imported"
-                    : row.flag === "new"
-                      ? "New"
-                      : "Saved"}
-                </div>
-              </div>
+              <Field
+                label="Duration"
+                value={Number(row.duration ?? 0).toLocaleString()}
+              />
+              <Field label="Status" value={StatusText(row.flag)} />
             </div>
           )}
         </div>
