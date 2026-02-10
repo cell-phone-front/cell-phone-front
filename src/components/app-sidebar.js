@@ -8,13 +8,11 @@ import {
   Factory,
   ListChecks,
   Cpu,
-  GanttChartSquare,
   Pin,
   MessageSquareText,
   Users,
   SquareTerminal,
   ChartColumnStacked,
-  Route, // ✅ (없으면 지우셔도 됩니다)
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -47,15 +45,9 @@ const data = {
     { title: "기계", url: "/machine", icon: Cpu },
   ],
 
-  navMain: [
-    {
-      title: "결과분석",
-      icon: ChartColumnStacked,
-      items: [
-        { title: "시뮬레이션", url: "/simulation", icon: GanttChartSquare },
-        { title: "간트", url: "/gantt", icon: GanttChartSquare },
-      ],
-    },
+  // ✅ 결과분석: 펼침 없이 단일(계정관리처럼)
+  analysis: [
+    { title: "시뮬레이션", url: "/simulation", icon: ChartColumnStacked },
   ],
 
   community: [
@@ -93,7 +85,9 @@ export function AppSidebar({ onNavigate, ...props }) {
         {canSeeAll && (
           <>
             <NavTables label="테이블" items={data.tables} />
-            <NavMain label="결과분석" items={data.navMain} />
+
+            {/* ✅ 결과분석(단일) */}
+            <NavLinks label="결과분석" items={data.analysis} />
           </>
         )}
 

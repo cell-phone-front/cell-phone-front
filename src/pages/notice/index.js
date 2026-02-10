@@ -448,9 +448,9 @@ export default function Notice() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="공지사항">
-      <div className="h-full w-full overflow-hidden">
+      <div className="h-full w-full overflow-hidden px-5">
         {/* 상단 헤더 */}
-        <div className="pt-4 pb-5">
+        <div className="pt-4 pb-5 ">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-100 bg-white/80 backdrop-blur">
               <div className="flex items-start justify-between gap-4">

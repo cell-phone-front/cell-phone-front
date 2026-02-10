@@ -314,7 +314,7 @@ export default function Board() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="자유게시판">
-      <div className="h-full w-full overflow-hidden">
+      <div className="h-full w-full overflow-hidden px-5">
         {/* 상단 헤더 */}
         <div className="pt-4 pb-5">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
