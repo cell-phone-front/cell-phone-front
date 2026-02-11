@@ -1,3 +1,4 @@
+// src/components/dashboard/calendar.js
 "use client";
 
 import * as React from "react";
@@ -9,9 +10,7 @@ import { cn } from "@/lib/utils";
 import { getPersonalSchedule } from "@/api/simulation-api";
 import { useToken } from "@/stores/account-store";
 
-/* ===============================
-   utils
-=============================== */
+/* utils */
 function ymdLocal(d) {
   if (!(d instanceof Date)) return "";
   const y = d.getFullYear();
@@ -32,9 +31,6 @@ function normalizeShift(v) {
   return s || null;
 }
 
-/* ===============================
-   Dashboard Calendar
-=============================== */
 export function DashboardCalendar() {
   const token = useToken((s) => s.token);
 
@@ -52,18 +48,15 @@ export function DashboardCalendar() {
     setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
   const goToday = () => setMonth(new Date());
 
-  // { "YYYY-MM-DD": { labels: ["D","N"], textOnly?, badge } }
   const [shiftMap, setShiftMap] = React.useState({});
 
   React.useEffect(() => {
     if (!token) return;
 
     let alive = true;
-
     (async () => {
       try {
         const data = await getPersonalSchedule(token);
-
         const list = Array.isArray(data)
           ? data
           : data?.schedule ||
@@ -73,8 +66,7 @@ export function DashboardCalendar() {
             data?.result ||
             [];
 
-        const map = {}; // dateKey -> Set(labels)
-
+        const map = {};
         for (const s of list || []) {
           const rawDate =
             s?.date || s?.workDate || s?.day || s?.startAt || s?.endAt;
@@ -91,15 +83,9 @@ export function DashboardCalendar() {
         const next = {};
         for (const [dateKey, set] of Object.entries(map)) {
           const labels = Array.from(set);
-
-          if (labels.length === 1 && labels[0] === "휴") {
+          if (labels.length === 1 && labels[0] === "휴")
             next[dateKey] = { labels: ["휴"], textOnly: true };
-          } else {
-            next[dateKey] = {
-              labels,
-              badge: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
-            };
-          }
+          else next[dateKey] = { labels };
         }
 
         if (!alive) return;
@@ -116,7 +102,7 @@ export function DashboardCalendar() {
   }, [token]);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-white">
+    <div className="h-full min-h-0 w-full overflow-hidden bg-white">
       {/* 상단 툴바 */}
       <div className="shrink-0 px-5 pt-2 pb-2">
         <div className="flex items-center gap-3">
@@ -159,98 +145,99 @@ export function DashboardCalendar() {
         </div>
       </div>
 
-      {/* 달력 */}
-      <div className="flex-1 min-h-0 p-4">
-        <Calendar
-          mode="default"
-          fixedWeeks // ✅ 월마다 5주/6주 바뀌어도 높이 고정
-          month={month}
-          onMonthChange={setMonth}
-          selected={range}
-          onSelect={setRange}
-          numberOfMonths={1}
-          className="p-0 [--cell-size:56px]"
-          classNames={{
-            month_caption: "hidden",
-            caption_label: "hidden",
-            nav: "hidden",
+      {/* ✅ 달력 영역: 남은 높이 안에서만 렌더 + 필요 시 스크롤 */}
+      <div className="flex-1 min-h-0 px-4 pb-4">
+        <div className="h-full min-h-0 overflow-auto pr-1">
+          <Calendar
+            mode="default"
+            fixedWeeks
+            month={month}
+            onMonthChange={setMonth}
+            selected={range}
+            onSelect={setRange}
+            numberOfMonths={1}
+            className="p-0
+              [--cell-size:44px]
+              lg:[--cell-size:50px]
+            "
+            classNames={{
+              month_caption: "hidden",
+              caption_label: "hidden",
+              nav: "hidden",
 
-            weekdays: "flex mb-2",
-            weekday:
-              "flex-1 text-left pl-1 pb-2 text-[11px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
+              weekdays: "flex mb-2",
+              weekday:
+                "flex-1 text-left pl-1 pb-2 text-[11px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
 
-            week: "flex w-full h-[56px]",
-            day: "relative w-full h-[56px] text-left align-top",
-          }}
-          components={{
-            DayButton: ({ children, day, modifiers, ...props }) => {
-              const d = day?.date;
-              if (!d) return null;
+              // ✅ 56 고정 제거 (var 기반)
+              week: "flex w-full h-[var(--cell-size)]",
+              day: "relative w-full h-[var(--cell-size)] text-left align-top",
+            }}
+            components={{
+              DayButton: ({ children, day, modifiers, ...props }) => {
+                const d = day?.date;
+                if (!d) return null;
 
-              const key = ymdLocal(d);
-              const isSunday = d.getDay() === 0;
-              const isOutside = !!modifiers?.outside;
-              const isToday = !!modifiers?.today;
+                const key = ymdLocal(d);
+                const isSunday = d.getDay() === 0;
+                const isOutside = !!modifiers?.outside;
+                const isToday = !!modifiers?.today;
 
-              const info = shiftMap[key];
-              const labels = info?.labels || [];
-              const hasWork = !isOutside && labels.length > 0; // 휴/근무 구분 없이 "뭔가 있으면"
-              // 휴무도 점 찍고 싶으면 위대로, 휴무는 빼고 싶으면:
-              // const hasWork = !isOutside && labels.length > 0 && !(labels.length === 1 && labels[0] === "휴");
+                const info = shiftMap[key];
+                const labels = info?.labels || [];
+                const hasWork = !isOutside && labels.length > 0;
 
-              return (
-                <CalendarDayButton
-                  day={day}
-                  modifiers={modifiers}
-                  {...props}
-                  className={cn(
-                    "w-full h-[var(--cell-size)] p-0 overflow-hidden rounded-xl",
-                    "flex flex-col items-stretch justify-start",
-                    "hover:bg-gray-100 active:bg-gray-200 transition-colors",
-                    isOutside && "opacity-40",
-                    isToday &&
-                      "bg-transparent hover:bg-gray-100 active:bg-gray-200",
-                  )}
-                >
-                  {/* 상단: 날짜(숫자) */}
-                  <div className="flex items-start justify-between px-2 pt-2">
-                    <div
-                      className={cn(
-                        "text-[12px] font-medium leading-none text-slate-900",
-                        isSunday && "text-rose-500",
-                        isToday && "font-semibold text-indigo-800",
-                      )}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        {isToday && (
-                          // ✅ 오늘 점 (기존 그대로)
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                return (
+                  <CalendarDayButton
+                    day={day}
+                    modifiers={modifiers}
+                    {...props}
+                    className={cn(
+                      "w-full h-[var(--cell-size)] p-0 overflow-hidden rounded-xl",
+                      "flex flex-col items-stretch justify-start",
+                      "hover:bg-gray-100 active:bg-gray-200 transition-colors",
+                      isOutside && "opacity-40",
+                      isToday &&
+                        "bg-transparent hover:bg-gray-100 active:bg-gray-200",
+                    )}
+                  >
+                    <div className="flex items-start justify-between px-2 pt-2">
+                      <div
+                        className={cn(
+                          "text-[12px] font-medium leading-none text-slate-900",
+                          isSunday && "text-rose-500",
+                          isToday && "font-semibold text-indigo-800",
                         )}
-                        {children}
-                      </span>
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {isToday && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                          )}
+                          {children}
+                        </span>
 
-                      {isToday && (
-                        <div className="mt-1 h-0.5 w-8 rounded-full bg-indigo-200" />
-                      )}
+                        {isToday && (
+                          <div className="mt-1 h-0.5 w-8 rounded-full bg-indigo-200" />
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* ✅ 근무 있는 날: 오늘처럼 "점만" (그레이) */}
-                  {hasWork && !isToday ? (
-                    <div className="mt-auto px-2 pb-2">
-                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                    </div>
-                  ) : (
-                    // 높이 흔들림 방지용 자리(원치 않으면 삭제 가능)
-                    <div className="mt-auto px-2 pb-2 opacity-0 select-none">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full" />
-                    </div>
-                  )}
-                </CalendarDayButton>
-              );
-            },
-          }}
-        />
+                    {/* 점 표시 */}
+                    {hasWork && !isToday ? (
+                      <div className="mt-auto px-2 pb-2">
+                        <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      </div>
+                    ) : (
+                      <div className="mt-auto px-2 pb-2 opacity-0 select-none">
+                        <span className="inline-block h-2 w-2 rounded-full" />
+                      </div>
+                    )}
+                  </CalendarDayButton>
+                );
+              },
+            }}
+          />
+        </div>
       </div>
     </div>
   );

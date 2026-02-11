@@ -53,7 +53,7 @@ function buildStartDateTime(dateStr, timeStr) {
 }
 
 /* ===============================
-   UI pieces
+   UI pieces (폰트/굵기 낮춤)
 =============================== */
 function StatusPill({ status, clickable, onClick }) {
   const st = String(status || "").toUpperCase();
@@ -65,8 +65,8 @@ function StatusPill({ status, clickable, onClick }) {
         onClick={onClick}
         disabled={!clickable}
         className={[
-          "inline-flex items-center gap-1.5 min-w-[92px] justify-center",
-          "text-[11px] px-2 py-1 rounded-full border font-semibold",
+          "inline-flex items-center gap-1.5 min-w-[86px] justify-center",
+          "text-[10px] px-2 py-1 rounded-full border font-medium",
           "transition",
           clickable
             ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
@@ -81,7 +81,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "PENDING") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200 font-semibold">
+      <span className="inline-flex items-center gap-1.5 min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200 font-medium">
         PENDING <Spinner className="h-3.5 w-3.5" />
       </span>
     );
@@ -89,7 +89,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "OPTIMAL") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+      <span className="inline-flex items-center gap-1.5 min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
         OPTIMAL <Check className="h-3.5 w-3.5" />
       </span>
     );
@@ -97,14 +97,14 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (!st || st === "-") {
     return (
-      <span className="inline-flex items-center min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-semibold">
+      <span className="inline-flex items-center min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
         -
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center min-w-[92px] justify-center text-[11px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-semibold">
+    <span className="inline-flex items-center min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
       {st}
     </span>
   );
@@ -120,7 +120,7 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
 
   return (
     <div className="relative rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
-      <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+      <div className="text-[10px] font-medium text-slate-500">{label}</div>
 
       {icon ? (
         <div className="absolute right-4 top-4 h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
@@ -130,7 +130,7 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
 
       <div
         className={[
-          "mt-1 text-3xl font-extrabold leading-tight",
+          "mt-1 text-[22px] font-semibold leading-tight",
           toneMap[tone] || toneMap.slate,
         ].join(" ")}
       >
@@ -138,7 +138,7 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
       </div>
 
       {sub ? (
-        <div className="mt-0.5 text-[11px] leading-tight text-slate-500">
+        <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
           {sub}
         </div>
       ) : null}
@@ -146,20 +146,19 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
   );
 }
 
-// ✅ Field 카드가 "카드 안 카드"가 되어서 높이 먹던 부분을 정리 (1겹만)
 function Field({ label, value, mono, right, pill }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+        <div className="text-[10px] font-medium text-slate-500">{label}</div>
         {right ? (
-          <div className="text-[11px] text-slate-400">{right}</div>
+          <div className="text-[10px] text-slate-400">{right}</div>
         ) : null}
       </div>
 
       <div
         className={[
-          "mt-1 text-[13px] font-semibold text-slate-900 leading-snug",
+          "mt-1 text-[12px] font-medium text-slate-900 leading-snug",
           mono ? "font-mono" : "",
         ].join(" ")}
       >
@@ -554,21 +553,20 @@ export default function SimulationPage() {
 
   return (
     <DashboardShell crumbTop="시뮬레이션" crumbCurrent="simulation">
-      {/* ✅ 핵심: 높이 고정(h-...) 제거하고 min-h로 변경 + 페이지네이션이 아래에서 절대 안 잘리게 구조 변경 */}
       <div className="px-4 pt-4 min-h-[calc(100vh-120px)] flex flex-col gap-4">
-        {/* ===== 상단 타이틀 + 검색 ===== */}
+        {/* ===== 상단 타이틀 + 검색 (폰트 낮춤) ===== */}
         <div className="shrink-0">
           <div className="flex justify-between items-end gap-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-4xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-[28px] font-semibold tracking-tight text-slate-900">
                 Simulation
               </h2>
-              <p className="text-[12px] text-slate-500">
+              <p className="text-[11px] text-slate-500">
                 생성 · 실행 · 결과(스케줄) 확인
               </p>
             </div>
 
-            <div className="w-[380px]">
+            <div className="w-[445px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 <input
@@ -580,11 +578,11 @@ export default function SimulationPage() {
                   placeholder="검색 (제목/설명/작성자/상태/제품)"
                   className="
                     h-10 w-full rounded-xl border
-                    pl-9 pr-9 text-[12px]
+                    pl-9 pr-9 text-[11px]
                     outline-none transition
                     hover:border-slate-300
                     focus:ring-2 focus:ring-indigo-200
-                    placeholder:text-[11px]
+                    placeholder:text-[10px]
                     placeholder:text-slate-400
                   "
                 />
@@ -611,9 +609,9 @@ export default function SimulationPage() {
             </div>
           </div>
 
-          {/* ===== KPI + 작업 패널 ===== */}
-          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* ===== KPI + 작업 패널 (반응형 제거: 고정 12컬럼) ===== */}
+          <div className="mt-5 grid grid-cols-12 gap-4">
+            <div className="col-span-8 grid grid-cols-3 gap-4">
               <StatCard
                 label="총 데이터"
                 value={totalRows.toLocaleString()}
@@ -633,29 +631,29 @@ export default function SimulationPage() {
                 value={`${optimalCount}/${pendingCount}/${readyCount}`}
                 sub="OPTIMAL / PENDING / READY"
                 tone="slate"
-                icon={<span className="text-[11px] font-black">O/P/R</span>}
+                icon={<span className="text-[10px] font-semibold">O/P/R</span>}
               />
             </div>
 
-            <div className="lg:col-span-4">
+            <div className="col-span-4">
               <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="text-[11px] font-semibold text-slate-500">
+                  <div className="text-[10px] font-medium text-slate-500">
                     작업
                   </div>
-                  <span className="items-center text-[11px] text-slate-400">
+                  <span className="items-center text-[10px] text-slate-400">
                     controls
                   </span>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 w-full">
+                <div className="mt-3 flex items-center gap-2 w-full">
                   <button
                     type="button"
                     onClick={deleteSelectedHandle}
                     disabled={!canEdit || selectedCount === 0}
                     className={[
                       "h-10 w-[110px] px-3",
-                      "text-[12px] font-semibold transition",
+                      "text-[11px] font-medium transition",
                       "inline-flex items-center justify-center gap-2 whitespace-nowrap",
                       !canEdit || selectedCount === 0
                         ? "text-slate-300 cursor-not-allowed"
@@ -674,7 +672,7 @@ export default function SimulationPage() {
                       className="
                         h-10 flex-1 rounded-xl px-4
                         bg-indigo-900 text-white
-                        text-[12px] font-semibold
+                        text-[11px] font-medium
                         inline-flex items-center justify-center gap-2
                         transition hover:bg-indigo-800 active:bg-indigo-950
                         active:scale-[0.98] cursor-pointer
@@ -685,7 +683,7 @@ export default function SimulationPage() {
                       생성
                     </button>
                   ) : (
-                    <div className="flex-1 h-10 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-400 flex items-center justify-center">
+                    <div className="flex-1 h-10 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-400 flex items-center justify-center">
                       권한: Admin/Planner
                     </div>
                   )}
@@ -695,18 +693,17 @@ export default function SimulationPage() {
           </div>
         </div>
 
-        {/* ✅ 핵심: 여기만 flex-1로 "남는 높이"를 먹게 해서 페이지네이션이 항상 보이게 */}
+        {/* 본문 */}
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* 테이블 + 상세패널 */}
-          <div className="h-[485px] min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
+          {/* ✅ 반응형 제거: 항상 [1fr_auto] + 상세패널 고정폭 */}
+          <div className="h-[485px] min-h-0 grid grid-cols-[1fr_auto] gap-4">
             {/* ===== 테이블 카드 ===== */}
             <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
-              {/* 헤더 */}
               <div className="shrink-0">
                 <table className="w-full table-fixed border-collapse">
                   <ColGroup />
                   <thead>
-                    <tr className="text-left text-sm">
+                    <tr className="text-left text-[12px]">
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
                         <div className="flex justify-center">
                           <input
@@ -721,19 +718,19 @@ export default function SimulationPage() {
                           />
                         </div>
                       </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
                         Sim Id
                       </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
                         Title
                       </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white text-right">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white text-right">
                         Product
                       </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
                         Status
                       </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
                         Start
                       </th>
                     </tr>
@@ -741,16 +738,15 @@ export default function SimulationPage() {
                 </table>
               </div>
 
-              {/* 바디 */}
               <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
                 <table className="w-full table-fixed border-collapse">
                   <ColGroup />
-                  <tbody className="text-sm">
+                  <tbody className="text-[12px]">
                     {loading ? (
                       <tr>
                         <td
                           colSpan={6}
-                          className="px-4 py-12 text-center text-[12px] text-slate-500"
+                          className="px-4 py-12 text-center text-[11px] text-slate-500"
                         >
                           불러오는 중...
                         </td>
@@ -758,15 +754,15 @@ export default function SimulationPage() {
                     ) : pageRows.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-0">
-                          <div className="px-4 py-16 text-center text-[12px] text-slate-600">
-                            <div className="font-extrabold text-indigo-700">
+                          <div className="px-4 py-16 text-center text-[11px] text-slate-600">
+                            <div className="font-semibold text-indigo-700">
                               데이터가 없습니다.
                             </div>
                             {canEdit ? (
                               <button
                                 type="button"
                                 onClick={() => setOpenNew(true)}
-                                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[12px] font-semibold text-indigo-700 hover:bg-indigo-100 cursor-pointer"
+                                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100 cursor-pointer"
                               >
                                 <Plus className="h-4 w-4" />
                                 시뮬레이션 생성
@@ -793,7 +789,6 @@ export default function SimulationPage() {
                             ].join(" ")}
                             onClick={() => setActiveId(r.id)}
                           >
-                            {/* check */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="flex justify-center"
@@ -810,38 +805,34 @@ export default function SimulationPage() {
                               </div>
                             </td>
 
-                            {/* id */}
                             <td className="border-b border-slate-100 px-3 py-2">
-                              <div className="font-mono text-xs text-slate-700 truncate">
+                              <div className="font-mono text-[11px] text-slate-700 truncate">
                                 {r.id}
                               </div>
-                              <div className="text-[11px] text-slate-500 truncate">
+                              <div className="text-[10px] text-slate-500 truncate">
                                 {r.memberName || "-"}
                               </div>
                             </td>
 
-                            {/* title */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
-                                className="font-semibold text-slate-900 truncate"
+                                className="font-medium text-slate-900 truncate"
                                 title={r.title || ""}
                               >
                                 {r.title}
                               </div>
                               <div
-                                className="text-[11px] text-slate-500 truncate"
+                                className="text-[10px] text-slate-500 truncate"
                                 title={r.description || ""}
                               >
                                 {r.description || "-"}
                               </div>
                             </td>
 
-                            {/* product count */}
                             <td className="border-b border-slate-100 px-3 py-2 text-right tabular-nums">
                               {Number(r.productCount ?? 0)}
                             </td>
 
-                            {/* status */}
                             <td
                               className="border-b border-slate-100 px-3 py-2"
                               onClick={(e) => e.stopPropagation()}
@@ -853,9 +844,8 @@ export default function SimulationPage() {
                               />
                             </td>
 
-                            {/* start */}
                             <td className="border-b border-slate-100 px-3 py-2">
-                              <span className="text-slate-700 tabular-nums">
+                              <span className="text-slate-700 tabular-nums text-[11px]">
                                 {fmtDate(r.simulationStartDate)}
                               </span>
                             </td>
@@ -868,18 +858,15 @@ export default function SimulationPage() {
               </div>
             </div>
 
-            {/* ===== 상세 패널 ===== */}
-            <div className="w-full lg:w-[445px] shrink-0 min-h-0">
+            {/* ===== 상세 패널 (고정폭) ===== */}
+            <div className="w-[445px] shrink-0 min-h-0">
               <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col h-full">
                 <div className="shrink-0 px-4 py-4 bg-white">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-col">
-                      <div className="text-[14px] font-extrabold text-slate-900">
-                        상세 정보
-                      </div>
+                    <div className="text-[13px] font-semibold text-slate-900">
+                      상세 정보
                     </div>
-
-                    <div className="text-[11px] font-black text-slate-400">
+                    <div className="text-[10px] font-semibold text-slate-400">
                       {activeRow?.id ? `#${activeRow.id}` : ""}
                     </div>
                   </div>
@@ -887,7 +874,7 @@ export default function SimulationPage() {
 
                 <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
                   {!activeRow ? (
-                    <div className="rounded-xl border bg-slate-50 p-6 text-[12px] text-slate-500">
+                    <div className="rounded-xl border bg-slate-50 p-6 text-[11px] text-slate-500">
                       선택된 항목이 없습니다.
                     </div>
                   ) : (
@@ -950,7 +937,7 @@ export default function SimulationPage() {
                           "PENDING"
                       }
                       className={[
-                        "h-10 w-[120px] rounded-xl px-4 text-[12px] font-semibold transition",
+                        "h-10 w-[120px] rounded-xl px-4 text-[11px] font-medium transition",
                         !activeRow ||
                         String(activeRow.status || "").toUpperCase() ===
                           "PENDING"
@@ -970,7 +957,7 @@ export default function SimulationPage() {
                     }
                     disabled={!activeRow}
                     className={[
-                      "h-10 flex-1 rounded-xl px-4 text-[12px] font-semibold transition",
+                      "h-10 flex-1 rounded-xl px-4 text-[11px] font-medium transition",
                       activeRow
                         ? "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50"
                         : "bg-slate-100 text-slate-300 cursor-not-allowed",
@@ -983,14 +970,14 @@ export default function SimulationPage() {
             </div>
           </div>
 
-          {/* ✅ 페이지네이션은 항상 보이게 shrink-0 */}
-          <div className="shrink-0 flex items-center justify-end  px-1 py-4">
+          {/* 페이지네이션 */}
+          <div className="shrink-0 flex items-center justify-end px-1 py-4">
             <button
               type="button"
               onClick={goPrev}
               disabled={pageIndex === 0}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
+                "h-8 px-3 text-[11px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex === 0
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",
@@ -1000,7 +987,7 @@ export default function SimulationPage() {
               이전
             </button>
 
-            <div className="min-w-20 text-center text-[13px]">
+            <div className="min-w-20 text-center text-[11px]">
               <span className="font-medium">{pageIndex + 1}</span>
               <span className="text-gray-500"> / {pageCount}</span>
             </div>
@@ -1010,7 +997,7 @@ export default function SimulationPage() {
               onClick={goNext}
               disabled={pageIndex >= pageCount - 1}
               className={[
-                "h-8 px-3 text-[12px] rounded-md transition inline-flex items-center gap-1",
+                "h-8 px-3 text-[11px] rounded-md transition inline-flex items-center gap-1",
                 pageIndex >= pageCount - 1
                   ? "text-gray-300 cursor-not-allowed"
                   : "text-gray-700 hover:bg-gray-200 cursor-pointer",

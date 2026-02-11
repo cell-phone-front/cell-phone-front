@@ -15,27 +15,41 @@ export default function GanttRightPanelMachine({
   bottomScrollHeight,
   rangeStart,
   stepMinutes,
-  scrollLeft,
-  rightScrollYRef,
+
+  rightYRef,
   onRightScrollY,
-  rightScrollXRef,
+
+  rightXRef,
   onRightScrollX,
 }) {
+  const vLineCount = Math.floor(gridWidthPx / colWidth) + 1;
+
   return (
-    <div className="flex-1 min-w-0">
-      {/* 세로 스크롤(유일) */}
+    <div className="flex-1 min-w-0 min-h-0 bg-white">
+      {/* ✅ 오른쪽이 “세로 스크롤 유일” */}
       <div
-        ref={rightScrollYRef}
+        ref={rightYRef}
         onScroll={onRightScrollY}
-        className="h-full overflow-y-auto overflow-x-hidden"
+        className="h-full min-h-0 overflow-y-auto overflow-x-hidden"
         style={{ paddingBottom: bottomScrollHeight }}
       >
-        {/* 가로 스크롤(내용) */}
+        {/* ✅ 내부 가로 이동은 가능하지만, 스크롤바는 숨김 */}
         <div
-          ref={rightScrollXRef}
+          ref={rightXRef}
           onScroll={onRightScrollX}
           className="overflow-x-auto overflow-y-hidden"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
         >
+          {/* 크롬 스크롤바 숨김 */}
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              height: 0px;
+            }
+          `}</style>
+
           <div style={{ width: gridWidthPx, minHeight: 1 }}>
             {(groups || []).map((g, gi) => {
               const isCollapsed = !!collapsed[g.id];
@@ -43,7 +57,7 @@ export default function GanttRightPanelMachine({
 
               return (
                 <div key={g.id} className="border-b border-slate-200/60">
-                  {/* 머신 헤더 높이만큼 오른쪽도 맞춰줌 */}
+                  {/* 머신 헤더 높이 맞춤 */}
                   <div
                     className="bg-white"
                     style={{ height: groupHeaderHeight }}
@@ -66,21 +80,14 @@ export default function GanttRightPanelMachine({
                           className="relative border-t border-slate-100"
                           style={{ height: rowHeight }}
                         >
-                          {/* grid 라인 */}
-                          <div className="absolute inset-0 pointer-events-none">
-                            {Array.from({
-                              length: Math.max(
-                                1,
-                                Math.floor(gridWidthPx / colWidth),
-                              ),
-                            }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="absolute top-0 bottom-0 border-l border-slate-100"
-                                style={{ left: i * colWidth }}
-                              />
-                            ))}
-                          </div>
+                          {/* grid 세로선 */}
+                          {Array.from({ length: vLineCount }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="absolute top-0 bottom-0 w-px bg-slate-100"
+                              style={{ left: i * colWidth }}
+                            />
+                          ))}
 
                           {/* bar */}
                           <div
@@ -88,7 +95,7 @@ export default function GanttRightPanelMachine({
                               "absolute top-1/2 -translate-y-1/2",
                               "h-8 rounded-lg shadow-sm",
                               "px-2 flex items-center gap-2",
-                              "text-[11px] font-black text-white",
+                              "text-[11px] font-semibold text-white",
                               pickBarClass?.(gi) || "bg-indigo-500",
                             ].join(" ")}
                             style={{ left, width }}

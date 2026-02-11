@@ -80,8 +80,7 @@ function getRowKey(n, idx) {
 }
 
 /**
- * ✅ 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
- * raw attachments 예:
+ * 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
  * { fileSize, fileType, fileUri: "15b5...jpg", id: "a0f093" }
  */
 function normalizeFiles(n) {

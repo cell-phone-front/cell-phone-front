@@ -1,4 +1,3 @@
-// src/components/gantt-test/gantt-board.js
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -14,10 +13,19 @@ export default function GanttBoard({ groups = [] }) {
   // ====== CONFIG ======
   const stepMinutes = 60;
   const colWidth = 120;
-  const rowHeight = 50;
-  const groupHeaderHeight = 50;
+
+  // ✅ 요청: 표(행) 높이 더 크게
+  const rowHeight = 62;
+
+  // ✅ 요청: 그룹 헤더는 과하게 크지 않게(살짝만)
+  const groupHeaderHeight = 48;
+
   const leftWidth = 235;
-  const headerHeight = 44;
+
+  // ✅ 요청: 위 네모칸(헤더) 높이 줄이기
+  const headerHeight = 38;
+
+  // ✅ 하단 고정 가로 스크롤바 높이
   const bottomScrollHeight = 16;
 
   const [collapsed, setCollapsed] = useState({});
@@ -52,10 +60,8 @@ export default function GanttBoard({ groups = [] }) {
   const [scrollLeft, setScrollLeft] = useState(0);
 
   // ====== refs ======
-  const leftScrollRef = useRef(null); // 왼쪽은 스크롤바는 숨기되, scrollTop 동기화용으로만 씀
-  const rightScrollYRef = useRef(null); // 오른쪽 세로 스크롤(유일)
-  const rightScrollXRef = useRef(null); // 오른쪽 가로 스크롤(실제 내용)
-  const bottomXRef = useRef(null); // ✅ 하단 고정 가로 스크롤바
+  const rightScrollXRef = useRef(null); // 오른쪽 내용 가로 스크롤
+  const bottomXRef = useRef(null); // 하단 고정 가로 스크롤바
   const syncingRef = useRef(false);
 
   // ✅ X 스크롤 싱크: 오른쪽 내용 <-> 하단 고정바
@@ -83,18 +89,6 @@ export default function GanttBoard({ groups = [] }) {
     syncingRef.current = false;
   };
 
-  // ✅ Y 스크롤: 오른쪽만 스크롤, 왼쪽은 따라가기
-  const onRightScrollY = (e) => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-
-    if (leftScrollRef.current) {
-      leftScrollRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
-
-    syncingRef.current = false;
-  };
-
   // ✅ range (데이터의 최소 startAt ~ 최대 endAt 기준)
   const { rangeStart, rangeEnd, ticks } = useMemo(() => {
     const allTasks = (groups || []).flatMap((g) =>
@@ -111,13 +105,12 @@ export default function GanttBoard({ groups = [] }) {
       if (Number.isFinite(e)) max = Math.max(max, e);
     }
 
-    // ✅ 데이터가 없으면 "지금 ~ +9시간" (원하시면 다른 기본값으로 변경 가능)
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
       const start = new Date();
       const end = new Date(start.getTime() + 9 * 60 * 60 * 1000);
 
-      const startAligned = floorToStep(start, stepMinutes); // ✅ 시작은 floor
-      const endAligned = ceilToStep(end, stepMinutes); // ✅ 끝은 ceil
+      const startAligned = floorToStep(start, stepMinutes);
+      const endAligned = ceilToStep(end, stepMinutes);
 
       return {
         rangeStart: startAligned,
@@ -126,13 +119,9 @@ export default function GanttBoard({ groups = [] }) {
       };
     }
 
-    // ✅ 시작: 데이터 최소 startAt을 stepMinutes 기준으로 "내림(floor)"
     const startAligned = floorToStep(new Date(min), stepMinutes);
-
-    // ✅ 끝: 데이터 최대 endAt을 stepMinutes 기준으로 "올림(ceil)"
     let endAligned = ceilToStep(new Date(max), stepMinutes);
 
-    // end가 start보다 작으면 최소 9시간은 보여주기
     if (endAligned.getTime() <= startAligned.getTime()) {
       endAligned = new Date(startAligned.getTime() + 9 * 60 * 60 * 1000);
       endAligned = ceilToStep(endAligned, stepMinutes);
@@ -159,7 +148,8 @@ export default function GanttBoard({ groups = [] }) {
 
   return (
     <div className="h-full w-full min-h-0 overflow-hidden">
-      <Card className="h-full w-full border border-slate-200/80 rounded-xl shadow-sm">
+      {/* ✅ 표 라운드: 카드 자체 + 내부도 자연스럽게 */}
+      <Card className="h-full w-full border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
         <CardContent className="p-0 flex flex-col min-h-0">
           <GanttHeaderRow
             leftWidth={leftWidth}
@@ -173,59 +163,59 @@ export default function GanttBoard({ groups = [] }) {
             scrollLeft={scrollLeft}
           />
 
-          {/* ✅ 본문: 아래 고정 스크롤바 자리(bottomScrollHeight)만큼 빼서 높이 확보 */}
-          <div
-            className="flex flex-1 min-h-0 min-w-0"
-            style={{ paddingBottom: bottomScrollHeight }}
-          >
-            <GanttLeftPanel
-              groups={groups}
-              collapsed={collapsed}
-              toggleGroup={toggleGroup}
-              opCollapsed={opCollapsed}
-              toggleOperation={toggleOperation}
-              leftWidth={leftWidth}
-              groupHeaderHeight={groupHeaderHeight}
-              rowHeight={rowHeight}
-              leftScrollRef={leftScrollRef}
-              bottomScrollHeight={bottomScrollHeight}
-              rangeStart={rangeStart}
-              gridWidthPx={gridWidthPx}
-              colWidth={colWidth}
-              stepMinutes={stepMinutes}
-            />
+          {/* ✅ 요청: 세로 스크롤은 “전체”에 1개만 */}
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
+            <div className="flex min-w-0">
+              <GanttLeftPanel
+                groups={groups}
+                collapsed={collapsed}
+                toggleGroup={toggleGroup}
+                opCollapsed={opCollapsed}
+                toggleOperation={toggleOperation}
+                leftWidth={leftWidth}
+                groupHeaderHeight={groupHeaderHeight}
+                rowHeight={rowHeight}
+              />
 
-            <GanttRightPanel
-              groups={groups}
-              collapsed={collapsed}
-              opCollapsed={opCollapsed}
-              pickBarClass={pickBarClass}
-              gridWidthPx={gridWidthPx}
-              colWidth={colWidth}
-              rowHeight={rowHeight}
-              groupHeaderHeight={groupHeaderHeight}
-              bottomScrollHeight={bottomScrollHeight}
-              rangeStart={rangeStart}
-              stepMinutes={stepMinutes}
-              scrollLeft={scrollLeft}
-              rightScrollYRef={rightScrollYRef}
-              onRightScrollY={onRightScrollY}
-              rightScrollXRef={rightScrollXRef}
-              onRightScrollX={onRightScrollX}
-            />
+              <GanttRightPanel
+                groups={groups}
+                collapsed={collapsed}
+                opCollapsed={opCollapsed}
+                pickBarClass={pickBarClass}
+                gridWidthPx={gridWidthPx}
+                colWidth={colWidth}
+                rowHeight={rowHeight}
+                groupHeaderHeight={groupHeaderHeight}
+                rangeStart={rangeStart}
+                stepMinutes={stepMinutes}
+                rightScrollXRef={rightScrollXRef}
+                onRightScrollX={onRightScrollX}
+              />
+            </div>
+
+            {/* ✅ 세로 스크롤 여유(하단 고정바 겹침 방지) */}
+            <div style={{ height: bottomScrollHeight }} />
           </div>
 
-          {/* ✅ 하단 “고정” 가로 스크롤바 */}
-          <div
-            className="shrink-0 border-t border-slate-200/70 bg-white"
-            style={{ height: bottomScrollHeight }}
-          >
-            <div
-              ref={bottomXRef}
-              onScroll={onBottomScrollX}
-              className="h-full overflow-x-auto overflow-y-hidden"
-            >
-              <div style={{ width: gridWidthPx + 240, height: 1 }} />
+          {/* ✅ 요청: 하단 “고정” 가로 스크롤바는 ‘간트 그래프(오른쪽)’부터 시작 */}
+          <div className="shrink-0 border-t border-slate-200/70 bg-white">
+            <div className="flex" style={{ height: bottomScrollHeight }}>
+              {/* 왼쪽 영역은 가로 스크롤 시작에서 제외 */}
+              <div
+                className="shrink-0 border-r border-slate-200/70"
+                style={{ width: leftWidth }}
+              />
+
+              {/* 오른쪽(그래프)만 가로 스크롤 */}
+              <div className="flex-1 min-w-0">
+                <div
+                  ref={bottomXRef}
+                  onScroll={onBottomScrollX}
+                  className="h-full overflow-x-auto overflow-y-hidden"
+                >
+                  <div style={{ width: gridWidthPx, height: 1 }} />
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>

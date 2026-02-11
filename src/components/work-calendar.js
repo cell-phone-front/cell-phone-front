@@ -4,7 +4,7 @@ import * as React from "react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeftIcon, ChevronRightIcon, X } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, X, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPersonalSchedule } from "@/api/simulation-api";
 import { useToken } from "@/stores/account-store";
@@ -36,6 +36,8 @@ function shiftTime(label) {
   return "";
 }
 
+const MEMO_KEY = "aps_calendar_memo_v1";
+
 export function CalendarCustomDays() {
   const token = useToken((s) => s.token);
 
@@ -50,9 +52,33 @@ export function CalendarCustomDays() {
   const [month, setMonth] = React.useState(new Date());
   const monthLabel = `${month.getFullYear()}.${String(month.getMonth() + 1).padStart(2, "0")}`;
 
-  // ✅ 우측 모달(패널) 상태
+  // ✅ 우측 패널 상태
   const [panelOpen, setPanelOpen] = React.useState(false);
   const [panelDate, setPanelDate] = React.useState(null);
+
+  // ✅ 메모 맵: { "YYYY-MM-DD": "메모 내용" }
+  const [memoMap, setMemoMap] = React.useState({});
+  const [memoDraft, setMemoDraft] = React.useState("");
+
+  // ✅ 메모 로드(최초 1회)
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(MEMO_KEY);
+      if (raw) setMemoMap(JSON.parse(raw));
+    } catch (e) {
+      console.error(e);
+      setMemoMap({});
+    }
+  }, []);
+
+  // ✅ memoMap 저장
+  const persistMemoMap = React.useCallback((next) => {
+    try {
+      localStorage.setItem(MEMO_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const goPrev = () =>
     setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1));
@@ -139,13 +165,39 @@ export function CalendarCustomDays() {
     };
   }, [token]);
 
-  const openPanel = (dateKey) => {
-    setPanelDate(dateKey);
-    setPanelOpen(true);
-  };
+  const openPanel = React.useCallback(
+    (dateKey) => {
+      setPanelDate(dateKey);
+      setPanelOpen(true);
+      setMemoDraft(memoMap?.[dateKey] || "");
+    },
+    [memoMap],
+  );
+
+  const saveMemo = React.useCallback(() => {
+    if (!panelDate) return;
+    const text = String(memoDraft || "").trimEnd();
+
+    const next = { ...(memoMap || {}) };
+    if (!text.trim()) delete next[panelDate];
+    else next[panelDate] = text;
+
+    setMemoMap(next);
+    persistMemoMap(next);
+  }, [memoDraft, memoMap, panelDate, persistMemoMap]);
+
+  const clearMemo = React.useCallback(() => {
+    if (!panelDate) return;
+    const next = { ...(memoMap || {}) };
+    delete next[panelDate];
+    setMemoMap(next);
+    persistMemoMap(next);
+    setMemoDraft("");
+  }, [memoMap, panelDate, persistMemoMap]);
 
   const panelInfo = panelDate ? shiftMap[panelDate] : null;
   const panelLabels = panelInfo?.labels || [];
+  const hasMemo = !!(panelDate && memoMap?.[panelDate]);
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -193,10 +245,8 @@ export function CalendarCustomDays() {
         </div>
       </div>
 
-      {/* ✅ 달력 + 우측 패널을 같은 컨테이너 안에서 오버레이로 */}
       <div className="flex-1 min-h-0 px-6 pb-6">
         <div className="relative h-full min-h-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-black/5">
-          {/* 본문 달력 */}
           <div className="h-full min-h-0 p-5">
             <Calendar
               mode="default"
@@ -230,16 +280,24 @@ export function CalendarCustomDays() {
 
                   const info = shiftMap[key];
                   const labels = info?.labels || [];
-
-                  // 표시용: 첫 라벨 + more
                   const label = labels[0];
                   const more = labels.length > 1 ? labels.length - 1 : 0;
+
+                  const memo = memoMap?.[key];
+                  const hasMemoDot =
+                    !isOutside && !!(memo && String(memo).trim());
 
                   return (
                     <CalendarDayButton
                       day={day}
                       modifiers={modifiers}
                       {...props}
+                      onClick={(e) => {
+                        // ✅ 날짜 칸 클릭하면 메모 패널 열기
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!isOutside) openPanel(key);
+                      }}
                       className={cn(
                         "w-full h-full p-2 relative",
                         "flex flex-col items-start justify-start",
@@ -266,22 +324,27 @@ export function CalendarCustomDays() {
                           {isToday && (
                             <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
                           )}
+
+                          {/* ✅ 메모 있는 날: 작은 점 표시 */}
+                          {hasMemoDot && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                          )}
+
                           {children}
                         </span>
                       </div>
 
-                      {/* 휴 */}
                       {!isOutside && info?.textOnly && label === "휴" && (
                         <div className="mt-3 text-[13px] font-semibold text-rose-600">
                           휴
                         </div>
                       )}
 
-                      {/* shift 카드 */}
                       {!isOutside && !info?.textOnly && label && (
                         <button
                           type="button"
                           onClick={(e) => {
+                            // shift 버튼 눌러도 패널 오픈(기존 유지)
                             e.preventDefault();
                             e.stopPropagation();
                             openPanel(key);
@@ -315,10 +378,8 @@ export function CalendarCustomDays() {
             />
           </div>
 
-          {/* ✅ 우측 “살짝” 모달/패널 */}
           {panelOpen ? (
             <>
-              {/* 바깥 클릭 닫기용 오버레이 (투명) */}
               <button
                 type="button"
                 onClick={() => setPanelOpen(false)}
@@ -329,19 +390,18 @@ export function CalendarCustomDays() {
               <div
                 className={cn(
                   "absolute z-20 top-5 right-5",
-                  "w-[320px] max-w-[85vw]",
+                  "w-[360px] max-w-[90vw]",
                   "rounded-2xl bg-white shadow-xl ring-1 ring-black/10",
                   "overflow-hidden",
                 )}
               >
-                {/* 헤더 */}
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold text-slate-900">
                       {panelDate || "-"}
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      내 근무 상세
+                      근무 + 메모
                     </div>
                   </div>
 
@@ -355,49 +415,84 @@ export function CalendarCustomDays() {
                   </button>
                 </div>
 
-                {/* 바디 */}
-                <div className="max-h-[60vh] overflow-auto p-4">
-                  {panelLabels.length === 0 ? (
-                    <div className="text-sm text-slate-500">
-                      이 날짜에는 표시할 근무 정보가 없습니다.
+                <div className="max-h-[65vh] overflow-auto p-4 space-y-4">
+                  {/* 근무 섹션 */}
+                  <div className="space-y-2">
+                    <div className="text-[12px] font-semibold text-slate-700">
+                      근무
                     </div>
-                  ) : panelLabels.length === 1 && panelLabels[0] === "휴" ? (
-                    <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-100">
-                      휴무
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {panelLabels.map((lb, i) => (
-                        <div
-                          key={`${lb}-${i}`}
-                          className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-black/5"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="text-[15px] font-bold text-slate-900">
-                              {lb}
-                            </div>
-                            <div className="text-[12px] font-medium text-slate-600">
-                              {shiftTime(lb)}
+
+                    {panelLabels.length === 0 ? (
+                      <div className="text-sm text-slate-500">
+                        이 날짜에는 표시할 근무 정보가 없습니다.
+                      </div>
+                    ) : panelLabels.length === 1 && panelLabels[0] === "휴" ? (
+                      <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-100">
+                        휴무
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {panelLabels.map((lb, i) => (
+                          <div
+                            key={`${lb}-${i}`}
+                            className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-black/5"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="text-[15px] font-bold text-slate-900">
+                                {lb}
+                              </div>
+                              <div className="text-[12px] font-medium text-slate-600">
+                                {shiftTime(lb)}
+                              </div>
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-                          {/* 여기 아래에 task/machine/operation 넣고 싶으면 확장하면 됩니다 */}
-                          {/* <div className="mt-1 text-[12px] text-slate-600">...</div> */}
-                        </div>
-                      ))}
+                  {/* 메모 섹션 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <div className="text-[12px] font-semibold text-slate-700">
+                        메모
+                      </div>
+                      {hasMemo ? (
+                        <span className="ml-2 text-[11px] font-medium text-slate-500">
+                          저장됨
+                        </span>
+                      ) : null}
                     </div>
-                  )}
-                </div>
 
-                {/* 푸터(선택) */}
-                <div className="border-t border-slate-100 px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setPanelOpen(false)}
-                    className="w-full rounded-xl bg-slate-900 px-3 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 active:bg-slate-700"
-                  >
-                    닫기
-                  </button>
+                    <textarea
+                      value={memoDraft}
+                      onChange={(e) => setMemoDraft(e.target.value)}
+                      placeholder="이 날짜에 대한 메모를 입력하세요."
+                      className={cn(
+                        "w-full min-h-[140px] resize-y rounded-xl",
+                        "bg-white px-3 py-2 text-[13px] text-slate-900",
+                        "ring-1 ring-black/10 focus:ring-2 focus:ring-indigo-200 outline-none",
+                      )}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={clearMemo}
+                        className="rounded-xl bg-slate-100 px-3 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-200 active:bg-slate-300"
+                      >
+                        지우기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveMemo}
+                        className="flex-1 rounded-xl bg-indigo-600 px-3 py-2 text-[12px] font-semibold text-white hover:bg-indigo-500 active:bg-indigo-700 inline-flex items-center justify-center gap-2"
+                      >
+                        <Save className="size-4" />
+                        저장
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
