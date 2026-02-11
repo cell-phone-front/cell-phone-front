@@ -80,8 +80,7 @@ function getRowKey(n, idx) {
 }
 
 /**
- * ✅ 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
- * raw attachments 예:
+ * 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
  * { fileSize, fileType, fileUri: "15b5...jpg", id: "a0f093" }
  */
 function normalizeFiles(n) {
@@ -242,12 +241,6 @@ export default function Notice() {
   const [selected, setSelected] = useState(null);
 
   async function openModal(row) {
-    setNotices((prev) =>
-      prev.map((n) =>
-        n.id === row.id ? { ...n, views: (Number(getViews(n)) || 0) + 1 } : n,
-      ),
-    );
-
     setSelected(row);
     setOpen(true);
 
@@ -259,15 +252,6 @@ export default function Notice() {
 
       const normalized = normalizeRow(item || {});
 
-      // ✅ 확인용 로그
-      console.log("files from detail =", normalized.files);
-      console.log(
-        "raw attachments =",
-        item?.attachments,
-        item?.attachmentList,
-        item?.noticeAttachmentList,
-      );
-
       const merged = {
         ...row,
         ...normalized,
@@ -276,7 +260,14 @@ export default function Notice() {
             ? normalized.files
             : normalizeFiles(row || {}),
       };
+
+      // ✅ 모달에 서버 값 반영(조회수 포함)
       setSelected(merged);
+
+      // ✅ 목록에도 서버 값 반영(조회수 포함)
+      setNotices((prev) =>
+        prev.map((n) => (n.id === row.id ? { ...n, ...normalized } : n)),
+      );
     } catch (e) {
       console.error("[NOTICE DETAIL ERROR]", e);
     }
