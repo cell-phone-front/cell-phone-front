@@ -96,15 +96,13 @@ export default function SimulationCreateDrawer({
     <Drawer open={open} onOpenChange={onOpenChange} direction="right">
       <DrawerContent className="fixed right-0 top-0 h-dvh w-[420px] sm:w-[520px] rounded-none border-l bg-white p-0">
         <div className="flex h-dvh flex-col">
-          <DrawerHeader>
-            <DrawerTitle>시뮬레이션 생성</DrawerTitle>
-          </DrawerHeader>
+          <DrawerHeader></DrawerHeader>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
             {/* Title */}
             <div>
               <div className="flex items-end justify-between mb-1">
-                <div className="text-xs text-gray-500">Title</div>
+                <div className="text-xs text-gray-500">제목</div>
                 <div className="text-[11px] text-gray-400">
                   {(newForm.title || "").length}/{TITLE_MAX}
                 </div>
@@ -117,14 +115,14 @@ export default function SimulationCreateDrawer({
                   setNewForm((s) => ({ ...s, title: e.target.value }))
                 }
                 className="h-10 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
-                placeholder="Title"
+                placeholder="제목"
               />
             </div>
 
             {/* Description */}
             <div>
               <div className="flex items-end justify-between mb-1">
-                <div className="text-xs text-gray-500">Description</div>
+                <div className="text-xs text-gray-500">내용</div>
                 <div className="text-[11px] text-gray-400">
                   {(newForm.description || "").length}/{DESC_MAX}
                 </div>
@@ -137,14 +135,14 @@ export default function SimulationCreateDrawer({
                   setNewForm((s) => ({ ...s, description: e.target.value }))
                 }
                 className="h-30 w-full rounded-md border px-2 py-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs resize-none"
-                placeholder="Description"
+                placeholder="내용"
               />
             </div>
 
             {/* Product list */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-gray-500">Product List</div>
+                <div className="text-xs text-gray-500">생산 대상 리스트</div>
 
                 {(newForm.productIds || []).length > 0 && (
                   <button
@@ -158,7 +156,7 @@ export default function SimulationCreateDrawer({
               </div>
 
               <div className="rounded-md border bg-white">
-                <div className="max-h-[240px] overflow-y-auto p-2 space-y-2">
+                <div className="max-h-[300px] overflow-y-auto p-2 space-y-2">
                   {prodLoading ? (
                     <div className="px-2 py-2 text-xs text-gray-500">
                       제품 목록 불러오는 중...
@@ -215,7 +213,7 @@ export default function SimulationCreateDrawer({
             {/* Selected */}
             <div>
               <div className="text-xs text-gray-500 mb-2">
-                Selected Product
+                선택된 생산 대상
                 <span className="ml-2 text-[11px] text-gray-400">
                   {(newForm.productIds || []).length}개 선택됨
                 </span>
@@ -252,7 +250,7 @@ export default function SimulationCreateDrawer({
 
             {/* Staff */}
             <div>
-              <div className="text-xs text-gray-500 mb-1">Staff</div>
+              <div className="text-xs text-gray-500 mb-1">인원</div>
               <input
                 type="number"
                 value={newForm.requiredStaff}
@@ -261,13 +259,13 @@ export default function SimulationCreateDrawer({
                 }
                 className="h-9 w-full rounded-md border px-2 outline-none focus:ring-1 focus:ring-black/10 bg-white text-sm placeholder:text-xs"
                 min={0}
-                placeholder="Staff"
+                placeholder="인원"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                <div className="text-xs text-gray-500 mb-1">시작 날짜</div>
                 <input
                   type="date"
                   value={newForm.startDate || ""}
@@ -281,7 +279,7 @@ export default function SimulationCreateDrawer({
               </div>
 
               <div>
-                <div className="text-xs text-gray-500 mb-1">Start Time</div>
+                <div className="text-xs text-gray-500 mb-1">시작 시간</div>
                 <input
                   type="time"
                   value={newForm.startTime || ""}

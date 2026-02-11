@@ -471,7 +471,7 @@ export default function Notice() {
                         setQuery(e.target.value);
                         setPage(1);
                       }}
-                      placeholder="제목/내용/작성자 검색"
+                      placeholder="제목/내용 검색"
                       className="
                         h-10 w-[320px] rounded-xl border border-slate-200 bg-white
                         pl-9 pr-3 text-[13px]

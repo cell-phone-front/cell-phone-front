@@ -33,15 +33,15 @@ const data = {
   // ✅ 테이블: 생산대상만 2단 펼침
   tables: [
     {
-      title: "생산대상",
+      title: "생산",
       icon: Boxes,
       items: [
-        { title: "생산대상", url: "/product", icon: Boxes },
-        { title: "생산 공정 순서 관리", url: "/product-routing" },
+        { title: "생산 대상", url: "/product", icon: Boxes },
+        { title: "공정 순서 관리", url: "/product-routing" },
       ],
     },
-    { title: "공정단계", url: "/operation", icon: Factory },
-    { title: "매칭작업", url: "/tasks", icon: ListChecks },
+    { title: "공정 단계", url: "/operation", icon: Factory },
+    { title: "매칭 작업", url: "/tasks", icon: ListChecks },
     { title: "기계", url: "/machine", icon: Cpu },
   ],
 

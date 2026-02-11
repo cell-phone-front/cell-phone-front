@@ -516,7 +516,7 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 px-3 py-3">
         <div className="flex gap-4 items-center">
-          <h2 className="text-2xl font-bold tracking-tight">Accounts</h2>
+          <h2 className="text-2xl font-bold tracking-tight">계정 관리</h2>
           <p className="mt-1 text-sm text-gray-500">
             행 추가/ 파일 업로드 후 저장됩니다.
           </p>
@@ -530,7 +530,7 @@ export default function AccountsPage() {
               setQuery(e.target.value);
               setPageIndex(0);
             }}
-            placeholder="검색 (Id/Name/Email/Phone/Dept/Team/Role/HireDate)"
+            placeholder="검색 (이름/부서/부서팀)"
             className="
               h-9 w-[320px] rounded-md border bg-white
               px-3 pr-8 text-[12px] outline-none transition
@@ -682,31 +682,31 @@ export default function AccountsPage() {
                     </th>
 
                     <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Id
+                      사원번호
                     </th>
                     <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Name
+                      이름
                     </th>
                     <th className="w-[200px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Email
+                      이메일
                     </th>
                     <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Phone
+                      전화번호
                     </th>
                     <th className="w-[150px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Department
+                      부서
                     </th>
                     <th className="w-[90px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Team
+                      부서팀
                     </th>
                     <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Role
+                      직급
                     </th>
                     <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Hire Date
+                      입사 일자
                     </th>
                     <th className="w-[90px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Status
+                      상태
                     </th>
                   </tr>
                 </thead>

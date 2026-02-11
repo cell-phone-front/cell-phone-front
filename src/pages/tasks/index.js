@@ -318,25 +318,25 @@ export default function TasksPage() {
               </th>
 
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Task Id
+                작업 코드
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Operation Id
+                공정 코드
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Machine Id
+                기계 품번
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Name
+                작업 이름
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Description
+                작업 설명
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white text-right">
-                Duration
+                작업 시간(분)
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Status
+                상태
               </th>
             </tr>
           </thead>
@@ -511,7 +511,7 @@ export default function TasksPage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Tasks
+                  매칭 작업
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -527,7 +527,7 @@ export default function TasksPage() {
                       setQuery(e.target.value);
                       setPageIndex(0);
                     }}
-                    placeholder="검색 (Task/Operation/Machine/Name/Description)"
+                    placeholder="검색 (이름/설명)"
                     className="
                       h-10 w-full rounded-xl border
                       pl-9 pr-9 text-[11px]

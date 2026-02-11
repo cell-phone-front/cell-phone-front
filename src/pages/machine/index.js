@@ -143,7 +143,6 @@ export default function MachinePage() {
     { key: "check", w: "6%" },
     { key: "id", w: "18%" },
     { key: "name", w: "20%" },
-    { key: "koreanName", w: "20%" },
     { key: "description", w: "26%" },
     { key: "status", w: "10%" },
   ];
@@ -274,19 +273,16 @@ export default function MachinePage() {
               </th>
 
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Id
+                기계 품번
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Name
+                기계 이름
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Korean Name
+                기계 설명
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Description
-              </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Status
+                상태
               </th>
             </tr>
           </thead>
@@ -360,18 +356,6 @@ export default function MachinePage() {
 
                   <td className="border-b border-slate-100 px-3 py-2">
                     <input
-                      value={row.koreanName ?? ""}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        updateCell(row._rid, "koreanName", e.target.value)
-                      }
-                      className="h-9 w-full rounded-xl border px-3 bg-white text-[13px] outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
-                      placeholder="Korean Name"
-                    />
-                  </td>
-
-                  <td className="border-b border-slate-100 px-3 py-2">
-                    <input
                       value={row.description ?? ""}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) =>
@@ -433,7 +417,7 @@ export default function MachinePage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Machine
+                  기계
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -449,7 +433,7 @@ export default function MachinePage() {
                       setQuery(e.target.value);
                       setPageIndex(0);
                     }}
-                    placeholder="검색 (ID/Name/KoreanName/Description)"
+                    placeholder="검색 (이름/설명)"
                     className="
                       h-10 w-full rounded-xl border
                       pl-9 pr-9 text-[11px]

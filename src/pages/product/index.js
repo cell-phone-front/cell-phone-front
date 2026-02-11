@@ -276,19 +276,19 @@ export default function ProductPage() {
                 </div>
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Id
+                생산 대상 품번
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Brand
+                브랜드 이름
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Name
+                휴대폰 이름(EN)
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Description
+                휴대폰 이름(KR)
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Status
+                상태
               </th>
             </tr>
           </thead>
@@ -446,7 +446,7 @@ export default function ProductPage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Product
+                  생산 대상
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -462,7 +462,7 @@ export default function ProductPage() {
                       setQuery(e.target.value);
                       setPageIndex(0);
                     }}
-                    placeholder="검색 (ID/Brand/Name/Description)"
+                    placeholder="검색 (이름(EN/Kor))"
                     className="
                       h-10 w-full rounded-xl border
                       pl-9 pr-9 text-[11px]

@@ -1,7 +1,11 @@
+// src/components/table-modal/operation.js
 import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { getOperations } from "@/api/operation-api";
 
+/* ===============================
+   utils
+=============================== */
 function cryptoId() {
   try {
     return (
@@ -10,6 +14,23 @@ function cryptoId() {
   } catch {
     return `rid-${Date.now()}-${Math.random()}`;
   }
+}
+
+function Clamp2({ children, className = "" }) {
+  return (
+    <div
+      className={className}
+      style={{
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+        overflow: "hidden",
+      }}
+      title={typeof children === "string" ? children : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function OperationFullModal({ open, onClose, token }) {
@@ -44,6 +65,16 @@ export default function OperationFullModal({ open, onClose, token }) {
     };
   }, [open, token]);
 
+  // ✅ ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   const data = useMemo(() => rows || [], [rows]);
 
   const filteredData = useMemo(() => {
@@ -64,10 +95,10 @@ export default function OperationFullModal({ open, onClose, token }) {
   return (
     <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-6">
       <div className="w-[min(1200px,95vw)] h-[min(760px,90vh)] rounded-2xl bg-white shadow-xl overflow-hidden flex flex-col">
-        {/* 헤더: 라우팅/프로덕트 모달과 동일 */}
+        {/* 헤더 */}
         <div className="shrink-0 px-4 py-3 bg-indigo-900 text-white flex items-center gap-3">
           <div className="text-[14px] font-extrabold shrink-0">
-            Operation 전체 보기
+            공정 단계 전체 보기
           </div>
 
           {/* 검색창 */}
@@ -75,7 +106,7 @@ export default function OperationFullModal({ open, onClose, token }) {
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색 (Id / Name / Description)"
+              placeholder="검색 (이름 / 설명)"
               className="
                 h-8 w-full rounded-md
                 bg-white text-slate-900
@@ -131,16 +162,16 @@ export default function OperationFullModal({ open, onClose, token }) {
             <thead className="sticky top-0 z-10">
               <tr className="text-left">
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold text-center">
-                  No
+                  번호
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Id
+                  공정 코드
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Name
+                  공정 이름
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Description
+                  공정 설명
                 </th>
               </tr>
             </thead>
@@ -151,9 +182,24 @@ export default function OperationFullModal({ open, onClose, token }) {
                   <td className="border-b px-3 py-2 text-center text-slate-500">
                     {i + 1}
                   </td>
-                  <td className="border-b px-3 py-2">{r.id ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.name ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.description ?? "-"}</td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.id ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.name ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2 align-top">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.description ?? "-"}
+                    </Clamp2>
+                  </td>
                 </tr>
               ))}
 
@@ -171,7 +217,12 @@ export default function OperationFullModal({ open, onClose, token }) {
           </table>
         </div>
 
-        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-end">
+        {/* ✅ 하단: 총 개수 + 닫기 (Task 모달과 동일 패턴) */}
+        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-between items-center">
+          <div className="text-[12px] text-slate-500">
+            총 {data.length.toLocaleString()}건
+          </div>
+
           <button
             type="button"
             onClick={onClose}
