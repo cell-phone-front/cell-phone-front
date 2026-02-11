@@ -12,11 +12,7 @@ import {
 } from "lucide-react";
 import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
-import {
-  getCommunities,
-  getCommunityCommentCount,
-  deleteCommunity,
-} from "@/api/community-api";
+import { getCommunities, deleteCommunity } from "@/api/community-api";
 
 /* ===============================
    utils
@@ -144,45 +140,30 @@ export default function Board() {
 
     try {
       const json = await getCommunities(token);
+
       const list =
         json?.communities || json?.communityList || json?.items || json || [];
       const arr = Array.isArray(list) ? list : [];
 
-      const ids = arr
-        .map((r) => getId(r))
-        .filter((v) => v != null)
-        .map(String);
-
-      // 댓글 수 병합
-      const pairs = await Promise.all(
-        ids.map(async (cid) => {
-          try {
-            const res = await getCommunityCommentCount(cid, token);
-            const cnt =
-              res?.count ??
-              res?.commentCount ??
-              res?.data ??
-              (typeof res === "number" ? res : 0);
-            return [cid, Number(cnt) || 0];
-          } catch {
-            return [cid, 0];
-          }
-        }),
-      );
-
-      const countMap = Object.fromEntries(pairs);
-
+      // ✅ 댓글 수는 comment-count API를 따로 치지 말고,
+      //    getCommunities 응답에서 바로 뽑아쓰기
       const merged = arr.map((r) => {
         const cid = getId(r);
+
         const serverCnt =
-          r.comments ?? r.commentCount ?? r.comment_count ?? r.commentCnt;
-        const apiCnt = countMap[String(cid)] ?? 0;
+          r.comments ??
+          r.commentCount ??
+          r.comment_count ??
+          r.commentCnt ??
+          r.comment_cnt ??
+          r.replyCount ??
+          r.reply_count ??
+          0;
 
         return {
           ...r,
           id: cid != null ? String(cid) : null,
-          __commentCount:
-            typeof serverCnt === "number" ? serverCnt : Number(apiCnt) || 0,
+          __commentCount: Number(serverCnt) || 0,
         };
       });
 
@@ -252,7 +233,7 @@ export default function Board() {
         createdAt,
         comments: Number(comments) || 0,
         pinned: Boolean(r.pinned),
-        __writerId: getWriterId(r), // ✅ 작성자 id 보관
+        __writerId: getWriterId(r),
       };
     });
 
@@ -284,7 +265,7 @@ export default function Board() {
   const pinnedRows = filtered.pinned || [];
   const normalRows = filtered.normal || [];
   const total = pinnedRows.length + normalRows.length;
-  // ✅ 현재 화면에서 "내 글"이 하나라도 있는지
+
   const hasMine = useMemo(() => {
     if (!meId) return false;
     const all = [...(pinnedRows || []), ...(normalRows || [])];
@@ -482,7 +463,6 @@ export default function Board() {
                       <div className={COUNT_CELL}>{r.comments}</div>
 
                       <div className={ACTION_CELL}>
-                        {/* ✅ 본인 글만 수정/삭제 */}
                         {canWriteCommunity && isMinePost ? (
                           <>
                             <button
