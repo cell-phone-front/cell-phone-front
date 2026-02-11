@@ -22,14 +22,57 @@ import {
 /* ===============================
    utils
 =============================== */
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
 function fmtDate(v) {
   if (!v) return "";
-  const s = String(v);
-  let d = s;
-  if (d.includes("T")) d = d.split("T")[0];
-  else if (d.includes(" ")) d = d.split(" ")[0];
-  else d = d.slice(0, 10);
-  return d.replaceAll("-", ".");
+
+  let d = v;
+
+  // 문자열이면 Date로 파싱되기 쉬운 형태로 정리
+  if (typeof d === "string") {
+    let s = d.trim();
+    // "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
+    if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
+    d = new Date(s);
+  } else if (!(d instanceof Date)) {
+    d = new Date(d);
+  }
+
+  if (!(d instanceof Date) || isNaN(d.getTime())) {
+    // 파싱 실패 시 최소 방어(원래 하던 날짜만)
+    const s = String(v);
+    let only = s;
+    if (only.includes("T")) only = only.split("T")[0];
+    else if (only.includes(" ")) only = only.split(" ")[0];
+    else only = only.slice(0, 10);
+    return only.replaceAll("-", ".");
+  }
+
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth() + 1);
+  const day = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+
+  return `${y}.${m}.${day} ${hh}:${mm}`;
+}
+
+// ✅ 서버가 writer/author에 "id"를 내려주는 경우 화면에 잠깐 보이는 깜빡임 방지
+function isIdLike(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return false;
+
+  // 숫자만(1, 23) -> ID로 간주
+  if (/^\d+$/.test(s)) return true;
+
+  // uuid 형태 -> ID로 간주
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s))
+    return true;
+
+  return false;
 }
 
 function pickWriter(item, fallback = "익명") {
@@ -71,7 +114,11 @@ function normalizeComment(raw, fallbackIdx = 0) {
   if (!raw) return null;
 
   const id = getId(raw);
-  const author = pickWriter(raw, raw?.author || "익명");
+
+  // ✅ 서버가 author/writer에 id를 내려주는 경우가 있어서 필터링
+  //    (익명/익명1 라벨링은 렌더링 단계에서 처리)
+  const picked = pickWriter(raw, "");
+  const author = !picked || isIdLike(picked) ? "" : String(picked);
 
   const content =
     raw.content ??
@@ -95,7 +142,7 @@ function normalizeComment(raw, fallbackIdx = 0) {
   return {
     ...raw,
     id: id != null ? String(id) : `tmp-${fallbackIdx}-${Date.now()}`,
-    author: String(author || "익명"),
+    author, // ✅ 여기서 "익명"을 넣지 않음(라벨링에서 처리)
     content: String(content || ""),
     createdAt,
     memberId: memberId != null ? String(memberId) : null,
@@ -175,6 +222,7 @@ export default function BoardView() {
         .map((c, idx) => normalizeComment(c, idx))
         .filter(Boolean);
 
+      // ✅ 기존 정렬 그대로 유지(요구사항: 정렬 건드리지 마)
       normalized.sort((a, b) => {
         const at = Date.parse(a.createdAt || "") || 0;
         const bt = Date.parse(b.createdAt || "") || 0;
@@ -235,6 +283,7 @@ export default function BoardView() {
     if (!t) return;
     if (!token || !communityId) return;
 
+    // ✅ optimistic에선 내 이름 표시(여긴 깜빡일 수 없게 normalize 단계에서 id-like 방지)
     const optimistic = {
       id: `local-${Date.now()}`,
       author: meName,
@@ -297,7 +346,13 @@ export default function BoardView() {
     }
   }
 
-  const writer = useMemo(() => pickWriter(post, "익명"), [post]);
+  // 작성자 표시(게시글)
+  const writerRaw = useMemo(() => pickWriter(post, "익명"), [post]);
+  const writer = useMemo(
+    () => (isIdLike(writerRaw) ? "익명" : writerRaw),
+    [writerRaw],
+  );
+
   const createdAt =
     post?.createdAt ??
     post?.created_at ??
@@ -310,6 +365,42 @@ export default function BoardView() {
   const isMinePost = Boolean(
     meId && postWriterId && String(meId) === String(postWriterId),
   );
+
+  // ✅ 익명 / 익명1 / 익명2 ... 라벨링 (정렬 순서 변경 없이 현재 comments 순서대로 번호 부여)
+  const anonLabelByMemberId = useMemo(() => {
+    const map = new Map();
+
+    const ownerId = postWriterId ? String(postWriterId) : null;
+    if (ownerId) map.set(ownerId, "익명"); // 글 작성자 = 익명
+
+    // ✅ 번호 부여는 "오래된 댓글부터" (표시 정렬은 건드리지 않음)
+    const sortedForLabel = [...(comments || [])].sort((a, b) => {
+      const at = Date.parse(a.createdAt || "") || 0;
+      const bt = Date.parse(b.createdAt || "") || 0;
+      if (at !== bt) return at - bt; // 오래된 순
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+    let next = 1;
+
+    for (const c of sortedForLabel) {
+      const mid = c?.memberId ? String(c.memberId) : null;
+      if (!mid) continue;
+
+      // 이름이 있으면 번호 필요 없음
+      if (c.author && String(c.author).trim()) continue;
+
+      // 글 작성자는 "익명"
+      if (ownerId && mid === ownerId) continue;
+
+      if (!map.has(mid)) {
+        map.set(mid, `익명${next}`);
+        next += 1;
+      }
+    }
+
+    return map;
+  }, [comments, postWriterId]);
 
   if (!hydrated) return null;
 
@@ -472,14 +563,19 @@ export default function BoardView() {
                     </div>
                   ) : (
                     comments.map((c, idx) => {
-                      // ✅ 댓글도 본인만
-                      const isMine =
-                        (meId && c.memberId && String(c.memberId) === meId) ||
-                        (meId &&
-                          pickWriterId(c) &&
-                          String(pickWriterId(c)) === meId);
+                      const isMine = Boolean(
+                        meId &&
+                        c.memberId &&
+                        String(c.memberId) === String(meId),
+                      );
 
                       const editing = editingId === c.id;
+
+                      const displayAuthor =
+                        (c.author && String(c.author).trim()) ||
+                        (c.memberId &&
+                          anonLabelByMemberId.get(String(c.memberId))) ||
+                        "익명";
 
                       return (
                         <div
@@ -491,28 +587,49 @@ export default function BoardView() {
                               : "border-slate-200",
                           ].join(" ")}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-start gap-2 min-w-0">
-                                <div className="text-[12px] font-bold text-slate-800 truncate">
-                                  {c.author || "익명"}
-                                </div>
-                                {isMine ? (
-                                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0">
-                                    내 댓글
-                                  </span>
-                                ) : null}
+                          <div className="flex items-center justify-between gap-2">
+                            {/* 왼쪽: 작성자/배지 */}
+                            <div className="min-w-0 flex items-center gap-2">
+                              <div
+                                className="
+        h-7 min-w-0 flex items-center
+        text-[12px] font-bold text-slate-800 truncate
+      "
+                                title={displayAuthor}
+                              >
+                                {displayAuthor}
                               </div>
+
+                              {isMine ? (
+                                <span
+                                  className="
+          h-7 inline-flex items-center
+          text-[10px] font-extrabold
+          px-2 rounded-full
+          bg-indigo-100 text-indigo-700
+          border border-indigo-200
+          shrink-0
+        "
+                                >
+                                  내 댓글
+                                </span>
+                              ) : null}
                             </div>
 
+                            {/* 오른쪽: 날짜 + 액션 */}
                             <div className="flex items-center gap-2 shrink-0">
                               {c.createdAt ? (
-                                <div className="text-[11px] text-slate-400 tabular-nums">
+                                <div
+                                  className="
+          h-7 inline-flex items-center
+          text-[11px] text-slate-400 tabular-nums
+          px-1
+        "
+                                >
                                   {fmtDate(c.createdAt)}
                                 </div>
                               ) : null}
 
-                              {/* ✅ 댓글 수정/삭제: 본인 댓글만 */}
                               {canEditRole &&
                               isMine &&
                               c.id &&
@@ -523,14 +640,24 @@ export default function BoardView() {
                                       <button
                                         type="button"
                                         onClick={() => saveEditComment(c)}
-                                        className="h-8 px-3 rounded-lg bg-indigo-600 text-white text-[12px] font-bold hover:bg-indigo-700 active:bg-indigo-800 transition"
+                                        className="
+                h-7 px-3 rounded-lg
+                bg-indigo-600 text-white
+                text-[12px] font-bold
+                hover:bg-indigo-700 active:bg-indigo-800 transition
+              "
                                       >
                                         저장
                                       </button>
                                       <button
                                         type="button"
                                         onClick={cancelEditComment}
-                                        className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-[12px] font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition"
+                                        className="
+                h-7 px-3 rounded-lg
+                border border-slate-200 bg-white
+                text-[12px] font-bold text-slate-700
+                hover:bg-slate-50 active:bg-slate-100 transition
+              "
                                       >
                                         취소
                                       </button>
@@ -540,7 +667,11 @@ export default function BoardView() {
                                       <button
                                         type="button"
                                         onClick={() => startEditComment(c)}
-                                        className="h-8 w-8 grid place-items-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
+                                        className="
+                h-7 w-7 grid place-items-center
+                rounded-lg
+                text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition
+              "
                                         title="댓글 수정"
                                       >
                                         <Pencil className="w-4 h-4" />
@@ -548,7 +679,11 @@ export default function BoardView() {
                                       <button
                                         type="button"
                                         onClick={() => removeComment(c)}
-                                        className="h-8 w-8 grid place-items-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                                        className="
+                h-7 w-7 grid place-items-center
+                rounded-lg
+                text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition
+              "
                                         title="댓글 삭제"
                                       >
                                         <Trash2 className="w-4 h-4" />

@@ -85,18 +85,3 @@ export async function deleteCommunity(communityId, token) {
   }
   return true;
 }
-
-// (6) 댓글 수 조회 (Auth: all)
-export async function getCommunityCommentCount(communityId, token) {
-  const response = await fetch(
-    `${serverAddr}/api/community/${communityId}/comment-count`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: "Bearer " + token,
-      },
-    },
-  );
-
-  return response.json();
-}
