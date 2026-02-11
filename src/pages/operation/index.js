@@ -276,16 +276,16 @@ export default function OperationPage() {
                 </div>
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Id
+                공정 코드
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Name
+                공정 이름
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Description
+                공정 설명
               </th>
               <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
-                Status
+                상태
               </th>
             </tr>
           </thead>
@@ -421,7 +421,7 @@ export default function OperationPage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Operation
+                  공정 단계
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -437,7 +437,7 @@ export default function OperationPage() {
                       setQuery(e.target.value);
                       setPageIndex(0);
                     }}
-                    placeholder="검색 (ID/Name/Description)"
+                    placeholder="검색 (이름/설명)"
                     className="
                       h-10 w-full rounded-xl border
                       pl-9 pr-9 text-[11px]

@@ -101,7 +101,7 @@ export default function MachineFullModal({ open, onClose, token }) {
         {/* 헤더: 오퍼레이션/테스크 모달과 동일 톤 */}
         <div className="shrink-0 px-4 py-3 bg-indigo-900 text-white flex items-center gap-3">
           <div className="text-[14px] font-extrabold shrink-0">
-            Machine 전체 보기
+            기계 전체 보기
           </div>
 
           {/* 검색창 */}
@@ -109,7 +109,7 @@ export default function MachineFullModal({ open, onClose, token }) {
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색 (ID / Name / Description)"
+              placeholder="검색 (이름 / 설명)"
               className="
                 h-8 w-full rounded-md
                 bg-white text-slate-900
@@ -165,16 +165,16 @@ export default function MachineFullModal({ open, onClose, token }) {
             <thead className="sticky top-0 z-10 shadow-[0_1px_0_0_rgba(15,23,42,0.12)]">
               <tr className="text-left">
                 <th className="border-b bg-slate-50 px-3 py-2 font-semibold text-center">
-                  No
+                  번호
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-2 font-semibold">
-                  Id
+                  기계 품번
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-2 font-semibold">
-                  Name
+                  기계 이름
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-2 font-semibold">
-                  Description
+                  기계 설명
                 </th>
               </tr>
             </thead>

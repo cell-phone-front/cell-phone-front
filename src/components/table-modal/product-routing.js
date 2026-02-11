@@ -3,6 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { getProductRoutings } from "@/api/product-routing-api";
 
+/* ===============================
+   utils
+=============================== */
 function cryptoId() {
   try {
     return (
@@ -38,12 +41,29 @@ function normalizeRow(r) {
   };
 }
 
+function Clamp2({ children, className = "" }) {
+  return (
+    <div
+      className={className}
+      style={{
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+        overflow: "hidden",
+      }}
+      title={typeof children === "string" ? children : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function ProductRoutingFullModal({ open, onClose, token }) {
   const [keyword, setKeyword] = useState("");
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
 
-  // ESC 닫기
+  // ✅ ESC 닫기
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
@@ -99,7 +119,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
         {/* 헤더 */}
         <div className="shrink-0 px-4 py-3 bg-indigo-900 text-white flex items-center gap-3">
           <div className="text-[14px] font-extrabold shrink-0">
-            Product Routing 전체 보기
+            공정 순서 전체 보기
           </div>
 
           {/* 검색 */}
@@ -107,7 +127,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색 (Id / Name / ProductId / OperationId / Seq / Description)"
+              placeholder="검색 (이름 / 설명)"
               className="
                 h-8 w-full rounded-md
                 bg-white text-slate-900
@@ -165,25 +185,25 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
             <thead className="sticky top-0 z-10">
               <tr className="text-left">
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold text-center">
-                  No
+                  번호
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold whitespace-nowrap">
-                  Id
+                  생산 공정 코드
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold whitespace-nowrap">
-                  Name
+                  생산 공정 이름(EN)
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold whitespace-nowrap">
-                  ProductId
+                  생산 대상 품번
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold whitespace-nowrap">
-                  OperationId
+                  공정 코드
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold whitespace-nowrap text-center">
-                  Seq
+                  생산 공정 순서
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Description
+                  생산 공정 설명
                 </th>
               </tr>
             </thead>
@@ -194,14 +214,40 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
                   <td className="border-b px-3 py-2 text-center text-slate-500">
                     {i + 1}
                   </td>
-                  <td className="border-b px-3 py-2">{r.id ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.name ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.productId ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.operationId ?? "-"}</td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.id ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.name ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.productId ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.operationId ?? "-"}
+                    </Clamp2>
+                  </td>
+
                   <td className="border-b px-3 py-2 text-center">
                     {r.operationSeq ?? "-"}
                   </td>
-                  <td className="border-b px-3 py-2">{r.description ?? "-"}</td>
+
+                  <td className="border-b px-3 py-2 align-top">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.description ?? "-"}
+                    </Clamp2>
+                  </td>
                 </tr>
               ))}
 
@@ -219,7 +265,12 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
           </table>
         </div>
 
-        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-end">
+        {/* ✅ 하단: 총 개수 + 닫기 (Task/Operation 모달 패턴과 동일) */}
+        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-between items-center">
+          <div className="text-[12px] text-slate-500">
+            총 {data.length.toLocaleString()}건
+          </div>
+
           <button
             type="button"
             onClick={onClose}
