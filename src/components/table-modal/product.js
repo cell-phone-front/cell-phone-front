@@ -3,6 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { getProducts } from "@/api/product-api";
 
+/* ===============================
+   utils
+=============================== */
 function cryptoId() {
   try {
     return (
@@ -11,6 +14,23 @@ function cryptoId() {
   } catch {
     return `rid-${Date.now()}-${Math.random()}`;
   }
+}
+
+function Clamp2({ children, className = "" }) {
+  return (
+    <div
+      className={className}
+      style={{
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+        overflow: "hidden",
+      }}
+      title={typeof children === "string" ? children : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function ProductFullModal({ open, onClose, token }) {
@@ -45,6 +65,16 @@ export default function ProductFullModal({ open, onClose, token }) {
     };
   }, [open, token]);
 
+  // ✅ ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   const data = useMemo(() => rows || [], [rows]);
 
   const filteredData = useMemo(() => {
@@ -68,14 +98,14 @@ export default function ProductFullModal({ open, onClose, token }) {
         {/* 헤더 */}
         <div className="shrink-0 px-4 py-3 bg-indigo-900 text-white flex items-center gap-3">
           <div className="text-[14px] font-extrabold shrink-0">
-            Product 전체 보기
+            생산 대상 전체 보기
           </div>
 
           <div className="ml-auto relative w-[360px]">
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색 (Id / Brand / Name / Description)"
+              placeholder="검색 (이름(EN / KR))"
               className="
                 h-8 w-full rounded-md
                 bg-white text-slate-900
@@ -132,19 +162,19 @@ export default function ProductFullModal({ open, onClose, token }) {
             <thead className="sticky top-0 z-10">
               <tr className="text-left">
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold text-center">
-                  No
+                  번호
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Id
+                  생산 대상 품번
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Brand
+                  브랜드 이름
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Name
+                  휴대폰 이름(EN)
                 </th>
                 <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  Description
+                  휴대폰 이름(KR)
                 </th>
               </tr>
             </thead>
@@ -155,10 +185,30 @@ export default function ProductFullModal({ open, onClose, token }) {
                   <td className="border-b px-3 py-2 text-center text-slate-500">
                     {i + 1}
                   </td>
-                  <td className="border-b px-3 py-2">{r.id ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.brand ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.name ?? "-"}</td>
-                  <td className="border-b px-3 py-2">{r.description ?? "-"}</td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.id ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.brand ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.name ?? "-"}
+                    </Clamp2>
+                  </td>
+
+                  <td className="border-b px-3 py-2">
+                    <Clamp2 className="whitespace-normal break-words leading-5">
+                      {r.description ?? "-"}
+                    </Clamp2>
+                  </td>
                 </tr>
               ))}
 
@@ -176,7 +226,12 @@ export default function ProductFullModal({ open, onClose, token }) {
           </table>
         </div>
 
-        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-end">
+        {/* ✅ 하단: 총 개수 + 닫기 */}
+        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-between items-center">
+          <div className="text-[12px] text-slate-500">
+            총 {data.length.toLocaleString()}건
+          </div>
+
           <button
             type="button"
             onClick={onClose}

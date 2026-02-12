@@ -559,7 +559,7 @@ export default function SimulationPage() {
           <div className="flex justify-between items-end gap-4">
             <div className="flex flex-col gap-1">
               <h2 className="text-[28px] font-semibold tracking-tight text-slate-900">
-                Simulation
+                시뮬레이션
               </h2>
               <p className="text-[11px] text-slate-500">
                 생성 · 실행 · 결과(스케줄) 확인
@@ -575,7 +575,7 @@ export default function SimulationPage() {
                     setQ(e.target.value);
                     setPageIndex(0);
                   }}
-                  placeholder="검색 (제목/설명/작성자/상태/제품)"
+                  placeholder="검색 (제목/설명/생성자)"
                   className="
                     h-10 w-full rounded-xl border
                     pl-9 pr-9 text-[11px]
@@ -719,19 +719,19 @@ export default function SimulationPage() {
                         </div>
                       </th>
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        Sim Id
+                        시뮬레이션 코드
                       </th>
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        Title
+                        시뮬레이션 제목
                       </th>
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white text-right">
-                        Product
+                        생산 대상
                       </th>
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        Status
+                        상태
                       </th>
                       <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        Start
+                        시작 날짜
                       </th>
                     </tr>
                   </thead>
@@ -879,19 +879,19 @@ export default function SimulationPage() {
                     </div>
                   ) : (
                     <>
-                      <Field label="Title" value={activeRow.title || "-"} />
+                      <Field label="제목" value={activeRow.title || "-"} />
                       <Field
-                        label="Description"
+                        label="설명"
                         value={activeRow.description || "-"}
                       />
 
                       <div className="grid grid-cols-2 gap-3">
                         <Field
-                          label="Member"
+                          label="생성자"
                           value={activeRow.memberName || "-"}
                         />
                         <Field
-                          label="Status"
+                          label="상태"
                           value="-"
                           pill={
                             <StatusPill
@@ -902,22 +902,22 @@ export default function SimulationPage() {
                           }
                         />
                         <Field
-                          label="Product Count"
+                          label="생산 대상 개수"
                           value={Number(activeRow.productCount ?? 0)}
                           right="ea"
                         />
                         <Field
-                          label="Required Staff"
+                          label="인원"
                           value={Number(activeRow.requiredStaff || 0)}
                           right="people"
                         />
                         <Field
-                          label="Start Date"
+                          label="시작 날짜"
                           value={fmtDate(activeRow.simulationStartDate)}
                           mono
                         />
                         <Field
-                          label="Work Time"
+                          label="작업 시간(분)"
                           value={Number(activeRow.workTime || 0)}
                           right="min"
                         />

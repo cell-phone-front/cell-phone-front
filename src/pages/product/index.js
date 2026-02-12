@@ -312,20 +312,20 @@ export default function ProductPage() {
                   />
                 </div>
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Id
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                생산 대상 품번
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Brand
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                브랜드 이름
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Name
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                휴대폰 이름(EN)
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Description
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                휴대폰 이름(KR)
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Status
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                상태
               </th>
             </tr>
           </thead>
@@ -488,7 +488,7 @@ export default function ProductPage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Product
+                  생산 대상
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -504,8 +504,16 @@ export default function ProductPage() {
                       setQuery(e.target.value);
                       setPageIndex(0);
                     }}
-                    placeholder="검색 (ID/Brand/Name/Description)"
-                    className="h-10 w-full rounded-xl border pl-9 pr-9 text-[11px] outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 placeholder:text-[10px] placeholder:text-slate-400"
+                    placeholder="검색 (이름(EN/Kor))"
+                    className="
+                      h-10 w-full rounded-xl border
+                      pl-9 pr-9 text-[11px]
+                      outline-none transition
+                      hover:border-slate-300
+                      focus:ring-2 focus:ring-indigo-200
+                      placeholder:text-[10px]
+                      placeholder:text-slate-400
+                    "
                   />
 
                   {query || routerFocus ? (

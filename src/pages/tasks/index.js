@@ -342,26 +342,26 @@ export default function TasksPage() {
                 </div>
               </th>
 
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Task Id
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                작업 코드
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Operation Id
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                공정 코드
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Machine Id
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                기계 품번
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Name
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                작업 이름
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Description
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                작업 설명
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900 whitespace-nowrap">
-                Duration
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white text-right">
+                작업 시간(분)
               </th>
-              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
-                Status
+              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+                상태
               </th>
             </tr>
           </thead>
@@ -538,7 +538,7 @@ export default function TasksPage() {
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
-                  Tasks
+                  매칭 작업
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   행 추가/ 파일 업로드 후 저장됩니다.
@@ -548,7 +548,14 @@ export default function TasksPage() {
               {/* 검색 */}
               <div className="w-[445px]">
                 <div className="relative">
-                  <div
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setPageIndex(0);
+                    }}
+                    placeholder="검색 (이름/설명)"
                     className="
                       group flex flex-nowrap items-center gap-2
                       h-10 rounded-xl border border-slate-200

@@ -38,10 +38,18 @@ function shiftTime(label) {
 
 const MEMO_KEY = "aps_calendar_memo_v1";
 
+// ✅ 메모 프리뷰: 첫 줄만(길면 …)
+function memoPreview(text, max = 18) {
+  const t = String(text || "").trim();
+  if (!t) return "";
+  const oneLine = t.replace(/\s+/g, " ");
+  if (oneLine.length <= max) return oneLine;
+  return oneLine.slice(0, max) + "…";
+}
+
 export function CalendarCustomDays() {
   const token = useToken((s) => s.token);
 
-  // ✅ { "YYYY-MM-DD": { labels: ["D","N"], textOnly?, cls } }
   const [shiftMap, setShiftMap] = React.useState({});
 
   const [range, setRange] = React.useState(() => {
@@ -52,15 +60,12 @@ export function CalendarCustomDays() {
   const [month, setMonth] = React.useState(new Date());
   const monthLabel = `${month.getFullYear()}.${String(month.getMonth() + 1).padStart(2, "0")}`;
 
-  // ✅ 우측 패널 상태
   const [panelOpen, setPanelOpen] = React.useState(false);
   const [panelDate, setPanelDate] = React.useState(null);
 
-  // ✅ 메모 맵: { "YYYY-MM-DD": "메모 내용" }
   const [memoMap, setMemoMap] = React.useState({});
   const [memoDraft, setMemoDraft] = React.useState("");
 
-  // ✅ 메모 로드(최초 1회)
   React.useEffect(() => {
     try {
       const raw = localStorage.getItem(MEMO_KEY);
@@ -71,7 +76,6 @@ export function CalendarCustomDays() {
     }
   }, []);
 
-  // ✅ memoMap 저장
   const persistMemoMap = React.useCallback((next) => {
     try {
       localStorage.setItem(MEMO_KEY, JSON.stringify(next));
@@ -86,7 +90,6 @@ export function CalendarCustomDays() {
     setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
   const goToday = () => setMonth(new Date());
 
-  // ESC 닫기
   React.useEffect(() => {
     if (!panelOpen) return;
     const onKey = (e) => {
@@ -114,7 +117,7 @@ export function CalendarCustomDays() {
             data?.result ||
             [];
 
-        const map = {}; // dateKey -> Set(labels)
+        const map = {};
         let firstDateKey = null;
 
         for (const s of list || []) {
@@ -149,7 +152,6 @@ export function CalendarCustomDays() {
         if (!alive) return;
         setShiftMap(next);
 
-        // 데이터 달로 자동 이동(있으면)
         if (firstDateKey) {
           const dt = new Date(firstDateKey + "T00:00:00");
           setMonth(new Date(dt.getFullYear(), dt.getMonth(), 1));
@@ -184,6 +186,7 @@ export function CalendarCustomDays() {
 
     setMemoMap(next);
     persistMemoMap(next);
+    setMemoDraft(text);
   }, [memoDraft, memoMap, panelDate, persistMemoMap]);
 
   const clearMemo = React.useCallback(() => {
@@ -283,9 +286,10 @@ export function CalendarCustomDays() {
                   const label = labels[0];
                   const more = labels.length > 1 ? labels.length - 1 : 0;
 
+                  // ... DayButton 내부
                   const memo = memoMap?.[key];
-                  const hasMemoDot =
-                    !isOutside && !!(memo && String(memo).trim());
+                  const memoText = memoPreview(memo, 18); // 기존 함수 그대로 사용
+                  const hasMemoDot = !isOutside && !!memoText;
 
                   return (
                     <CalendarDayButton
@@ -293,7 +297,6 @@ export function CalendarCustomDays() {
                       modifiers={modifiers}
                       {...props}
                       onClick={(e) => {
-                        // ✅ 날짜 칸 클릭하면 메모 패널 열기
                         e.preventDefault();
                         e.stopPropagation();
                         if (!isOutside) openPanel(key);
@@ -313,6 +316,7 @@ export function CalendarCustomDays() {
                           "text-rose-500!",
                       )}
                     >
+                      {/* 날짜 숫자 */}
                       <div
                         className={cn(
                           "text-sm font-medium leading-none text-slate-900",
@@ -324,53 +328,72 @@ export function CalendarCustomDays() {
                           {isToday && (
                             <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
                           )}
-
-                          {/* ✅ 메모 있는 날: 작은 점 표시 */}
                           {hasMemoDot && (
                             <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
                           )}
-
                           {children}
                         </span>
                       </div>
 
+                      {/* 휴무 */}
                       {!isOutside && info?.textOnly && label === "휴" && (
-                        <div className="mt-3 text-[13px] font-semibold text-rose-600">
+                        <div className="mt-2 text-[13px] font-semibold text-rose-600 text-left w-full">
                           휴
                         </div>
                       )}
 
+                      {/* ✅ 근무 버튼이 먼저(위로) */}
+                      {/* ✅ 근무 버튼: 메모 바 스타일 기준으로 통일 */}
                       {!isOutside && !info?.textOnly && label && (
                         <button
                           type="button"
                           onClick={(e) => {
-                            // shift 버튼 눌러도 패널 오픈(기존 유지)
                             e.preventDefault();
                             e.stopPropagation();
                             openPanel(key);
                           }}
                           className={cn(
-                            "mt-2 w-full h-9 flex items-center gap-2 px-3 rounded-xl",
-                            info?.cls ||
-                              "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100",
-                            "hover:brightness-[0.98] active:brightness-[0.95]",
+                            "mt-1 w-full", // ✅ mt-2 -> mt-1
+                            "rounded-lg bg-slate-50 px-2 py-1",
+                            "ring-1 ring-black/5",
+                            "text-[11px] leading-4 text-left",
+                            "overflow-hidden", // ✅ 추가
+                            "hover:bg-slate-100 active:bg-slate-200 transition",
                           )}
                         >
-                          <span className="text-[15px] font-semibold leading-none">
-                            {label}
-                          </span>
-
-                          <span className="text-[12px] font-medium text-slate-600 leading-none">
-                            {shiftTime(label)}
-                          </span>
-
-                          {more ? (
-                            <span className="ml-auto text-[11px] font-bold text-slate-600">
-                              +{more}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-slate-900 shrink-0">
+                              {label}
                             </span>
-                          ) : null}
+                            <span className="font-medium text-slate-600 truncate min-w-0">
+                              {shiftTime(label)}
+                            </span>
+                            {more ? (
+                              <span className="ml-auto text-[11px] font-bold text-slate-600 shrink-0">
+                                +{more}
+                              </span>
+                            ) : null}
+                          </div>
                         </button>
                       )}
+
+                      {/* ✅ 메모 프리뷰는 마지막(아래로) + 왼쪽 정렬 */}
+                      {!isOutside && memoText ? (
+                        <div
+                          className={cn(
+                            "mt-1 w-full", // ✅ mt-2 -> mt-1
+                            "rounded-lg bg-slate-50 px-2 py-1",
+                            "text-[11px] leading-4 text-slate-700",
+                            "ring-1 ring-black/5",
+                            "text-left",
+                            "overflow-hidden", // ✅ 추가
+                          )}
+                          title={String(memo || "")}
+                        >
+                          <div className="truncate">{memoText}</div>{" "}
+                          {/* ✅ 1줄로 잘라서 높이 고정 */}
+                        </div>
+                      ) : null}
                     </CalendarDayButton>
                   );
                 },
@@ -378,6 +401,7 @@ export function CalendarCustomDays() {
             />
           </div>
 
+          {/* 우측 패널(기존 그대로) */}
           {panelOpen ? (
             <>
               <button
@@ -416,7 +440,6 @@ export function CalendarCustomDays() {
                 </div>
 
                 <div className="max-h-[65vh] overflow-auto p-4 space-y-4">
-                  {/* 근무 섹션 */}
                   <div className="space-y-2">
                     <div className="text-[12px] font-semibold text-slate-700">
                       근무
@@ -451,7 +474,6 @@ export function CalendarCustomDays() {
                     )}
                   </div>
 
-                  {/* 메모 섹션 */}
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <div className="text-[12px] font-semibold text-slate-700">

@@ -498,28 +498,28 @@ export default function AccountsPage() {
                 <thead className="sticky top-0 z-10 bg-slate-700 text-white">
                   <tr className="text-left text-sm">
                     <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Id
+                      사원번호
                     </th>
                     <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Name
+                      이름
                     </th>
                     <th className="w-[220px] border-b border-slate-200 px-3 py-3 font-medium">
                       Email
                     </th>
                     <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Phone
+                      전화번호
                     </th>
                     <th className="w-[150px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Department
+                      부서
                     </th>
                     <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-medium">
                       Team
                     </th>
                     <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Role
+                      직급
                     </th>
                     <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      Hire Date
+                      입사 일자
                     </th>
                   </tr>
                 </thead>
