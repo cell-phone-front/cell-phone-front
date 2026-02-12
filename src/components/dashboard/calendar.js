@@ -31,7 +31,7 @@ function normalizeShift(v) {
   return s || null;
 }
 
-export function DashboardCalendar() {
+export function DashboardCalendar({ month, onMonthChange }) {
   const token = useToken((s) => s.token);
 
   const [range, setRange] = React.useState(() => {
@@ -39,14 +39,14 @@ export function DashboardCalendar() {
     return { from, to: addDays(from, 10) };
   });
 
-  const [month, setMonth] = React.useState(new Date());
-  const monthLabel = `${month.getFullYear()}.${String(month.getMonth() + 1).padStart(2, "0")}`;
+  // const [month, setMonth] = React.useState(new Date());
+  // const monthLabel = `${month.getFullYear()}.${String(month.getMonth() + 1).padStart(2, "0")}`;
 
-  const goPrev = () =>
-    setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1));
-  const goNext = () =>
-    setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
-  const goToday = () => setMonth(new Date());
+  // const goPrev = () =>
+  //   setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1));
+  // const goNext = () =>
+  //   setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
+  // const goToday = () => setMonth(new Date());
 
   const [shiftMap, setShiftMap] = React.useState({});
 
@@ -104,7 +104,7 @@ export function DashboardCalendar() {
   return (
     <div className="h-full min-h-0 w-full overflow-hidden bg-white">
       {/* 상단 툴바 */}
-      <div className="shrink-0 px-5 pt-2 pb-2">
+      {/* <div className="shrink-0 px-5 pt-2 pb-2">
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <div className="text-base font-semibold tracking-tight text-slate-900">
@@ -143,23 +143,22 @@ export function DashboardCalendar() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* ✅ 달력 영역: 남은 높이 안에서만 렌더 + 필요 시 스크롤 */}
       <div className="flex-1 min-h-0 px-4 pb-4">
         <div className="h-full min-h-0 overflow-auto pr-1">
           <Calendar
             mode="default"
-            fixedWeeks
             month={month}
-            onMonthChange={setMonth}
+            onMonthChange={onMonthChange}
             selected={range}
             onSelect={setRange}
             numberOfMonths={1}
             className="p-0
-              [--cell-size:44px]
-              lg:[--cell-size:50px]
-            "
+  [--cell-size:40px]
+  lg:[--cell-size:40px]
+"
             classNames={{
               month_caption: "hidden",
               caption_label: "hidden",
@@ -167,7 +166,7 @@ export function DashboardCalendar() {
 
               weekdays: "flex mb-2",
               weekday:
-                "flex-1 text-left pl-1 pb-2 text-[11px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
+                "flex-1 text-left pl-1 pb-1 text-[10px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
 
               // ✅ 56 고정 제거 (var 기반)
               week: "flex w-full h-[var(--cell-size)]",
