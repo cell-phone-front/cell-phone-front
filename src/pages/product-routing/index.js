@@ -19,6 +19,8 @@ import {
 
 import ProductRoutingFullModal from "@/components/table-modal/product-routing";
 import ProductRoutingDetailPanel from "@/components/detail-panel/product-routing";
+import { useRouter } from "next/router";
+import { filterRows } from "@/lib/table-filter";
 
 /* ===============================
    util
@@ -47,6 +49,21 @@ export default function ProductRoutingPage() {
 
   // search
   const [query, setQuery] = useState("");
+  const router = useRouter();
+  const [routerFocus, setRouterFocus] = useState("");
+
+  // ✅ 통합검색(keyword/focus) 감지
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const focus = router.query?.focus != null ? String(router.query.focus) : "";
+    const keyword =
+      router.query?.keyword != null ? String(router.query.keyword) : "";
+
+    const next = (focus || keyword).trim();
+    setRouterFocus(next);
+    setPageIndex(0);
+  }, [router.isReady, router.query?.focus, router.query?.keyword]);
 
   const fileRef = useRef(null);
 
@@ -57,12 +74,17 @@ export default function ProductRoutingPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  const clearSelection = () => {
+    setSelectedRow(null);
+    setDetailOpen(false);
+  };
+
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
 
-    getProductRoutings(token, query)
+    getProductRoutings(token, "")
       .then((json) => {
         if (!alive) return;
 
@@ -113,17 +135,32 @@ export default function ProductRoutingPage() {
     return () => {
       alive = false;
     };
-  }, [token, query]);
+  }, [token]);
+
+  // ✅ 통합검색(routerFocus) + 페이지검색(query) 합치기
+  const effectiveFilter = `${routerFocus} ${query}`.trim();
+
+  // ✅ 프론트 필터링
+  const filtered = useMemo(() => {
+    return filterRows(data, effectiveFilter, [
+      (r) => r?.id,
+      "name",
+      "productId",
+      "operationId",
+      "operationSeq",
+      "description",
+    ]);
+  }, [data, effectiveFilter]);
 
   // pagination calc
-  const totalRows = data.length;
+  const totalRows = filtered.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
   const pageRows = useMemo(() => {
     const safeIndex = Math.min(pageIndex, pageCount - 1);
     const start = safeIndex * pageSize;
-    return data.slice(start, start + pageSize);
-  }, [data, pageIndex, pageSize, pageCount]);
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, pageIndex, pageSize, pageCount]);
 
   // selection calc
   const selectedCount = selected.size;
@@ -214,6 +251,10 @@ export default function ProductRoutingPage() {
       if (!prev) return prev;
       return selected.has(prev._rid) ? null : prev;
     });
+
+    if (selectedRow && selected.has(selectedRow._rid)) {
+      setDetailOpen(false);
+    }
   };
 
   const saveHandle = () => {
@@ -222,7 +263,6 @@ export default function ProductRoutingPage() {
       return;
     }
 
-    // 백에 올릴 payload (내부용 _rid/flag 제거)
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
     postProductRoutings(payload, token)
@@ -279,6 +319,7 @@ export default function ProductRoutingPage() {
         setPageIndex(0);
         setSelected(new Set());
         setDirty(true);
+        setLoadError("");
       })
       .catch((err) => {
         console.error(err);
@@ -299,7 +340,7 @@ export default function ProductRoutingPage() {
           <ColGroup />
           <thead>
             <tr className="text-left text-[13px]">
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+              <th className="border-b border-slate-200  bg-gray-200  px-3 py-3">
                 <div className="flex justify-center">
                   <input
                     type="checkbox"
@@ -313,25 +354,26 @@ export default function ProductRoutingPage() {
                   />
                 </div>
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Name
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Product Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Operation Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white whitespace-nowrap">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900 whitespace-nowrap">
                 Seq
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Description
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Status
               </th>
             </tr>
@@ -348,9 +390,9 @@ export default function ProductRoutingPage() {
               const isUploaded = row.flag === "pre";
               const isNew = row.flag === "new";
               const rowBg = isUploaded
-                ? "bg-green-900/10"
+                ? "bg-green-800/10"
                 : isNew
-                  ? "bg-indigo-900/10"
+                  ? "bg-indigo-300/30"
                   : "";
 
               const isActive = selectedRow?._rid === row._rid;
@@ -364,6 +406,11 @@ export default function ProductRoutingPage() {
                     rowBg,
                   ].join(" ")}
                   onClick={() => {
+                    // ✅ 같은 행을 다시 클릭하면 선택 해제
+                    if (selectedRow?._rid === row._rid) {
+                      clearSelection();
+                      return;
+                    }
                     setSelectedRow(row);
                     setDetailOpen(true);
                   }}
@@ -507,9 +554,10 @@ export default function ProductRoutingPage() {
 
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="product-routing">
+      {/* ✅ 가로는 부모에서 스크롤, 세로는 내부에서만 */}
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 min-h-0">
-          {/* ===== 상단 카드 ===== */}
+          {/* ===== 상단 ===== */}
           <div>
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
@@ -523,43 +571,93 @@ export default function ProductRoutingPage() {
 
               <div className="w-[445px]">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  <input
-                    value={query}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setPageIndex(0);
-                    }}
-                    placeholder="검색 (Id/ProductId/OperationId/Description)"
+                  <div
                     className="
-                      h-10 w-full rounded-xl border
-                      pl-9 pr-9 text-[11px]
-                      outline-none transition
+                      group
+                      flex flex-nowrap items-center gap-2
+                      h-10
+                      rounded-xl
+                      border border-slate-200
+                      bg-white
+                      px-3
+                      overflow-hidden
+                      transition
                       hover:border-slate-300
-                      focus:ring-2 focus:ring-indigo-200
-                      placeholder:text-[10px]
-                      placeholder:text-slate-400
+                      focus-within:ring-2 focus-within:ring-indigo-200
                     "
-                  />
-                  {query ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuery("");
+                  >
+                    <Search className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 shrink-0" />
+
+                    <input
+                      value={query}
+                      onChange={(e) => {
+                        const v = e.target.value;
+
+                        // ✅ 페이지 검색 쓰면 통합검색 해제
+                        if (routerFocus) {
+                          setRouterFocus("");
+
+                          const next = { ...router.query };
+                          delete next.focus;
+                          delete next.keyword;
+
+                          router.replace(
+                            { pathname: router.pathname, query: next },
+                            undefined,
+                            { shallow: true },
+                          );
+                        }
+
+                        setQuery(v);
                         setPageIndex(0);
                       }}
                       className="
-                        absolute right-2 top-1/2 -translate-y-1/2
-                        h-7 w-7 rounded-lg
-                        text-slate-400 transition
-                        hover:bg-slate-100 hover:text-indigo-700
-                        active:bg-slate-200
+                        w-full min-w-0
+                        text-[11px]
+                        outline-none
+                        bg-transparent
+                        placeholder:text-slate-400
+                        placeholder:text-[10px]
                       "
-                      aria-label="clear"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
+                      placeholder="검색 (Id / ProductId / OperationId / Description)"
+                    />
+
+                    {(query || routerFocus) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery("");
+                          setPageIndex(0);
+
+                          if (routerFocus) {
+                            setRouterFocus("");
+
+                            const next = { ...router.query };
+                            delete next.focus;
+                            delete next.keyword;
+
+                            router.replace(
+                              { pathname: router.pathname, query: next },
+                              undefined,
+                              { shallow: true },
+                            );
+                          }
+                        }}
+                        className="
+                          shrink-0
+                          text-slate-400
+                          hover:text-indigo-600
+                          text-sm
+                          px-1
+                          transition
+                        "
+                        aria-label="clear"
+                        title="검색 초기화"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {loadError ? (
@@ -575,42 +673,42 @@ export default function ProductRoutingPage() {
               <div className="col-span-8 grid grid-cols-4 gap-3 items-stretch">
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       총 데이터
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">
+                  <div className="mt-1 text-3xl font-bold text-slate-900">
                     {totalRows.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       선택
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-indigo-700">
+                  <div className="mt-1 text-3xl font-bold text-indigo-700">
                     {selectedCount.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       변경 사항
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       dirty
                     </span>
                   </div>
-                  <div className="text-[18px] font-bold">
+                  <div className="text-[23px] font-bold">
                     {dirty ? (
                       <span className="text-indigo-600">작업 중</span>
                     ) : (
@@ -631,7 +729,7 @@ export default function ProductRoutingPage() {
                   "
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       전체 보기
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -639,7 +737,7 @@ export default function ProductRoutingPage() {
                     </span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
                       <Maximize2 className="h-4 w-4" />
                     </span>
@@ -659,7 +757,7 @@ export default function ProductRoutingPage() {
               <div className="col-span-4">
                 <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       작업
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -674,7 +772,7 @@ export default function ProductRoutingPage() {
                       disabled={selectedCount === 0}
                       className={[
                         "h-10 w-[96px] px-3",
-                        "text-[11px] font-semibold transition",
+                        "text-[12px] font-semibold transition",
                         "inline-flex items-center justify-center whitespace-nowrap",
                         selectedCount === 0
                           ? "text-slate-300 cursor-not-allowed"
@@ -689,7 +787,7 @@ export default function ProductRoutingPage() {
                       onClick={uploadHandle}
                       className={[
                         "h-10 w-[110px] px-3",
-                        "text-[11px] font-semibold text-slate-700",
+                        "text-[12px] font-semibold text-slate-700",
                         "inline-flex items-center justify-center gap-2",
                         "transition cursor-pointer whitespace-nowrap",
                       ].join(" ")}
@@ -756,16 +854,25 @@ export default function ProductRoutingPage() {
 
           {/* ===== 테이블 + 상세패널 + 페이지네이션 ===== */}
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4">
-              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
+            {/* ✅ 핵심: grid-cols-[1fr_auto] + 패널 1번만 + 바깥클릭 해제 */}
+            <div
+              className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4"
+              onMouseDown={() => clearSelection()}
+            >
+              <div
+                className="min-w-0 min-h-0 rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex flex-col"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 {renderTable()}
               </div>
 
-              <ProductRoutingDetailPanel
-                open={detailOpen}
-                row={selectedRow}
-                onToggle={() => setDetailOpen((v) => !v)}
-              />
+              <div className="min-h-0" onMouseDown={(e) => e.stopPropagation()}>
+                <ProductRoutingDetailPanel
+                  open={detailOpen}
+                  row={selectedRow}
+                  onToggle={() => setDetailOpen((v) => !v)}
+                />
+              </div>
             </div>
 
             {/* 페이지네이션 */}

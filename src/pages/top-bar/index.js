@@ -1,82 +1,15 @@
-import { Search, LogOut, ChevronDown, Bell } from "lucide-react";
+// src/components/topbar.js
+import { LogOut, ChevronDown, Bell } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { useAccount, useToken } from "@/stores/account-store";
 import { getNoticeNotifications } from "@/api/notice-api";
-import { searchDashboard } from "@/api/dashboard-api";
-
-/* =========================
- * SearchCard
- *  - ✅ 결과 없으면 카드 숨김
- * ========================= */
-function SearchCard({
-  title,
-  count,
-  items,
-  onMore,
-  onClickItem,
-  getId,
-  getTitle,
-  getSub,
-  hideWhenEmpty = true,
-}) {
-  const list = Array.isArray(items) ? items : [];
-  const top = list.slice(0, 6);
-  const c = Number(count ?? list.length ?? 0);
-
-  if (hideWhenEmpty && (c <= 0 || top.length === 0)) return null;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-        <div className="text-[12px] font-semibold text-slate-900">
-          {title}
-          <span className="ml-2 text-[11px] font-medium text-slate-400">
-            {c}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={onMore}
-          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
-        >
-          더보기
-        </button>
-      </div>
-
-      <div className="py-1">
-        {top.map((it, idx) => {
-          const id = getId?.(it);
-          const label = getTitle?.(it) ?? "(제목 없음)";
-          const sub = getSub?.(it);
-          const key = id != null ? `${title}-${id}` : `${title}-x-${idx}`;
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => id != null && onClickItem?.(id, it)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 transition"
-            >
-              <div className="text-[12px] text-slate-800 truncate">{label}</div>
-              {sub ? (
-                <div className="mt-0.5 text-[10px] text-slate-400 truncate">
-                  {sub}
-                </div>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+import TopBarSearch from "@/components/topbar-search";
 
 /* =========================
  * TopBar
- *  - ✅ 결과 있는 카드만 노출
- *  - ✅ 공지/알림 클릭 시 /notice?focus=ID 로 연결 (404 방지 + 모달 오픈 유도)
+ *  - ✅ 결과 있는 카드만 노출 (검색 컴포넌트 내부)
+ *  - ✅ 공지/알림 클릭 시 /notice?focus=ID 로 연결
  * ========================= */
 export default function TopBar() {
   const router = useRouter();
@@ -94,14 +27,6 @@ export default function TopBar() {
   // 유저 메뉴
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
-
-  // 검색
-  const searchWrapRef = useRef(null);
-  const [searchValue, setSearchValue] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const [searchResult, setSearchResult] = useState(null);
 
   // ====== 역할 ======
   const roleLabel =
@@ -123,13 +48,12 @@ export default function TopBar() {
   function logout() {
     setOpen(false);
     setAlarmOpen(false);
-    setSearchOpen(false);
     clearToken();
     clearAccount();
     router.push("/login");
   }
 
-  // ✅ 공지 ID 추출 (알림의 id는 "알림 id"일 수 있어서 절대 공지 id로 쓰지 않음)
+  // ✅ 공지 ID 추출 (알림의 id는 "알림 id"일 수 있으므로)
   function extractNoticeId(item) {
     const direct = item?.noticeId ?? item?.notice_id;
     if (direct != null && String(direct).trim() !== "") return String(direct);
@@ -162,7 +86,6 @@ export default function TopBar() {
     return `${mm}.${dd} ${hh}:${mi}`;
   }
 
-  // ====== 알림 로드 ======
   async function loadAlarm() {
     if (!token) return;
 
@@ -193,53 +116,6 @@ export default function TopBar() {
       console.error("알림 조회 실패:", e);
     }
   }
-
-  // ====== 통합 검색 실행 ======
-  async function runSearch(v) {
-    if (!token) return;
-
-    const kw = String(v || "").trim();
-    if (!kw) {
-      setSearchResult(null);
-      setSearchOpen(false);
-      setSearchError("");
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError("");
-    try {
-      const json = await searchDashboard(token, kw);
-      setSearchResult(json || {});
-      setSearchOpen(true);
-    } catch (e) {
-      console.error("검색 실패:", e);
-      setSearchError(e?.message || "검색 실패");
-      setSearchResult(null);
-      setSearchOpen(true);
-    } finally {
-      setSearchLoading(false);
-    }
-  }
-
-  // ✅ 입력 멈추면 자동 검색
-  useEffect(() => {
-    if (!token) return;
-    const kw = String(searchValue || "").trim();
-
-    const t = setTimeout(() => {
-      if (!kw) {
-        setSearchResult(null);
-        setSearchOpen(false);
-        setSearchError("");
-        return;
-      }
-      runSearch(kw);
-    }, 250);
-
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchValue, token]);
 
   // 최초 + 주기적 갱신 (알림)
   useEffect(() => {
@@ -273,211 +149,36 @@ export default function TopBar() {
     return () => window.removeEventListener("mousedown", onDown);
   }, [alarmOpen]);
 
-  // 바깥 클릭 닫기 (검색)
-  useEffect(() => {
-    function onDown(e) {
-      if (!searchOpen) return;
-      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target))
-        setSearchOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [searchOpen]);
-
   // ESC 닫기 (공통)
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") {
         setOpen(false);
         setAlarmOpen(false);
-        setSearchOpen(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ✅ 알림 클릭: 공지 상세 페이지가 없으므로 focus로 이동
   function onClickAlarmItem(item) {
     const noticeId = extractNoticeId(item);
+
     if (!noticeId) {
       console.warn("noticeId 추출 실패:", item);
       return;
     }
+
     setAlarmOpen(false);
-    router.push(`/notice?focus=${encodeURIComponent(String(noticeId))}`);
+
+    // ✅ 이렇게 변경
+    router.push(`/notice/${noticeId}`);
   }
 
-  // ====== 검색 결과 getter ======
-  const notices = searchResult?.notices?.noticeList ?? [];
-  const noticeTotal =
-    searchResult?.notices?.totalNoticeCount ??
-    searchResult?.notices?.totalCount ??
-    notices.length ??
-    0;
-
-  const communities = searchResult?.communities?.communityList ?? [];
-  const communityTotal =
-    searchResult?.communities?.totalCount ?? communities.length ?? 0;
-
-  const products = searchResult?.products?.productList ?? [];
-  const tasks = searchResult?.tasks?.taskList ?? [];
-  const operations = searchResult?.operations?.operationList ?? [];
-  const simulations = searchResult?.simulations?.simulationScheduleList ?? [];
-  const machines = searchResult?.machines?.machineList ?? [];
-  const members = searchResult?.members?.memberList ?? [];
-
-  // ✅ 라우팅 규칙:
-  // - 공지: /notice?focus=ID (상세 페이지 없음, 목록이 모달 열게)
-  // - 커뮤니티: /board/${id} (상세 페이지가 있을 때만)
-  // - 그 외: 일단 /xxx?focus=ID 로 (해당 페이지에서 focus 지원하면 연결됨)
-  const sections = [
-    {
-      key: "notice",
-      title: "공지사항",
-      count: noticeTotal,
-      items: notices,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/notice?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/notice?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.noticeId ?? x?.notice_id,
-      getTitle: (x) => x?.title ?? x?.noticeTitle ?? "(제목 없음)",
-      getSub: (x) =>
-        x?.createdAt || x?.date ? String(x?.createdAt || x?.date) : "",
-    },
-    {
-      key: "community",
-      title: "커뮤니티",
-      count: communityTotal,
-      items: communities,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/board?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/board/${id}`);
-      },
-      getId: (x) => x?.id ?? x?.communityId ?? x?.community_id,
-      getTitle: (x) => x?.title ?? x?.subject ?? "(제목 없음)",
-    },
-    {
-      key: "product",
-      title: "제품",
-      count: products.length,
-      items: products,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/product?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/product?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.productId ?? x?.product_id,
-      getTitle: (x) => x?.name ?? x?.productName ?? "(이름 없음)",
-    },
-    {
-      key: "task",
-      title: "작업(Task)",
-      count: tasks.length,
-      items: tasks,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/task?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/task?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.taskId ?? x?.task_id,
-      getTitle: (x) => x?.taskName ?? x?.name ?? x?.description ?? "(작업)",
-    },
-    {
-      key: "operation",
-      title: "오퍼레이션",
-      count: operations.length,
-      items: operations,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/operation?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/operation?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.operationId ?? x?.operation_id,
-      getTitle: (x) =>
-        x?.operationName ?? x?.name ?? x?.description ?? "(오퍼레이션)",
-    },
-    {
-      key: "simulation",
-      title: "시뮬레이션",
-      count: simulations.length,
-      items: simulations,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/simulation?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/simulation?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) =>
-        x?.id ??
-        x?.simulationId ??
-        x?.simulation_id ??
-        x?.simulationScheduleId ??
-        x?.simulation_schedule_id,
-      getTitle: (x) =>
-        x?.name ?? x?.title ?? x?.simulationName ?? "(시뮬레이션)",
-    },
-    {
-      key: "machine",
-      title: "머신",
-      count: machines.length,
-      items: machines,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/machine?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/machine?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.machineId ?? x?.machine_id,
-      getTitle: (x) => x?.machineName ?? x?.name ?? "(머신)",
-    },
-    {
-      key: "member",
-      title: "멤버",
-      count: members.length,
-      items: members,
-      onMore: () => {
-        setSearchOpen(false);
-        router.push(`/member?keyword=${encodeURIComponent(searchValue)}`);
-      },
-      onClick: (id) => {
-        setSearchOpen(false);
-        router.push(`/member?focus=${encodeURIComponent(String(id))}`);
-      },
-      getId: (x) => x?.id ?? x?.memberId ?? x?.member_id,
-      getTitle: (x) => x?.name ?? x?.memberName ?? "(멤버)",
-    },
-  ];
-
-  const visibleSections = sections.filter((s) => {
-    const list = Array.isArray(s.items) ? s.items : [];
-    const c = Number(s.count ?? list.length ?? 0);
-    return c > 0 && list.length > 0;
-  });
-
-  const hasAnyResult = visibleSections.length > 0;
+  function closeOthers() {
+    setOpen(false);
+    setAlarmOpen(false);
+  }
 
   return (
     <header
@@ -500,139 +201,8 @@ export default function TopBar() {
             />
           </div>
 
-          {/* 검색창 + 결과 */}
-          <div
-            className="relative flex-1 max-w-[520px] min-w-[240px]"
-            ref={searchWrapRef}
-          >
-            <div
-              className="
-                group
-                flex items-center gap-2
-                h-9
-                rounded-xl
-                border border-slate-200
-                bg-white
-                px-3
-                shadow-xs
-                focus-within:ring-2 focus-within:ring-indigo-500/30
-                focus-within:border-indigo-200
-                transition
-              "
-            >
-              <Search
-                className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 cursor-pointer"
-                onClick={() => runSearch(searchValue)}
-              />
-
-              <input
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                onFocus={() => {
-                  setOpen(false);
-                  setAlarmOpen(false);
-                  if (searchResult) setSearchOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") runSearch(searchValue);
-                  if (e.key === "Escape") setSearchOpen(false);
-                }}
-                className="
-                  w-full
-                  text-sm
-                  outline-none
-                  placeholder:text-slate-400
-                  placeholder:text-[12px]
-                  bg-transparent
-                "
-                placeholder="검색어를 입력하세요 (Enter)"
-              />
-
-              {searchLoading && (
-                <span className="text-[11px] text-slate-400">검색중…</span>
-              )}
-            </div>
-
-            {searchOpen && (
-              <div className="absolute left-0 mt-2 w-[720px] max-w-[85vw] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
-                {/* 헤더 */}
-                <div className="px-4 py-3 border-b border-slate-100 bg-white">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[13px] font-semibold text-slate-900">
-                      통합 검색
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSearchOpen(false)}
-                      className="text-[12px] text-slate-400 hover:text-slate-600"
-                    >
-                      닫기
-                    </button>
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-slate-400 truncate">
-                    키워드:{" "}
-                    <span className="text-slate-700 font-medium">
-                      {searchValue}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 바디 */}
-                <div className="max-h-[520px] overflow-y-auto">
-                  {searchError ? (
-                    <div className="px-4 py-10 text-center text-[12px] text-red-600">
-                      {searchError}
-                    </div>
-                  ) : !searchResult ? (
-                    <div className="px-4 py-10 text-center text-[12px] text-slate-400">
-                      검색 결과가 없습니다.
-                    </div>
-                  ) : !hasAnyResult ? (
-                    <div className="px-4 py-10 text-center text-[12px] text-slate-400">
-                      검색 결과가 없습니다.
-                    </div>
-                  ) : (
-                    <div className="p-3 grid grid-cols-2 gap-3">
-                      {visibleSections.map((s) => (
-                        <SearchCard
-                          key={s.key}
-                          title={s.title}
-                          count={s.count}
-                          items={s.items}
-                          onMore={s.onMore}
-                          onClickItem={(id, it) => s.onClick?.(id, it)}
-                          getId={s.getId}
-                          getTitle={s.getTitle}
-                          getSub={s.getSub}
-                          hideWhenEmpty={true}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 푸터 */}
-                <div className="px-4 py-3 border-t bg-white flex items-center justify-between">
-                  <div className="text-[11px] text-slate-400">
-                    Enter로 검색 · 항목 클릭으로 이동
-                  </div>
-                  <button
-                    type="button"
-                    className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700"
-                    onClick={() => {
-                      setSearchOpen(false);
-                      router.push(
-                        `/dashboard?keyword=${encodeURIComponent(searchValue)}`,
-                      );
-                    }}
-                  >
-                    전체 보기 →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* ✅ 검색은 분리 컴포넌트 */}
+          <TopBarSearch token={token} onCloseOthers={closeOthers} />
         </div>
 
         {/* 오른쪽: 알림 + 유저 메뉴 */}
@@ -655,7 +225,6 @@ export default function TopBar() {
                 "
                 onClick={() => {
                   setOpen(false);
-                  setSearchOpen(false);
                   setAlarmOpen((v) => {
                     const next = !v;
                     if (!v) loadAlarm();
@@ -690,7 +259,7 @@ export default function TopBar() {
                 <div
                   className="
                     absolute right-0 mt-2
-                    w-[360px]
+                    w-[330px]
                     rounded-2xl
                     border border-slate-200
                     bg-white
@@ -700,7 +269,7 @@ export default function TopBar() {
                 >
                   <div className="px-4 py-3 border-b bg-white">
                     <div className="flex items-center justify-between">
-                      <div className="text-[13px] font-semibold text-slate-900">
+                      <div className="text-[13px] font-medium text-slate-900">
                         알림
                       </div>
                       <span className="text-[11px] font-semibold text-slate-400">
@@ -814,7 +383,6 @@ export default function TopBar() {
                 type="button"
                 onClick={() => {
                   setAlarmOpen(false);
-                  setSearchOpen(false);
                   setOpen((v) => !v);
                 }}
                 className="
@@ -852,7 +420,7 @@ export default function TopBar() {
                 <div
                   className="
                     absolute right-0 mt-2 w-44
-                    rounded-2xl
+                    rounded-lg
                     border border-slate-200
                     bg-white
                     shadow-xl

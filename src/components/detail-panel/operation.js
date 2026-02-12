@@ -4,8 +4,8 @@ import { ChevronRight } from "lucide-react";
 function Field({ label, value }) {
   return (
     <div className="rounded-xl border bg-white p-3">
-      <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 text-[12px] font-bold text-slate-800 break-words">
+     <div className="text-[11px] font-medium text-slate-500">{label}</div>
+      <div className="mt-1 text-[13px] font-bold text-slate-800 break-words">
         {value == null || value === "" ? "-" : String(value)}
       </div>
     </div>
@@ -43,8 +43,8 @@ export default function OperationDetailPanel({ open, row, onToggle }) {
   return (
     <div className="hidden lg:flex h-full min-h-0">
       <div className="w-[360px] rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b bg-indigo-900 text-white flex items-center justify-between">
-          <div className="text-[13px] font-extrabold">상세 정보</div>
+        <div className="shrink-0 px-4 py-1.5 border-b bg-gray-200 text-indigo-900  flex items-center justify-between">
+          <div className="text-[13px] font-medium">상세 정보</div>
           <button
             type="button"
             onClick={onToggle}

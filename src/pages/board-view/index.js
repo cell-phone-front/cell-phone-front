@@ -406,37 +406,47 @@ export default function BoardView() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="글 상세보기">
-      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden">
-        <div className="w-full py-5 min-w-0">
-          {/* 상단 헤더 카드 */}
+      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-auto min-w-[1100px]">
+        <div className="w-full py-6 min-w-0">
+          {/* ===== 상단 헤더 카드 ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden w-full min-w-0">
-            <div className="px-6 py-5 border-b border-slate-100">
+            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60">
               <div className="flex items-start justify-between gap-4 min-w-0">
+                {/* Left */}
                 <div className="min-w-0">
                   <div className="flex items-start gap-4 min-w-0">
-                    <div className="h-13 w-13 rounded-xl bg-indigo-100 grid place-items-center shadow-sm shrink-0">
-                      <MessageSquareText className="w-7 h-7 text-indigo-600" />
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 grid place-items-center shadow-sm shrink-0">
+                      <MessageSquareText className="w-6 h-6 text-indigo-600" />
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 truncate">
+                        <h1 className="text-[22px] font-semibold tracking-tight text-slate-900 truncate">
                           {title || "글 상세보기"}
                         </h1>
                       </div>
 
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500 font-medium">
-                        <span>
-                          작성자:{" "}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500 font-medium">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-slate-400">작성자</span>
                           <span className="font-semibold text-slate-700">
                             {writer}
                           </span>
                         </span>
+
                         <span className="text-slate-300">•</span>
-                        <span>작성일: {fmtDate(createdAt)}</span>
+
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-slate-400">작성일</span>
+                          <span className="tabular-nums">
+                            {fmtDate(createdAt)}
+                          </span>
+                        </span>
+
                         <span className="text-slate-300">•</span>
-                        <span>
-                          댓글{" "}
+
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-slate-400">댓글</span>
                           <span className="font-semibold text-slate-700 tabular-nums">
                             {comments.length}
                           </span>
@@ -446,33 +456,34 @@ export default function BoardView() {
                   </div>
                 </div>
 
+                {/* Right actions */}
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={onBack}
                     className="
-                      h-9 px-4 rounded-lg border border-slate-200 bg-white
-                      text-sm font-semibold text-slate-700
-                      hover:bg-slate-50 active:bg-slate-100 transition
-                      inline-flex items-center gap-2
-                    "
+                    h-9 px-4 rounded-xl border border-slate-200 bg-white
+                    text-sm font-semibold text-slate-700
+                    hover:bg-slate-50 active:bg-slate-100 transition
+                    inline-flex items-center gap-2
+                  "
                   >
                     <ArrowLeft className="h-4 w-4" />
                     목록
                   </button>
 
-                  {/* ✅ 내 글만 수정 버튼 */}
                   {canEditRole && isMinePost && (
                     <button
                       type="button"
                       onClick={onEditPost}
                       className="
-                        h-9 px-4 rounded-lg
-                        bg-indigo-600 text-white border border-indigo-600
-                        hover:bg-indigo-700 active:bg-indigo-800 transition
-                        inline-flex items-center gap-2
-                        text-sm font-semibold
-                      "
+                      h-9 px-4 rounded-xl
+                      bg-indigo-600 text-white border border-indigo-600
+                      hover:bg-indigo-700 active:bg-indigo-800 transition
+                      inline-flex items-center gap-2
+                      text-sm font-semibold
+                      shadow-sm
+                    "
                       title="수정"
                     >
                       <Pencil className="h-4 w-4" />
@@ -489,7 +500,7 @@ export default function BoardView() {
                   <div className="text-sm text-slate-500">불러오는 중...</div>
                 ) : null}
                 {error ? (
-                  <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 flex items-start gap-2">
+                  <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                     <span className="break-words">{error}</span>
                   </div>
@@ -498,67 +509,96 @@ export default function BoardView() {
             )}
           </div>
 
-          {/* 본문 + 댓글 2단 */}
-          <div className="mt-5 grid grid-cols-1 lg:grid-cols-[5fr_5fr] gap-5 min-w-0">
-            {/* 본문 카드 */}
+          {/* ===== 본문 + 댓글 2단 ===== */}
+          <div className="mt-6 grid grid-cols-[5fr_5fr] gap-6 min-w-0">
+            {/* ===== 본문 카드 ===== */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-w-0">
-              <div className="px-6 py-4 border-slate-100 flex justify-between items-center">
-                <div className="text-[12px] font-black text-slate-700">
-                  내용
-                </div>
-                <div className="mt-1 text-[11px] text-slate-400">
-                  수정은 본인이 작성한 글만 가능합니다.
+              {/* 섹션 헤더 */}
+              <div className="px-6 py-4 border-b border-slate-100 bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-1.5 rounded-full bg-indigo-600" />
+                  <div>
+                    <div className="text-[12px] font-semibold text-slate-800">
+                      게시글
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-400">
+                      수정은 본인이 작성한 글만 가능합니다.
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="px-6 py-5">
-                <div
-                  className="
-                    rounded-xl border border-slate-200 bg-slate-50
-                    px-4 py-4
-                    text-[15px] text-slate-800
-                    whitespace-pre-wrap
-                    leading-relaxed
-                    h-[350px]
-                  "
-                >
-                  {content || (loading ? "" : "내용이 없습니다.")}
+              {/* 실제 글 영역 */}
+              <div className="px-6 py-6">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-6">
+                  {/* 제목 */}
+                  <div className="pb-4 border-b border-slate-200">
+                    <h2 className="text-[18px] font-semibold text-slate-900 leading-snug">
+                      {title || "제목이 없습니다."}
+                    </h2>
+                  </div>
+
+                  {/* 내용 */}
+                  <div className="pt-5">
+                    <div
+                      className="
+            text-[15px]
+            text-slate-700
+            whitespace-pre-wrap
+            leading-relaxed
+            min-h-[300px]
+          "
+                    >
+                      {content || (loading ? "" : "내용이 없습니다.")}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* 댓글 카드 */}
+            {/* ===== 댓글 카드 ===== */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-w-0">
-              <div className="px-6 py-4 border-slate-100">
+              {/* 섹션 헤더 */}
+              <div className="px-6 py-4 border-b border-slate-100 bg-white">
                 <div className="flex items-center justify-between">
-                  <div className="text-[12px] font-black text-slate-700">
-                    댓글
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-1.5 rounded-full bg-indigo-600" />
+                    <div>
+                      <div className="text-[12px] font-semibold  text-slate-800">
+                        댓글
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-slate-400">
+                        {comments.length}개
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] font-black text-slate-400 tabular-nums">
+
+                  <div className="text-[11px] font-semibold  text-slate-400 tabular-nums">
                     {comments.length}개
                   </div>
                 </div>
               </div>
 
-              <div className="px-6 py-4">
+              <div className="px-6 py-5">
+                {/* 리스트 영역 */}
                 <div
                   className="
-                    rounded-xl border border-slate-200 bg-slate-50
-                    max-h-[360px] overflow-y-auto
-                    p-3 space-y-2
-                  "
+                  rounded-2xl border border-slate-200 bg-slate-50
+                  max-h-[375px] overflow-y-auto
+                  p-3 space-y-2
+                "
                 >
                   {commentLoading ? (
-                    <div className="px-3 py-6 text-center text-sm text-slate-500">
+                    <div className="px-3 py-10 text-center text-sm text-slate-500">
                       댓글 불러오는 중...
                     </div>
                   ) : commentError ? (
-                    <div className="px-3 py-3 rounded-lg border border-rose-200 bg-rose-50 text-sm text-rose-700 flex items-start gap-2">
+                    <div className="px-3 py-3 rounded-xl border border-rose-200 bg-rose-50 text-sm text-rose-700 flex items-start gap-2">
                       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                       <span className="break-words">{commentError}</span>
                     </div>
                   ) : comments.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-sm text-slate-500">
+                    <div className="px-3 py-10 text-center text-sm text-slate-500">
                       댓글이 없습니다.
                     </div>
                   ) : (
@@ -568,7 +608,6 @@ export default function BoardView() {
                         c.memberId &&
                         String(c.memberId) === String(meId),
                       );
-
                       const editing = editingId === c.id;
 
                       const displayAuthor =
@@ -581,51 +620,35 @@ export default function BoardView() {
                         <div
                           key={`${c.id}-${idx}`}
                           className={[
-                            "rounded-lg bg-white border px-4 py-4",
+                            "rounded-2xl border bg-white px-4 py-4",
                             isMine
-                              ? "border-indigo-200 bg-indigo-50/40"
+                              ? "border-indigo-200 ring-1 ring-indigo-100"
                               : "border-slate-200",
                           ].join(" ")}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            {/* 왼쪽: 작성자/배지 */}
-                            <div className="min-w-0 flex items-center gap-2">
-                              <div
-                                className="
-        h-7 min-w-0 flex items-center
-        text-[12px] font-bold text-slate-800 truncate
-      "
-                                title={displayAuthor}
-                              >
-                                {displayAuthor}
-                              </div>
-
-                              {isMine ? (
-                                <span
-                                  className="
-          h-7 inline-flex items-center
-          text-[10px] font-extrabold
-          px-2 rounded-full
-          bg-indigo-100 text-indigo-700
-          border border-indigo-200
-          shrink-0
-        "
+                          <div className="flex items-start justify-between gap-3">
+                            {/* 작성자 */}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div
+                                  className="text-[12px] font-extrabold text-slate-800 truncate"
+                                  title={displayAuthor}
                                 >
-                                  내 댓글
-                                </span>
-                              ) : null}
+                                  {displayAuthor}
+                                </div>
+
+                                {isMine ? (
+                                  <span className="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                                    내 댓글
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
 
-                            {/* 오른쪽: 날짜 + 액션 */}
+                            {/* 날짜 + 액션 */}
                             <div className="flex items-center gap-2 shrink-0">
                               {c.createdAt ? (
-                                <div
-                                  className="
-          h-7 inline-flex items-center
-          text-[11px] text-slate-400 tabular-nums
-          px-1
-        "
-                                >
+                                <div className="text-[11px] text-slate-400 tabular-nums">
                                   {fmtDate(c.createdAt)}
                                 </div>
                               ) : null}
@@ -641,11 +664,11 @@ export default function BoardView() {
                                         type="button"
                                         onClick={() => saveEditComment(c)}
                                         className="
-                h-7 px-3 rounded-lg
-                bg-indigo-600 text-white
-                text-[12px] font-bold
-                hover:bg-indigo-700 active:bg-indigo-800 transition
-              "
+                                        h-8 px-3 rounded-xl
+                                        bg-indigo-600 text-white
+                                        text-[12px] font-semibold
+                                        hover:bg-indigo-700 active:bg-indigo-800 transition
+                                      "
                                       >
                                         저장
                                       </button>
@@ -653,11 +676,11 @@ export default function BoardView() {
                                         type="button"
                                         onClick={cancelEditComment}
                                         className="
-                h-7 px-3 rounded-lg
-                border border-slate-200 bg-white
-                text-[12px] font-bold text-slate-700
-                hover:bg-slate-50 active:bg-slate-100 transition
-              "
+                                        h-8 px-3 rounded-xl
+                                        border border-slate-200 bg-white
+                                        text-[12px] font-semibold text-slate-700
+                                        hover:bg-slate-50 active:bg-slate-100 transition
+                                      "
                                       >
                                         취소
                                       </button>
@@ -668,10 +691,9 @@ export default function BoardView() {
                                         type="button"
                                         onClick={() => startEditComment(c)}
                                         className="
-                h-7 w-7 grid place-items-center
-                rounded-lg
-                text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition
-              "
+                                        h-8 w-8 grid place-items-center rounded-xl
+                                        text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition
+                                      "
                                         title="댓글 수정"
                                       >
                                         <Pencil className="w-4 h-4" />
@@ -680,10 +702,9 @@ export default function BoardView() {
                                         type="button"
                                         onClick={() => removeComment(c)}
                                         className="
-                h-7 w-7 grid place-items-center
-                rounded-lg
-                text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition
-              "
+                                        h-8 w-8 grid place-items-center rounded-xl
+                                        text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition
+                                      "
                                         title="댓글 삭제"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -695,7 +716,7 @@ export default function BoardView() {
                             </div>
                           </div>
 
-                          <div className="mt-2">
+                          <div className="mt-3">
                             {editing ? (
                               <textarea
                                 value={editingValue}
@@ -703,16 +724,16 @@ export default function BoardView() {
                                   setEditingValue(e.target.value)
                                 }
                                 className="
-                                  w-full min-h-[72px] resize-none
-                                  rounded-xl border border-slate-200 bg-white
-                                  px-3 py-2 text-[12px] text-slate-900
-                                  outline-none transition
-                                  focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
-                                "
+                                w-full min-h-[84px] resize-none
+                                rounded-2xl border border-slate-200 bg-white
+                                px-4 py-3 text-[13px] text-slate-900
+                                outline-none transition
+                                focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                              "
                                 placeholder="댓글 내용을 수정하세요"
                               />
                             ) : (
-                              <div className="text-[14px] text-slate-700 whitespace-pre-wrap">
+                              <div className="text-[14px] text-slate-700 whitespace-pre-wrap leading-relaxed">
                                 {String(c.content || "")}
                               </div>
                             )}
@@ -723,46 +744,44 @@ export default function BoardView() {
                   )}
                 </div>
 
-                {/* 입력 */}
-                <div className="mt-3 flex items-start gap-2">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        onSubmitComment();
-                      }
-                    }}
-                    placeholder="댓글을 입력하세요 (Shift+Enter 줄바꿈)"
-                    rows={3}
-                    className="
-                      min-h-[40px] max-h-[120px] resize-none
-                      flex-1 rounded-xl border border-slate-200 bg-white
-                      px-3 py-2 text-[13px] text-slate-900
-                      outline-none transition
-                      focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
-                      placeholder:text-slate-400
+                {/* 입력 영역 */}
+                <div className="mt-4 rounded-2xl bg-white p-3">
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          onSubmitComment();
+                        }
+                      }}
+                      placeholder="댓글을 입력하세요 (Shift+Enter 줄바꿈)"
+                      rows={3}
+                      className="
+                      min-h-[40px] max-h-[96px] resize-none
+    flex-1 rounded-2xl border border-slate-200 bg-slate-50
+    px-4 py-2 text-[13px] text-slate-900
+    outline-none transition
+    focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+    placeholder:text-slate-400
                     "
-                  />
-                  <button
-                    type="button"
-                    onClick={onSubmitComment}
-                    disabled={!String(newComment || "").trim()}
-                    className={[
-                      "h-10 px-4 rounded-xl inline-flex items-center gap-2 text-[13px] font-extrabold transition shrink-0",
-                      String(newComment || "").trim()
-                        ? "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800"
-                        : "bg-slate-200 text-slate-500 cursor-not-allowed",
-                    ].join(" ")}
-                  >
-                    <Send className="w-4 h-4" />
-                    등록
-                  </button>
-                </div>
-
-                <div className="mt-2 text-[11px] text-slate-400">
-                  Enter로 등록, Shift+Enter로 줄바꿈됩니다.
+                    />
+                    <button
+                      type="button"
+                      onClick={onSubmitComment}
+                      disabled={!String(newComment || "").trim()}
+                      className={[
+                        "h-11 px-4 rounded-2xl inline-flex items-center gap-2 text-[13px] font-extrabold transition shrink-0 shadow-sm",
+                        String(newComment || "").trim()
+                          ? "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed",
+                      ].join(" ")}
+                    >
+                      <Send className="w-4 h-4" />
+                      등록
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

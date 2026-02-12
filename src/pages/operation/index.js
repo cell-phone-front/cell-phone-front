@@ -19,6 +19,9 @@ import {
 
 import OperationDetailPanel from "@/components/detail-panel/operation";
 import OperationFullModal from "@/components/table-modal/operation";
+import { useRouter } from "next/router";
+import { filterRows } from "@/lib/table-filter";
+import CellText from "@/components/table/cell-text";
 
 /* ===============================
    util
@@ -47,6 +50,23 @@ export default function OperationPage() {
 
   // search
   const [query, setQuery] = useState("");
+  const router = useRouter();
+
+  // 통합검색(라우터) 전용: 페이지 검색창(query)과 완전 분리
+  const [routerFocus, setRouterFocus] = useState("");
+  // /operation?focus=... 또는 /operation?keyword=... 를 routerFocus로만 반영
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const focus = router.query?.focus != null ? String(router.query.focus) : "";
+    const keyword =
+      router.query?.keyword != null ? String(router.query.keyword) : "";
+
+    const next = (focus || keyword).trim();
+
+    setRouterFocus(next);
+    setPageIndex(0);
+  }, [router.isReady, router.query?.focus, router.query?.keyword]);
 
   const fileRef = useRef(null);
 
@@ -56,13 +76,17 @@ export default function OperationPage() {
 
   // 전체보기 모달
   const [fullOpen, setFullOpen] = useState(false);
+  const clearSelection = () => {
+    setSelectedRow(null);
+    setDetailOpen(false);
+  };
 
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
 
-    getOperations(token, query)
+    getOperations(token, "")
       .then((json) => {
         if (!alive) return;
 
@@ -93,17 +117,27 @@ export default function OperationPage() {
     return () => {
       alive = false;
     };
-  }, [token, query]);
+  }, [token, ""]);
+  // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
+  const effectiveFilter = `${routerFocus} ${query}`.trim();
+
+  const filtered = useMemo(() => {
+    return filterRows(data, effectiveFilter, [
+      (r) => r?.id,
+      "name",
+      "description",
+    ]);
+  }, [data, effectiveFilter]);
 
   // pagination calc
-  const totalRows = data.length;
+  const totalRows = filtered.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
   const pageRows = useMemo(() => {
     const safeIndex = Math.min(pageIndex, pageCount - 1);
     const start = safeIndex * pageSize;
-    return data.slice(start, start + pageSize);
-  }, [data, pageIndex, pageSize, pageCount]);
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, pageIndex, pageSize, pageCount]);
 
   // selection
   const selectedCount = selected.size;
@@ -261,7 +295,7 @@ export default function OperationPage() {
           <ColGroup />
           <thead>
             <tr className="text-left text-[13px]">
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+              <th className="border-b border-slate-200 bg-gray-200  px-3 py-3">
                 <div className="flex justify-center">
                   <input
                     type="checkbox"
@@ -275,16 +309,16 @@ export default function OperationPage() {
                   />
                 </div>
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Name
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Description
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Status
               </th>
             </tr>
@@ -300,9 +334,9 @@ export default function OperationPage() {
               const isUploaded = row.flag === "pre";
               const isNew = row.flag === "new";
               const rowBg = isUploaded
-                ? "bg-green-900/10"
+                ? "bg-green-800/10"
                 : isNew
-                  ? "bg-indigo-900/10"
+                  ? "bg-indigo-300/30"
                   : "";
 
               const isActive = selectedRow?._rid === row._rid;
@@ -316,6 +350,11 @@ export default function OperationPage() {
                     rowBg,
                   ].join(" ")}
                   onClick={() => {
+                    // ✅ 같은 행을 다시 클릭하면 선택 해제
+                    if (selectedRow?._rid === row._rid) {
+                      clearSelection();
+                      return;
+                    }
                     setSelectedRow(row);
                     setDetailOpen(true);
                   }}
@@ -448,20 +487,33 @@ export default function OperationPage() {
                       placeholder:text-slate-400
                     "
                   />
-                  {query ? (
+                  {query || routerFocus ? (
                     <button
                       type="button"
                       onClick={() => {
+                        // ✅ 둘 다 초기화 → 표 전체 보이게
                         setQuery("");
+                        setRouterFocus("");
                         setPageIndex(0);
+
+                        // ✅ URL 쿼리도 제거
+                        const nextQuery = { ...router.query };
+                        delete nextQuery.focus;
+                        delete nextQuery.keyword;
+
+                        router.replace(
+                          { pathname: router.pathname, query: nextQuery },
+                          undefined,
+                          { shallow: true },
+                        );
                       }}
                       className="
-                        absolute right-2 top-1/2 -translate-y-1/2
-                        h-7 w-7 rounded-lg
-                        text-slate-400 transition
-                        hover:bg-slate-100 hover:text-indigo-700
-                        active:bg-slate-200
-                      "
+      absolute right-2 top-1/2 -translate-y-1/2
+      h-7 w-7 rounded-lg
+      text-slate-400 transition
+      hover:bg-slate-100 hover:text-indigo-700
+      active:bg-slate-200
+    "
                       aria-label="clear"
                     >
                       ✕
@@ -481,42 +533,42 @@ export default function OperationPage() {
               <div className="col-span-8 grid grid-cols-4 gap-3 items-stretch">
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       총 데이터
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">
+                  <div className="mt-1 text-3xl font-bold text-slate-900">
                     {totalRows.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       선택
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-indigo-700">
+                  <div className="mt-1 text-3xl font-bold text-indigo-700">
                     {selectedCount.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       변경 사항
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       dirty
                     </span>
                   </div>
-                  <div className="text-[18px] font-bold">
+                  <div className="text-[23px] font-bold">
                     {dirty ? (
                       <span className="text-indigo-600">작업 중</span>
                     ) : (
@@ -537,7 +589,7 @@ export default function OperationPage() {
                   "
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       전체 보기
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -545,7 +597,7 @@ export default function OperationPage() {
                     </span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
                       <Maximize2 className="h-4 w-4" />
                     </span>
@@ -564,7 +616,7 @@ export default function OperationPage() {
               <div className="col-span-4">
                 <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       작업
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -579,7 +631,7 @@ export default function OperationPage() {
                       disabled={selectedCount === 0}
                       className={[
                         "h-10 w-[96px] px-3",
-                        "text-[11px] font-semibold transition",
+                        "text-[12px] font-semibold transition",
                         "inline-flex items-center justify-center whitespace-nowrap",
                         selectedCount === 0
                           ? "text-slate-300 cursor-not-allowed"
@@ -594,7 +646,7 @@ export default function OperationPage() {
                       onClick={uploadHandle}
                       className={[
                         "h-10 w-[110px] px-3",
-                        "text-[11px] font-semibold text-slate-700",
+                        "text-[12px] font-semibold text-slate-700",
                         "inline-flex items-center justify-center gap-2",
                         "transition cursor-pointer whitespace-nowrap",
                       ].join(" ")}
@@ -660,17 +712,28 @@ export default function OperationPage() {
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4">
-              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
+            <div
+              className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4"
+              onMouseDown={() => {
+                // ✅ 바깥(빈 영역) 클릭 시 선택 해제
+                clearSelection();
+              }}
+            >
+              <div
+                className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col"
+                onMouseDown={(e) => e.stopPropagation()} // ✅ 테이블 영역 클릭은 해제 방지
+              >
                 {renderTable()}
               </div>
 
-              <OperationDetailPanel
-                open={detailOpen}
-                row={selectedRow}
-                onToggle={() => setDetailOpen((v) => !v)}
-                onEdit={updateCell}
-              />
+              <div onMouseDown={(e) => e.stopPropagation()}>
+                <OperationDetailPanel
+                  open={detailOpen}
+                  row={selectedRow}
+                  onToggle={() => setDetailOpen((v) => !v)}
+                  onEdit={updateCell}
+                />
+              </div>
             </div>
 
             {/* 페이지네이션 */}

@@ -7,12 +7,12 @@ import GanttHeaderRow from "./gantt-header-row";
 import GanttLeftPanel from "./gantt-left-panel";
 import GanttRightPanel from "./gantt-right-panel";
 
-import { buildTicks, ceilToStep, floorToStep, toMs } from "./gantt-utils";
+import { buildTicks, ceilToStep, floorToStep, toMs } from "./gantt-util";
 
 export default function GanttBoard({ groups = [] }) {
   // ====== CONFIG ======
   const stepMinutes = 60;
-  const colWidth = 120;
+  const colWidth = 110;
 
   // ✅ 요청: 표(행) 높이 더 크게
   const rowHeight = 62;

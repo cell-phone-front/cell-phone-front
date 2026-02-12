@@ -53,7 +53,7 @@ export default function NoticeModal({ open, onClose, notice, token }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="text-3xl font-black tracking-tight text-slate-900 break-words">
+                  <div className="text-[30px] font-semibold tracking-tight text-slate-900 break-words">
                     {notice?.title || "공지사항"}
                   </div>
 

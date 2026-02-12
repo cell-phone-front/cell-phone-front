@@ -2,6 +2,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
+import { useRouter } from "next/router";
 import {
   ArrowDownToLine,
   ChevronLeft,
@@ -10,8 +11,8 @@ import {
   Search,
   Maximize2,
 } from "lucide-react";
-import { getMachine, postMachine, parseMachineXLS } from "@/api/machine-api";
 
+import { getMachine, postMachine, parseMachineXLS } from "@/api/machine-api";
 import MachineDetailPanel from "@/components/detail-panel/machine";
 import MachineFullModal from "@/components/table-modal/machine";
 
@@ -28,8 +29,14 @@ function cryptoId() {
   }
 }
 
+function safeStr(v) {
+  return String(v ?? "").trim();
+}
+
 export default function MachinePage() {
   const token = useToken((s) => s.token);
+  const router = useRouter();
+  const fileRef = useRef(null);
 
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
@@ -40,34 +47,89 @@ export default function MachinePage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(10);
 
-  // search
+  // ✅ 서버 검색어는 query만 사용
   const [query, setQuery] = useState("");
-
-  const fileRef = useRef(null);
 
   // detail
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+
+  // full modal
   const [fullOpen, setFullOpen] = useState(false);
 
+  const clearSelection = () => {
+    setSelectedRow(null);
+    setDetailOpen(false);
+  };
+
+  /* =========================
+   * ✅ URL keyword → query 동기화
+   *  - 통합검색에서 /machine?keyword=... 로 들어오면 query에 반영
+   ========================= */
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const kw = safeStr(router.query?.keyword);
+    // ✅ URL에 keyword가 있고, 현재 query와 다르면 반영
+    if (kw && kw !== safeStr(query)) {
+      setQuery(kw);
+      setPageIndex(0);
+    }
+
+    // ✅ URL에 keyword가 없는데 query가 남아있는 경우까지 지우고 싶으면 아래 주석 해제
+    // if (!kw && safeStr(query)) {
+    //   setQuery("");
+    //   setPageIndex(0);
+    // }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query?.keyword]);
+
+  /* =========================
+   * ✅ 데이터 로드 (서버 검색은 query만)
+   ========================= */
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
+    const kw = safeStr(query);
 
-    getMachine(token, query)
+    getMachine(token, kw)
       .then((json) => {
         if (!alive) return;
 
-        const list = json.machineList || json.items || json.data || [];
-        const rows = (list || []).map((r) => ({
+        // ✅ 응답 파싱 넓게 (객체 1개면 배열로 감싸기)
+        const raw =
+          json?.machineList ??
+          json?.machines?.machineList ??
+          json?.machines ??
+          json?.machine?.machineList ??
+          json?.machineListResponse?.machineList ??
+          json?.result?.machineList ??
+          json?.items ??
+          json?.data ??
+          json?.machine ??
+          [];
+
+        const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+
+        const rows = list.map((r) => ({
           ...r,
           _rid: r._rid || cryptoId(),
           flag: r.flag ?? "saved",
-          id: r.id ?? "",
-          name: r.name ?? "",
-          koreanName: r.koreanName ?? r.korean_name ?? "",
-          description: r.description ?? r.desc ?? "",
+
+          id:
+            r.id ??
+            r.machineId ??
+            r.machine_id ??
+            r.machineID ??
+            r.machineNo ??
+            r.machine_no ??
+            "",
+
+          name: r.name ?? r.machineName ?? r.machine_name ?? r.machineNM ?? "",
+          koreanName:
+            r.koreanName ?? r.korean_name ?? r.machineKoreanName ?? "",
+          description: r.description ?? r.desc ?? r.machineDesc ?? "",
         }));
 
         setData(rows);
@@ -76,6 +138,7 @@ export default function MachinePage() {
         setLoadError("");
         setDirty(false);
 
+        // ✅ 결과 바뀌면 선택 초기화 (원하시면 유지로 바꿔드릴게요)
         setSelectedRow(null);
         setDetailOpen(false);
       })
@@ -89,7 +152,25 @@ export default function MachinePage() {
     };
   }, [token, query]);
 
-  // pagination calc
+  /* =========================
+   * ✅ focus로 들어오면 해당 row 자동 선택
+   * - focus는 "선택용" (검색어로 쓰지 않음)
+   ========================= */
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const focus = safeStr(router.query?.focus);
+    if (!focus) return;
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const found = data.find((r) => safeStr(r.id) === focus);
+    if (!found) return;
+
+    setSelectedRow(found);
+    setDetailOpen(true);
+  }, [router.isReady, router.query?.focus, data]);
+
+  // pagination
   const totalRows = data.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
@@ -99,7 +180,7 @@ export default function MachinePage() {
     return data.slice(start, start + pageSize);
   }, [data, pageIndex, pageSize, pageCount]);
 
-  // selection calc
+  // selection
   const selectedCount = selected.size;
 
   const isAllPageSelected =
@@ -228,8 +309,8 @@ export default function MachinePage() {
           ...r,
           _rid: cryptoId(),
           flag: "pre",
-          id: r.id ?? "",
-          name: r.name ?? "",
+          id: r.id ?? r.machineId ?? r.machine_id ?? "",
+          name: r.name ?? r.machineName ?? "",
           koreanName: r.koreanName ?? r.korean_name ?? "",
           description: r.description ?? r.desc ?? "",
         }));
@@ -258,7 +339,7 @@ export default function MachinePage() {
           <ColGroup />
           <thead>
             <tr className="text-left text-[13px]">
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3">
                 <div className="flex justify-center">
                   <input
                     type="checkbox"
@@ -272,20 +353,19 @@ export default function MachinePage() {
                   />
                 </div>
               </th>
-
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Name
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Korean Name
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Description
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200  bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Status
               </th>
             </tr>
@@ -301,10 +381,11 @@ export default function MachinePage() {
               const isUploaded = row.flag === "pre";
               const isNew = row.flag === "new";
               const rowBg = isUploaded
-                ? "bg-green-900/10"
+                ? "bg-green-800/10"
                 : isNew
-                  ? "bg-indigo-900/10"
+                  ? "bg-indigo-300/30"
                   : "";
+
               const isActive = selectedRow?._rid === row._rid;
 
               return (
@@ -316,6 +397,10 @@ export default function MachinePage() {
                     rowBg,
                   ].join(" ")}
                   onClick={() => {
+                    if (selectedRow?._rid === row._rid) {
+                      clearSelection();
+                      return;
+                    }
                     setSelectedRow(row);
                     setDetailOpen(true);
                   }}
@@ -429,6 +514,7 @@ export default function MachinePage() {
     <DashboardShell crumbTop="테이블" crumbCurrent="machine">
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 min-h-0">
+          {/* 상단 */}
           <div>
             <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
@@ -440,14 +526,29 @@ export default function MachinePage() {
                 </p>
               </div>
 
+              {/* 검색 */}
               <div className="w-[445px]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+
                   <input
                     value={query}
                     onChange={(e) => {
-                      setQuery(e.target.value);
+                      const v = e.target.value;
+                      setQuery(v);
                       setPageIndex(0);
+
+                      // ✅ URL keyword 동기화 + focus 제거(헷갈림 방지)
+                      const next = { ...router.query };
+                      if (safeStr(v)) next.keyword = safeStr(v);
+                      else delete next.keyword;
+                      delete next.focus;
+
+                      router.replace(
+                        { pathname: router.pathname, query: next },
+                        undefined,
+                        { shallow: true, scroll: false },
+                      );
                     }}
                     placeholder="검색 (ID/Name/KoreanName/Description)"
                     className="
@@ -460,12 +561,26 @@ export default function MachinePage() {
                       placeholder:text-slate-400
                     "
                   />
-                  {query ? (
+
+                  {safeStr(query) ? (
                     <button
                       type="button"
                       onClick={() => {
                         setQuery("");
                         setPageIndex(0);
+
+                        clearSelection();
+                        setSelected(new Set());
+
+                        const next = { ...router.query };
+                        delete next.keyword;
+                        delete next.focus;
+
+                        router.replace(
+                          { pathname: router.pathname, query: next },
+                          undefined,
+                          { shallow: true, scroll: false },
+                        );
                       }}
                       className="
                         absolute right-2 top-1/2 -translate-y-1/2
@@ -475,6 +590,7 @@ export default function MachinePage() {
                         active:bg-slate-200
                       "
                       aria-label="clear"
+                      title="검색 초기화"
                     >
                       ✕
                     </button>
@@ -489,46 +605,47 @@ export default function MachinePage() {
               </div>
             </div>
 
+            {/* 카드 + 작업패널 */}
             <div className="mt-5 grid grid-cols-12 gap-3">
               <div className="col-span-8 grid grid-cols-4 gap-3 items-stretch">
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       총 데이터
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">
+                  <div className="mt-1 text-3xl font-bold text-slate-900">
                     {totalRows.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       선택
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-indigo-700">
+                  <div className="mt-1 text-3xl font-bold text-indigo-700">
                     {selectedCount.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       변경 사항
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       dirty
                     </span>
                   </div>
-                  <div className="text-[18px] font-bold">
+                  <div className="text-[23px] font-bold">
                     {dirty ? (
                       <span className="text-indigo-600">작업 중</span>
                     ) : (
@@ -549,7 +666,7 @@ export default function MachinePage() {
                   "
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       전체 보기
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -557,7 +674,7 @@ export default function MachinePage() {
                     </span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
                       <Maximize2 className="h-4 w-4" />
                     </span>
@@ -576,7 +693,7 @@ export default function MachinePage() {
               <div className="col-span-4">
                 <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       작업
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -629,7 +746,7 @@ export default function MachinePage() {
                       className={[
                         "h-10 w-[120px] rounded-md px-4",
                         "border border-indigo-200 bg-white",
-                        "text-[11px] font-semibold text-indigo-600",
+                        "text-[12px] font-semibold text-indigo-600",
                         "transition hover:bg-indigo-800 hover:text-white",
                         "focus:outline-none focus:ring-1 focus:ring-indigo-800",
                         "whitespace-nowrap cursor-pointer",
@@ -645,7 +762,7 @@ export default function MachinePage() {
                       className={[
                         "h-10 w-[120px] rounded-md px-4",
                         "flex items-center gap-2 justify-center",
-                        "text-[11px] font-semibold transition-all duration-200",
+                        "text-[12px] font-semibold transition-all duration-200",
                         "focus:outline-none whitespace-nowrap",
                         dirty
                           ? [
@@ -671,17 +788,26 @@ export default function MachinePage() {
             </div>
           </div>
 
+          {/* 테이블 + 상세패널 */}
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4">
-              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
+            <div
+              className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4"
+              onMouseDown={() => clearSelection()}
+            >
+              <div
+                className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 {renderTable()}
               </div>
 
-              <MachineDetailPanel
-                open={detailOpen}
-                row={selectedRow}
-                onToggle={() => setDetailOpen((v) => !v)}
-              />
+              <div onMouseDown={(e) => e.stopPropagation()}>
+                <MachineDetailPanel
+                  open={detailOpen}
+                  row={selectedRow}
+                  onToggle={() => setDetailOpen((v) => !v)}
+                />
+              </div>
             </div>
 
             {/* 페이지네이션 */}

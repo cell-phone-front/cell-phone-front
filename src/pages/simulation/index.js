@@ -66,7 +66,7 @@ function StatusPill({ status, clickable, onClick }) {
         disabled={!clickable}
         className={[
           "inline-flex items-center gap-1.5 min-w-[86px] justify-center",
-          "text-[10px] px-2 py-1 rounded-full border font-medium",
+          "text-[11px] px-2 py-1 rounded-full border font-medium",
           "transition",
           clickable
             ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
@@ -120,7 +120,7 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
 
   return (
     <div className="relative rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
-      <div className="text-[10px] font-medium text-slate-500">{label}</div>
+      <div className="text-[11px] font-medium text-slate-500">{label}</div>
 
       {icon ? (
         <div className="absolute right-4 top-4 h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
@@ -138,7 +138,7 @@ function StatCard({ label, value, sub, tone = "slate", icon }) {
       </div>
 
       {sub ? (
-        <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
+        <div className="mt-0.5 text-[11px] leading-tight text-slate-500">
           {sub}
         </div>
       ) : null}
@@ -150,9 +150,9 @@ function Field({ label, value, mono, right, pill }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[10px] font-medium text-slate-500">{label}</div>
+        <div className="text-[11px] font-medium text-slate-500">{label}</div>
         {right ? (
-          <div className="text-[10px] text-slate-400">{right}</div>
+          <div className="text-[11px] text-slate-400">{right}</div>
         ) : null}
       </div>
 
@@ -610,7 +610,7 @@ export default function SimulationPage() {
           </div>
 
           {/* ===== KPI + 작업 패널 (반응형 제거: 고정 12컬럼) ===== */}
-          <div className="mt-5 grid grid-cols-12 gap-4">
+          <div className="mt-5 grid grid-cols-12 gap-4 text-[11px]">
             <div className="col-span-8 grid grid-cols-3 gap-4">
               <StatCard
                 label="총 데이터"
@@ -638,7 +638,7 @@ export default function SimulationPage() {
             <div className="col-span-4">
               <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="text-[10px] font-medium text-slate-500">
+                  <div className="text-[11px] font-medium text-slate-500">
                     작업
                   </div>
                   <span className="items-center text-[10px] text-slate-400">
@@ -809,7 +809,7 @@ export default function SimulationPage() {
                               <div className="font-mono text-[11px] text-slate-700 truncate">
                                 {r.id}
                               </div>
-                              <div className="text-[10px] text-slate-500 truncate">
+                              <div className="text-[11px] text-slate-500 truncate">
                                 {r.memberName || "-"}
                               </div>
                             </td>
@@ -822,7 +822,7 @@ export default function SimulationPage() {
                                 {r.title}
                               </div>
                               <div
-                                className="text-[10px] text-slate-500 truncate"
+                                className="text-[11px] text-slate-500 truncate"
                                 title={r.description || ""}
                               >
                                 {r.description || "-"}
@@ -861,12 +861,12 @@ export default function SimulationPage() {
             {/* ===== 상세 패널 (고정폭) ===== */}
             <div className="w-[445px] shrink-0 min-h-0">
               <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col h-full">
-                <div className="shrink-0 px-4 py-4 bg-white">
+                <div className="shrink-0 px-4 mt-2 bg-white">
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-[13px] font-semibold text-slate-900">
                       상세 정보
                     </div>
-                    <div className="text-[10px] font-semibold text-slate-400">
+                    <div className="text-[11px] font-semibold text-slate-400">
                       {activeRow?.id ? `#${activeRow.id}` : ""}
                     </div>
                   </div>

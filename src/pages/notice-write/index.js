@@ -237,7 +237,7 @@ export default function NoticeWrite() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent={pageTitle}>
-      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden">
+      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden px-5">
         <div className="w-full py-5 min-w-0">
           {/* 상단 헤더 카드 */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden w-full min-w-0">
@@ -358,7 +358,7 @@ export default function NoticeWrite() {
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="공지사항 내용을 입력하세요"
                   className="
-                    h-[150px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3
+                    h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3
                     text-sm text-slate-900
                     outline-none transition
                     hover:border-slate-300
@@ -371,7 +371,7 @@ export default function NoticeWrite() {
               </div>
 
               {/* 첨부파일 */}
-              <div className="mt-1">
+              <div className="mt-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-9 w-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
@@ -382,21 +382,25 @@ export default function NoticeWrite() {
                         첨부파일
                       </div>
                       <div className="text-[11px] text-slate-400 truncate">
-                        새 파일을 추가하거나 기존 파일을 제거할 수 있습니다.
+                        새 파일 추가 및 기존 파일 제거를 한 곳에서 관리합니다.
                       </div>
                     </div>
                   </div>
+
                   <div className="flex items-center gap-3">
                     <div className="text-[12px] font-semibold text-slate-700">
-                      {fileCountLabel}
+                      {files.length > 0
+                        ? `${files.length}개 선택됨`
+                        : "파일 선택"}
                     </div>
+
                     <label
                       className="
-                      h-9 px-4 rounded-lg border border-slate-200 bg-white
-                      text-sm font-semibold text-slate-700
-                      hover:bg-slate-50 active:bg-slate-100 transition
-                      cursor-pointer inline-flex items-center gap-2 shrink-0
-                    "
+          h-9 px-4 rounded-lg border border-slate-200 bg-white
+          text-sm font-semibold text-slate-700
+          hover:bg-slate-50 active:bg-slate-100 transition
+          cursor-pointer inline-flex items-center gap-2 shrink-0
+        "
                     >
                       <Upload className="h-4 w-4" />
                       파일 선택
@@ -412,95 +416,144 @@ export default function NoticeWrite() {
                   </div>
                 </div>
 
+                {/* ✅ 통합 리스트(한 번만 스크롤) */}
                 <div
                   className="
-    mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 min-w-0
-    max-h-[130px] overflow-y-auto pr-1
-  "
+      mt-2 rounded-xl border border-slate-200 bg-slate-50
+      px-4 py-3 min-w-0
+      max-h-[220px] overflow-y-auto pr-1
+    "
                 >
-                  {files.length > 0 ? (
-                    <div className="mt- grid grid-cols-1 md:grid-cols-5 gap-2">
-                      {files.map((f) => (
-                        <div
-                          key={f.name + String(f.size)}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 min-w-0"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-[12px] font-semibold text-slate-800 truncate">
-                              {f.name}
-                            </div>
-                            <div className="text-[11px] text-slate-400 tabular-nums">
-                              {(f.size / 1024).toFixed(1)} KB
-                            </div>
+                  {/* 섹션이 완전히 비었을 때 */}
+                  {files.length === 0 && existingFiles.length === 0 ? (
+                    <div className="py-6 text-center text-[12px] text-slate-500">
+                      첨부된 파일이 없습니다. 우측 상단에서 파일을 선택해
+                      추가하세요.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* ✅ 새로 선택한 파일 */}
+                      {files.length > 0 ? (
+                        <div>
+                          <div className="mb-2 text-[11px] font-black text-slate-600">
+                            새로 추가할 파일
                           </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFiles((prev) => prev.filter((x) => x !== f))
-                            }
-                            className="h-8 w-8 rounded-lg grid place-items-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0"
-                            title="제거"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                            {files.map((f) => (
+                              <div
+                                key={f.name + String(f.size)}
+                                className="
+                    flex items-center justify-between gap-2
+                    rounded-lg bg-white border border-slate-200
+                    px-3 py-2 min-w-0
+                  "
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className="text-[12px] font-semibold text-slate-800 truncate"
+                                    title={f.name}
+                                  >
+                                    {f.name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 tabular-nums">
+                                    {(f.size / 1024).toFixed(1)} KB
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setFiles((prev) =>
+                                      prev.filter((x) => x !== f),
+                                    )
+                                  }
+                                  className="
+                      h-8 w-8 rounded-lg grid place-items-center
+                      text-slate-400 hover:text-rose-600 hover:bg-rose-50
+                      transition shrink-0
+                    "
+                                  title="제거"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                      ) : null}
 
-                {existingFiles.length > 0 ? (
-                  <div className="mt-3 min-w-0">
-                    <div className="text-[12px] font-black text-slate-700">
-                      기존 첨부파일
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-5 gap-2">
-                      {existingFiles.map((f) => {
-                        const key = f.id ?? f.url ?? f.name;
-                        return (
-                          <div
-                            key={key}
-                            className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 min-w-0"
-                          >
-                            <a
-                              href={f.url ?? "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="min-w-0 text-[12px] font-semibold text-indigo-700 hover:underline truncate"
-                              title={f.name}
-                            >
-                              {f.name}
-                            </a>
+                      {/* ✅ 기존 첨부파일 */}
+                      {existingFiles.length > 0 ? (
+                        <div>
+                          <div className="mb-2 flex items-center gap-3">
+                            <div className="text-[11px] font-black text-slate-600">
+                              기존 첨부파일
+                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setExistingFiles((prev) =>
-                                  prev.filter(
-                                    (x) => (x.id ?? x.url) !== (f.id ?? f.url),
-                                  ),
-                                );
-                                setRemovedAttachments((prev) =>
-                                  prev.concat(f.id ?? f.url),
-                                );
-                              }}
-                              className="h-8 px-3 rounded-lg border border-rose-200 bg-white text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition shrink-0"
-                              title="화면에서 제거"
-                            >
-                              제거
-                            </button>
+                            {removedAttachments.length > 0 && (
+                              <div className="text-[11px] text-slate-400">
+                                제거 표시: {removedAttachments.length}개
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
 
-                    {removedAttachments.length > 0 ? (
-                      <div className="mt-2 text-[11px] text-slate-400">
-                        제거 표시: {removedAttachments.length}개
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                            {existingFiles.map((f) => {
+                              const key = f.id ?? f.url ?? f.name;
+
+                              return (
+                                <div
+                                  key={key}
+                                  className="
+                      flex items-center justify-between gap-2
+                      rounded-lg bg-white border border-slate-200
+                      px-3 py-2 min-w-0
+                    "
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div
+                                      className="text-[12px] font-semibold text-slate-800 truncate"
+                                      title={f.name}
+                                    >
+                                      {f.name}
+                                    </div>
+                                    <div className="text-[11px] text-slate-400">
+                                      기존 파일
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExistingFiles((prev) =>
+                                        prev.filter(
+                                          (x) =>
+                                            (x.id ?? x.url) !== (f.id ?? f.url),
+                                        ),
+                                      );
+                                      setRemovedAttachments((prev) =>
+                                        prev.concat(f.id ?? f.url),
+                                      );
+                                    }}
+                                    className="
+                        h-8 w-8 rounded-lg grid place-items-center
+                        text-slate-400 hover:text-rose-600 hover:bg-rose-50
+                        transition shrink-0
+                      "
+                                    title="제거"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -510,7 +563,7 @@ export default function NoticeWrite() {
                 onClick={onCancel}
                 className="
                   h-10 px-5 rounded-xl border border-slate-200 bg-white
-                  text-sm font-black text-slate-700
+                  text-sm font-semibold text-slate-700
                   hover:bg-slate-50 active:bg-slate-100 transition
                 "
               >
@@ -521,7 +574,7 @@ export default function NoticeWrite() {
                 type="submit"
                 disabled={saving || !isValid || loading}
                 className={[
-                  "h-10 px-5 rounded-xl text-sm font-black transition inline-flex items-center gap-2",
+                  "h-10 px-5 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2",
                   saving || !isValid || loading
                     ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 cursor-pointer",

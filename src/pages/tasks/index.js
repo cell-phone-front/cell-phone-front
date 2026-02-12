@@ -2,6 +2,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
+import { useRouter } from "next/router";
 import {
   ArrowDownToLine,
   ChevronLeft,
@@ -11,9 +12,11 @@ import {
   Maximize2,
 } from "lucide-react";
 
+import { filterRows } from "@/lib/table-filter";
 import { getTasks, parseTaskXLS, postTasks } from "@/api/task-api";
-import TaskDetailPanel from "@/components/detail-panel/tasks";
+
 import TaskFullModal from "@/components/table-modal/tasks";
+import TaskDetailPanel from "@/components/detail-panel/tasks";
 
 /* ===============================
    util
@@ -28,46 +31,14 @@ function cryptoId() {
   }
 }
 
-function isNumericString(v) {
-  return typeof v === "string" && v.trim() !== "" && !isNaN(Number(v));
-}
-
-function normalizeTaskList(payload, flag) {
-  const list =
-    payload?.taskList ||
-    payload?.tasks ||
-    payload?.items ||
-    payload?.data ||
-    [];
-
-  return (list || []).map((t) => {
-    const operationId = t.operationId ?? t.operation?.id ?? "";
-    const machineId = t.machineId ?? t.machine?.id ?? "";
-
-    let duration = t.duration ?? 0;
-    let description = t.description ?? "";
-
-    if ((!duration || Number(duration) === 0) && isNumericString(description)) {
-      duration = Number(description);
-      description = "";
-    }
-
-    return {
-      ...t,
-      _rid: t._rid || cryptoId(),
-      flag: t.flag ?? flag,
-      id: t.id ?? "",
-      operationId,
-      machineId,
-      name: t.name ?? "",
-      duration: Number(duration) || 0,
-      description,
-    };
-  });
+function getTaskId(r) {
+  return r?.id ?? r?.taskId ?? r?.task_id ?? "";
 }
 
 export default function TasksPage() {
   const token = useToken((s) => s.token);
+  const router = useRouter();
+  const fileRef = useRef(null);
 
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
@@ -78,59 +49,114 @@ export default function TasksPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(10);
 
-  // search
-  const [query, setQuery] = useState("");
+  // ✅ keyword 기반: URL keyword / inputQuery 분리
+  const [routerKeyword, setRouterKeyword] = useState("");
+  const [inputQuery, setInputQuery] = useState("");
 
-  const fileRef = useRef(null);
-
-  // 전체보기 모달
-  const [fullOpen, setFullOpen] = useState(false);
-
-  // detail
+  // ✅ 상세
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  const clearSelection = () => {
+    setSelectedRow(null);
+    setDetailOpen(false);
+  };
+
+  // ✅ 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
+
+  // ✅ router keyword/focus 반영
+  const [focusId, setFocusId] = useState("");
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const kw =
+      router.query?.keyword != null ? String(router.query.keyword).trim() : "";
+    const f =
+      router.query?.focus != null ? String(router.query.focus).trim() : "";
+
+    setRouterKeyword(kw);
+    setInputQuery(kw); // ✅ 검색창에 표시
+    setFocusId(f);
+    setPageIndex(0);
+  }, [router.isReady, router.query?.keyword, router.query?.focus]);
+
+  // ✅ 데이터 로드 (서버는 전체 가져오고 프론트에서 필터링)
   useEffect(() => {
     if (!token) return;
-
     let alive = true;
 
-    const t = setTimeout(() => {
-      getTasks(token, query)
-        .then((json) => {
-          if (!alive) return;
+    getTasks(token, "")
+      .then((json) => {
+        if (!alive) return;
 
-          const rows = normalizeTaskList(json, "saved");
-          setData(rows);
-          setSelected(new Set());
-          setPageIndex(0);
-          setDirty(false);
-          setLoadError("");
+        const list =
+          json?.taskList || json?.tasks || json?.items || json?.data || [];
+        const rows = (list || []).map((r) => ({
+          ...r,
+          _rid: r?._rid || cryptoId(),
+          flag: r?.flag ?? "saved",
 
-          setSelectedRow(null);
-          setDetailOpen(false);
-        })
-        .catch((err) => {
-          console.error(err);
-          setLoadError(err?.message || "Tasks 불러오기 실패");
-        });
-    }, 250);
+          id: r?.id ?? r?.taskId ?? r?.task_id ?? "",
+          operationId: r?.operationId ?? r?.operation_id ?? "",
+          machineId: r?.machineId ?? r?.machine_id ?? "",
+          name: r?.name ?? r?.taskName ?? "",
+          description: r?.description ?? r?.desc ?? "",
+          duration: r?.duration ?? r?.time ?? "",
+        }));
+
+        setData(rows);
+        setSelected(new Set());
+        setPageIndex(0);
+        setLoadError("");
+        setDirty(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoadError(err?.message || "Tasks 불러오기 실패");
+      });
 
     return () => {
       alive = false;
-      clearTimeout(t);
     };
-  }, [token, query]);
+  }, [token]);
+
+  // ✅ focus가 있으면 해당 row 선택 + 상세 열기 (데이터 로드 후)
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!focusId) return;
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const found = data.find((r) => String(getTaskId(r)) === String(focusId));
+    if (!found) return;
+
+    setSelectedRow(found);
+    setDetailOpen(true);
+  }, [router.isReady, focusId, data]);
+
+  // ✅ keyword + inputQuery 합치기
+  const effectiveFilter = `${routerKeyword} ${inputQuery}`.trim();
+
+  const filtered = useMemo(() => {
+    return filterRows(data, effectiveFilter, [
+      (r) => r?.id,
+      "operationId",
+      "machineId",
+      "name",
+      "description",
+      "duration",
+    ]);
+  }, [data, effectiveFilter]);
 
   // pagination calc
-  const totalRows = data.length;
+  const totalRows = filtered.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
   const pageRows = useMemo(() => {
     const safeIndex = Math.min(pageIndex, pageCount - 1);
     const start = safeIndex * pageSize;
-    return data.slice(start, start + pageSize);
-  }, [data, pageIndex, pageSize, pageCount]);
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, pageIndex, pageSize, pageCount]);
 
   // selection calc
   const selectedCount = selected.size;
@@ -163,31 +189,23 @@ export default function TasksPage() {
 
   const updateCell = (rowRid, key, value) => {
     setData((prev) =>
-      prev.map((r) => {
-        if (r._rid !== rowRid) return r;
-        if (key === "duration") return { ...r, duration: Number(value) || 0 };
-        return { ...r, [key]: value };
-      }),
+      prev.map((r) => (r._rid === rowRid ? { ...r, [key]: value } : r)),
     );
     setDirty(true);
 
     setSelectedRow((prev) =>
-      prev && prev._rid === rowRid
-        ? key === "duration"
-          ? { ...prev, duration: Number(value) || 0 }
-          : { ...prev, [key]: value }
-        : prev,
+      prev && prev._rid === rowRid ? { ...prev, [key]: value } : prev,
     );
   };
 
-  // ✅ COLS: product-routing 처럼 퍼센트 기반(가로 스크롤은 바깥에서)
+  // ✅ width 합계 100%로 맞춤 (table-fixed에서 중요)
   const COLS = [
-    { key: "check", w: "6%" },
-    { key: "id", w: "14%" },
-    { key: "operationId", w: "16%" },
-    { key: "machineId", w: "16%" },
-    { key: "name", w: "16%" },
-    { key: "description", w: "20%" },
+    { key: "check", w: "5%" },
+    { key: "id", w: "12%" },
+    { key: "operationId", w: "14%" },
+    { key: "machineId", w: "14%" },
+    { key: "name", w: "15%" },
+    { key: "description", w: "22%" },
     { key: "duration", w: "8%" },
     { key: "status", w: "10%" },
   ];
@@ -201,20 +219,20 @@ export default function TasksPage() {
   );
 
   const addRow = () => {
-    const row = {
+    const newRow = {
       _rid: cryptoId(),
       flag: "new",
       id: "",
       operationId: "",
       machineId: "",
       name: "",
-      duration: 0,
       description: "",
+      duration: "",
     };
 
-    setData((prev) => [row, ...prev]);
-    setSelected(new Set());
+    setData((prev) => [newRow, ...prev]);
     setPageIndex(0);
+    setSelected(new Set());
     setDirty(true);
   };
 
@@ -236,6 +254,25 @@ export default function TasksPage() {
     }
   };
 
+  const saveHandle = () => {
+    if (!token) {
+      window.alert("토큰이 없어서 저장할 수 없어요. 다시 로그인 해주세요.");
+      return;
+    }
+
+    const payload = data.map(({ _rid, flag, ...rest }) => rest);
+
+    postTasks(payload, token)
+      .then(() => {
+        window.alert("저장 완료");
+        setDirty(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        window.alert(err?.message || "저장 실패");
+      });
+  };
+
   const uploadHandle = () => {
     if (!token) {
       window.alert("토큰이 없어서 업로드할 수 없어요. 다시 로그인 해주세요.");
@@ -250,7 +287,21 @@ export default function TasksPage() {
 
     parseTaskXLS(file, token)
       .then((json) => {
-        const items = normalizeTaskList(json, "pre");
+        const list =
+          json?.taskList || json?.tasks || json?.items || json?.data || [];
+
+        const items = (list || []).map((r) => ({
+          ...r,
+          _rid: cryptoId(),
+          flag: "pre",
+          id: r?.id ?? r?.taskId ?? r?.task_id ?? "",
+          operationId: r?.operationId ?? r?.operation_id ?? "",
+          machineId: r?.machineId ?? r?.machine_id ?? "",
+          name: r?.name ?? r?.taskName ?? "",
+          description: r?.description ?? r?.desc ?? "",
+          duration: r?.duration ?? r?.time ?? "",
+        }));
+
         setData((prev) => [...items, ...prev]);
         setPageIndex(0);
         setSelected(new Set());
@@ -259,37 +310,10 @@ export default function TasksPage() {
       })
       .catch((err) => {
         console.error(err);
-        setLoadError(err?.message || "엑셀 파싱 실패");
+        window.alert(err?.message || "엑셀 파싱 실패");
       });
 
     e.target.value = "";
-  };
-
-  const saveHandle = () => {
-    if (!token) {
-      window.alert("토큰이 없어서 저장할 수 없어요. 다시 로그인 해주세요.");
-      return;
-    }
-
-    const payload = data.map((r) => {
-      const { _rid, operation, machine, flag, ...rest } = r;
-      return {
-        ...rest,
-        operationId: r.operationId,
-        machineId: r.machineId,
-        duration: Number(r.duration) || 0,
-      };
-    });
-
-    postTasks(payload, token)
-      .then((ok) => {
-        window.alert(ok ? "저장 완료" : "저장 실패");
-        if (ok) setDirty(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoadError(err?.message || "저장 실패");
-      });
   };
 
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
@@ -297,12 +321,13 @@ export default function TasksPage() {
 
   const renderTable = () => (
     <div className="h-full flex flex-col min-h-0">
+      {/* 헤더 */}
       <div className="shrink-0">
         <table className="w-full table-fixed border-collapse">
           <ColGroup />
           <thead>
             <tr className="text-left text-[13px]">
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
+              <th className="border-b border-slate-200 bg-gray-200  px-3 py-3">
                 <div className="flex justify-center">
                   <input
                     type="checkbox"
@@ -317,25 +342,25 @@ export default function TasksPage() {
                 </div>
               </th>
 
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Task Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Operation Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Machine Id
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Name
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Description
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white text-right">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900 whitespace-nowrap">
                 Duration
               </th>
-              <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-semibold text-white">
+              <th className="border-b border-slate-200 bg-gray-200 px-3 py-3 font-medium text-indigo-900">
                 Status
               </th>
             </tr>
@@ -343,6 +368,7 @@ export default function TasksPage() {
         </table>
       </div>
 
+      {/* 바디 */}
       <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
         <table className="w-full table-fixed border-collapse">
           <ColGroup />
@@ -351,32 +377,33 @@ export default function TasksPage() {
               const isUploaded = row.flag === "pre";
               const isNew = row.flag === "new";
               const rowBg = isUploaded
-                ? "bg-green-900/10"
+                ? "bg-green-800/10"
                 : isNew
-                  ? "bg-indigo-900/10"
+                  ? "bg-indigo-300/30"
                   : "";
-              const isActive = selectedRow?._rid === row._rid;
 
-              const tdBase = "border-b border-slate-100";
-              const tdState = isActive
-                ? "bg-gray-200"
-                : "bg-transparent group-hover:bg-gray-200";
+              const isActive = selectedRow?._rid === row._rid;
 
               return (
                 <tr
                   key={row._rid}
                   className={[
-                    "cursor-pointer transition-colors group",
+                    "transition-colors cursor-pointer",
+                    isActive ? "bg-gray-200" : "hover:bg-gray-200",
                     rowBg,
                   ].join(" ")}
                   onClick={() => {
+                    if (selectedRow?._rid === row._rid) {
+                      clearSelection();
+                      return;
+                    }
                     setSelectedRow(row);
                     setDetailOpen(true);
                   }}
                 >
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <div
-                      className="flex items-center justify-center"
+                      className="flex justify-center"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -388,7 +415,7 @@ export default function TasksPage() {
                     </div>
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
                       value={row.id ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -400,7 +427,7 @@ export default function TasksPage() {
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
                       value={row.operationId ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -412,7 +439,7 @@ export default function TasksPage() {
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
                       value={row.machineId ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -424,7 +451,7 @@ export default function TasksPage() {
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
                       value={row.name ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -436,7 +463,7 @@ export default function TasksPage() {
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
                       value={row.description ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -448,25 +475,25 @@ export default function TasksPage() {
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <input
-                      value={String(row.duration ?? 0)}
+                      value={row.duration ?? ""}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) =>
                         updateCell(row._rid, "duration", e.target.value)
                       }
-                      className="h-9 w-full rounded-xl border px-3 bg-white text-[13px] outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200 text-right"
-                      placeholder="0"
+                      className="h-9 w-full rounded-xl border px-3 bg-white text-[13px] outline-none transition hover:border-slate-300 focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Duration"
                     />
                   </td>
 
-                  <td className={[tdBase, tdState, "px-3 py-2"].join(" ")}>
+                  <td className="border-b border-slate-100 px-3 py-2">
                     <div className="flex items-center">
-                      {isUploaded ? (
+                      {row.flag === "pre" ? (
                         <span className="inline-flex justify-center min-w-[62px] text-[9px] px-2 py-1 rounded-full bg-green-700 text-white border border-green-200 font-semibold">
                           Imported
                         </span>
-                      ) : isNew ? (
+                      ) : row.flag === "new" ? (
                         <span className="inline-flex justify-center min-w-[62px] text-[9px] px-2 py-1 rounded-full bg-indigo-600 text-white border border-indigo-200 font-semibold">
                           New
                         </span>
@@ -518,45 +545,81 @@ export default function TasksPage() {
                 </p>
               </div>
 
+              {/* 검색 */}
               <div className="w-[445px]">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  <input
-                    value={query}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setPageIndex(0);
-                    }}
-                    placeholder="검색 (Task/Operation/Machine/Name/Description)"
+                  <div
                     className="
-                      h-10 w-full rounded-xl border
-                      pl-9 pr-9 text-[11px]
-                      outline-none transition
+                      group flex flex-nowrap items-center gap-2
+                      h-10 rounded-xl border border-slate-200
+                      px-3 overflow-hidden transition
                       hover:border-slate-300
-                      focus:ring-2 focus:ring-indigo-200
-                      placeholder:text-[10px]
-                      placeholder:text-slate-400
+                      focus-within:ring-2 focus-within:ring-indigo-200
                     "
-                  />
-                  {query ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuery("");
+                  >
+                    <Search className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 shrink-0" />
+                    <input
+                      value={inputQuery}
+                      onChange={(e) => {
+                        const v = e.target.value;
+
+                        // ✅ 사용자가 타이핑 시작하면 URL keyword/focus 제거 + routerKeyword 해제
+                        if (
+                          routerKeyword ||
+                          router.query?.keyword ||
+                          router.query?.focus
+                        ) {
+                          setRouterKeyword("");
+
+                          const next = { ...router.query };
+                          delete next.keyword;
+                          delete next.focus;
+
+                          router.replace(
+                            { pathname: router.pathname, query: next },
+                            undefined,
+                            { shallow: true, scroll: false },
+                          );
+                        }
+
+                        setInputQuery(v);
                         setPageIndex(0);
                       }}
                       className="
-                        absolute right-2 top-1/2 -translate-y-1/2
-                        h-7 w-7 rounded-lg
-                        text-slate-400 transition
-                        hover:bg-slate-100 hover:text-indigo-700
-                        active:bg-slate-200
+                        w-full min-w-0 text-[11px] outline-none bg-transparent
+                        placeholder:text-slate-400 placeholder:text-[10px]
                       "
-                      aria-label="clear"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
+                      placeholder="검색 (Task/Operation/Machine/Name/Description)"
+                    />
+
+                    {(inputQuery || routerKeyword) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputQuery("");
+                          setRouterKeyword("");
+                          setPageIndex(0);
+                          setSelected(new Set());
+                          clearSelection();
+
+                          const next = { ...router.query };
+                          delete next.keyword;
+                          delete next.focus;
+
+                          router.replace(
+                            { pathname: router.pathname, query: next },
+                            undefined,
+                            { shallow: true, scroll: false },
+                          );
+                        }}
+                        className="shrink-0 text-slate-400 hover:text-indigo-600 text-sm px-1 transition"
+                        aria-label="clear"
+                        title="검색 초기화"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {loadError ? (
@@ -567,46 +630,47 @@ export default function TasksPage() {
               </div>
             </div>
 
+            {/* 카드 + 작업패널 */}
             <div className="mt-5 grid grid-cols-12 gap-3">
               <div className="col-span-8 grid grid-cols-4 gap-3 items-stretch">
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       총 데이터
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">
+                  <div className="mt-1 text-3xl font-bold text-slate-900">
                     {totalRows.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       선택
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       rows
                     </span>
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-indigo-700">
+                  <div className="mt-1 text-3xl font-bold text-indigo-700">
                     {selectedCount.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="h-full rounded-2xl border bg-white p-4 shadow-sm ring-black/5 flex flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       변경 사항
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
                       dirty
                     </span>
                   </div>
-                  <div className="text-[18px] font-bold">
+                  <div className="text-[23px] font-bold">
                     {dirty ? (
                       <span className="text-indigo-600">작업 중</span>
                     ) : (
@@ -627,7 +691,7 @@ export default function TasksPage() {
                   "
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       전체 보기
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -635,7 +699,7 @@ export default function TasksPage() {
                     </span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900 text-white">
                       <Maximize2 className="h-4 w-4" />
                     </span>
@@ -654,7 +718,7 @@ export default function TasksPage() {
               <div className="col-span-4">
                 <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[10px] font-semibold text-slate-500">
+                    <div className="text-[11px] font-semibold text-slate-500">
                       작업
                     </div>
                     <span className="items-center text-[10px] text-slate-400">
@@ -669,7 +733,7 @@ export default function TasksPage() {
                       disabled={selectedCount === 0}
                       className={[
                         "h-10 w-[96px] px-3",
-                        "text-[11px] font-semibold transition",
+                        "text-[12px] font-semibold transition",
                         "inline-flex items-center justify-center whitespace-nowrap",
                         selectedCount === 0
                           ? "text-slate-300 cursor-not-allowed"
@@ -684,7 +748,7 @@ export default function TasksPage() {
                       onClick={uploadHandle}
                       className={[
                         "h-10 w-[110px] px-3",
-                        "text-[11px] font-semibold text-slate-700",
+                        "text-[12px] font-semibold text-slate-700",
                         "inline-flex items-center justify-center gap-2",
                         "transition cursor-pointer whitespace-nowrap",
                       ].join(" ")}
@@ -749,20 +813,28 @@ export default function TasksPage() {
             </div>
           </div>
 
+          {/* 테이블 + 상세패널 + 페이지네이션 */}
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4">
-              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
+            <div
+              className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4"
+              onMouseDown={() => clearSelection()}
+            >
+              <div
+                className="min-w-0 min-h-0 rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex flex-col"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 {renderTable()}
               </div>
 
-              <TaskDetailPanel
-                open={detailOpen}
-                row={selectedRow}
-                onToggle={() => setDetailOpen((v) => !v)}
-              />
+              <div className="min-h-0" onMouseDown={(e) => e.stopPropagation()}>
+                <TaskDetailPanel
+                  open={detailOpen}
+                  row={selectedRow}
+                  onToggle={() => setDetailOpen((v) => !v)}
+                />
+              </div>
             </div>
 
-            {/* 페이지네이션 */}
             <div className="shrink-0 flex items-center justify-end px-1 py-9 pt-3">
               <button
                 type="button"
