@@ -21,6 +21,9 @@ import { buildGroupsByMachine } from "@/components/gantt/gantt-groups-machine";
 // ✅ aiSummary modal
 import AiSummaryModal from "@/components/simulation/AiSummaryModal";
 
+/* ===============================
+  util
+=============================== */
 function cx(...arr) {
   return arr.filter(Boolean).join(" ");
 }
@@ -31,6 +34,79 @@ function ensureKST(isoLike) {
   const s = String(isoLike).trim();
   const hasTZ = /[zZ]$/.test(s) || /[+-]\d{2}:\d{2}$/.test(s);
   return hasTZ ? s : `${s}+09:00`;
+}
+
+function StatCard({ label, value, sub, tone = "slate", icon }) {
+  const toneMap = {
+    slate: "text-slate-900",
+    indigo: "text-indigo-700",
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+  };
+
+  return (
+    <div className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-black/5">
+      <div className="text-[10px] font-medium text-slate-500">{label}</div>
+
+      {icon ? (
+        <div className="absolute right-4 top-4 h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+          {icon}
+        </div>
+      ) : null}
+
+      <div
+        className={cx(
+          "mt-1 text-[22px] font-semibold leading-tight",
+          toneMap[tone] || toneMap.slate,
+        )}
+      >
+        {value}
+      </div>
+
+      {sub ? (
+        <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SegTab({ value, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "flex-1 px-6 py-2 rounded-full text-[11px] font-semibold transition text-center whitespace-nowrap",
+        active
+          ? "bg-indigo-600 text-white shadow-sm"
+          : "bg-white text-slate-600 hover:bg-slate-100",
+      )}
+    >
+      {value}
+    </button>
+  );
+}
+
+function TopActionButton({ onClick, children, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cx(
+        "h-10 rounded-full px-4",
+        "inline-flex items-center justify-center gap-2",
+        "text-[11px] font-semibold transition",
+        disabled
+          ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+          : "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50",
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function SimulationGanttPage() {
@@ -67,9 +143,7 @@ export default function SimulationGanttPage() {
   }, [token, id]);
 
   /**
-   * ✅ 핵심: 간트가 계산에 쓰는 시간 필드를 Date로 보장
-   * - start/end/startTime/endTime을 문자열로 두면 (end-start) 계산이 깨져서 바가 1~2px로 나올 수 있습니다.
-   * - 그래서 여기서 Date 객체로 확정해 둡니다.
+   *  간트가 계산에 쓰는 시간 필드를 Date로 보장
    */
   const ganttList = useMemo(() => {
     const list = Array.isArray(scheduleList) ? scheduleList : [];
@@ -87,12 +161,8 @@ export default function SimulationGanttPage() {
 
         return {
           ...s,
-
-          // 원본 문자열은 유지 (디버깅/표시용)
           startAt: startRaw ?? s?.startAt,
           endAt: endRaw ?? s?.endAt,
-
-          // ✅ 간트 계산용은 Date로
           start: startDate,
           end: endDate,
           startTime: startDate,
@@ -108,17 +178,14 @@ export default function SimulationGanttPage() {
       });
   }, [scheduleList]);
 
-  // ✅ 3단 groups
   const productGroups = useMemo(() => {
     return buildGroupsByProductOperation(ganttList);
   }, [ganttList]);
 
-  // ✅ 2단 groups
   const machineGroups = useMemo(() => {
     return buildGroupsByMachine(ganttList);
   }, [ganttList]);
 
-  // ✅ 상단 요약 (Total / Products / Machines)
   const summary = useMemo(() => {
     const list = Array.isArray(scheduleList) ? scheduleList : [];
     const products = new Set();
@@ -140,15 +207,16 @@ export default function SimulationGanttPage() {
     return String(aiSummary || "").trim() ? 1 : 0;
   }, [aiSummary]);
 
+  // ===== Loading / Error (UI만 예쁘게) =====
   if (loading) {
     return (
-      <DashboardShell>
-        <div className="p-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-[13px] font-extrabold text-slate-800">
+      <DashboardShell crumbTop="시뮬레이션" crumbCurrent="gantt">
+        <div className="px-4 pt-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ring-black/5">
+            <div className="text-[13px] font-semibold text-slate-800">
               로딩 중...
             </div>
-            <div className="mt-2 text-[12px] font-semibold text-slate-500">
+            <div className="mt-2 text-[12px] text-slate-500">
               시뮬레이션 스케줄을 불러오고 있습니다.
             </div>
           </div>
@@ -159,154 +227,220 @@ export default function SimulationGanttPage() {
 
   if (err) {
     return (
-      <DashboardShell>
-        <div className="p-6">
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
-            <div className="text-[13px] font-extrabold text-red-700">{err}</div>
-            <button
-              type="button"
-              onClick={fetchData}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 border border-red-200 hover:bg-red-50"
-            >
-              <RefreshCw className="h-4 w-4" />
-              다시 시도
-            </button>
+      <DashboardShell crumbTop="시뮬레이션" crumbCurrent="gantt">
+        <div className="px-4 pt-4">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm ring-black/5">
+            <div className="text-[13px] font-semibold text-rose-700">{err}</div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={fetchData}
+                className="
+                  h-10 rounded-full px-4
+                  inline-flex items-center gap-2
+                  border border-rose-200 bg-white
+                  text-[12px] font-semibold text-slate-800
+                  hover:bg-rose-50 transition
+                "
+              >
+                <RefreshCw className="h-4 w-4" />
+                다시 시도
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/simulation")}
+                className="
+                  h-10 rounded-full px-4
+                  inline-flex items-center gap-2
+                  border border-slate-200 bg-white
+                  text-[12px] font-semibold text-slate-700
+                  hover:bg-slate-50 transition
+                "
+              >
+                목록으로
+              </button>
+            </div>
           </div>
         </div>
       </DashboardShell>
     );
   }
 
+  const showGroups = tab === "PRODUCT" ? productGroups : machineGroups;
+  const hasGroups = Array.isArray(showGroups) && showGroups.length > 0;
+
   return (
-    <DashboardShell>
+    <DashboardShell crumbTop="시뮬레이션" crumbCurrent="gantt">
+      {/* 스크롤/높이 */}
       <div className="p-3 h-[calc(100vh-120px)] min-h-0 flex flex-col gap-3">
-        {/* ===== 상단 헤더 (슬림 바) ===== */}
-        <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* 왼쪽 */}
-            <div className="flex items-center gap-4 min-w-0">
-              {/* 아이콘 */}
-              <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                {tab === "PRODUCT" ? (
-                  <Boxes className="h-5 w-5" />
-                ) : (
-                  <Cpu className="h-5 w-5" />
-                )}
-              </div>
-
-              {/* 타이틀 */}
-              <div className="min-w-0">
-                <div className="text-[14px] font-bold text-slate-900 truncate">
-                  시뮬레이션 간트
-                  <span className="ml-2 text-[12px] text-slate-400">#{id}</span>
+        {/* ===== 상단 타이틀 ===== */}
+        <div className="shrink-0">
+          <div className="flex items-end justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                  {tab === "PRODUCT" ? (
+                    <Boxes className="h-5 w-5" />
+                  ) : (
+                    <Cpu className="h-5 w-5" />
+                  )}
                 </div>
 
-                <div className="text-[11px] text-slate-500">
-                  {tab === "PRODUCT"
-                    ? "Product → Operation → Task"
-                    : "Machine → Task"}
+                <div className="min-w-0">
+                  <h2 className="text-[26px] font-semibold tracking-tight text-slate-900 leading-tight">
+                    시뮬레이션 간트
+                    <span className="ml-2 text-[12px] text-slate-400">
+                      #{id}
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    {tab === "PRODUCT"
+                      ? "Product → Operation → Task"
+                      : "Machine → Task"}
+                  </p>
                 </div>
               </div>
-
-              {/* 탭 */}
-              <div className="ml-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                <button
-                  onClick={() => setTab("PRODUCT")}
-                  className={cx(
-                    "px-5 py-1.5 rounded-md text-[11px] font-semibold",
-                    tab === "PRODUCT"
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-600 hover:bg-white",
-                  )}
-                >
-                  Product
-                </button>
-
-                <button
-                  onClick={() => setTab("MACHINE")}
-                  className={cx(
-                    "px-5 py-1.5 rounded-md text-[11px] font-semibold",
-                    tab === "MACHINE"
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-600 hover:bg-white",
-                  )}
-                >
-                  Machine
-                </button>
-              </div>
-              {/* AI */}
-              <button
-                onClick={() => setAiOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-[11px] font-semibold hover:bg-slate-50"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                AI Summary
-                {aiBadgeCount > 0 && (
-                  <span className="ml-1 rounded bg-indigo-100 px-1.5 text-indigo-700">
-                    {aiBadgeCount}
-                  </span>
-                )}
-              </button>
             </div>
 
-            {/* 오른쪽 */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* 요약 */}
-              <div className="hidden sm:flex items-center gap-2 text-[12px] font-semibold text-slate-600">
-                <span>
-                  Tasks{" "}
-                  <span className="font-bold text-slate-900">
-                    {summary.total}
-                  </span>
-                </span>
-
-                <span className="text-slate-300">|</span>
-
-                <span>
-                  Products{" "}
-                  <span className="font-bold text-slate-900">
-                    {summary.productCount}
-                  </span>
-                </span>
-
-                <span className="text-slate-300">|</span>
-
-                <span>
-                  Machines{" "}
-                  <span className="font-bold text-slate-900">
-                    {summary.machineCount}
-                  </span>
-                </span>
-              </div>
-
-              {/* 새로고침 */}
-              <button
-                onClick={fetchData}
-                className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold hover:bg-slate-50"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
+              <TopActionButton onClick={fetchData}>
+                <RefreshCw className="h-4 w-4" />
                 새로고침
+              </TopActionButton>
+
+              <button
+                type="button"
+                onClick={() => setAiOpen(true)}
+                className="
+                  h-10 rounded-full px-4
+                  inline-flex items-center justify-center gap-2
+                  bg-indigo-900 text-white
+                  text-[11px] font-semibold
+                  transition hover:bg-indigo-800 active:bg-indigo-950
+                  active:scale-[0.98]
+                  focus:outline-none focus:ring-2 focus:ring-indigo-300
+                "
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Summary
+                {aiBadgeCount > 0 ? (
+                  <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px]">
+                    {aiBadgeCount}
+                  </span>
+                ) : null}
               </button>
+            </div>
+          </div>
+
+          {/* ===== KPI + 보기모드 ===== */}
+
+          <div className="mt-4 grid grid-cols-12 gap-3">
+            <div className="col-span-12 xl:col-span-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="text-[10px] font-medium text-slate-500">
+                    보기 모드
+                  </div>
+                  <span className="items-center text-[10px] text-slate-400">
+                    view
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-full border border-slate-200 bg-slate-50 p-1">
+                  <SegTab
+                    value="Product"
+                    active={tab === "PRODUCT"}
+                    onClick={() => setTab("PRODUCT")}
+                  />
+                  <SegTab
+                    value="Machine"
+                    active={tab === "MACHINE"}
+                    onClick={() => setTab("MACHINE")}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="col-span-12 xl:col-span-8 grid grid-cols-3 gap-3">
+              <StatCard
+                label="총 작업(Task)"
+                value={summary.total.toLocaleString()}
+                sub="scheduleList 기준"
+                tone="slate"
+                icon={<span className="text-[10px] font-semibold">T</span>}
+              />
+              <StatCard
+                label="제품(Product)"
+                value={summary.productCount.toLocaleString()}
+                sub="중복 제거"
+                tone="indigo"
+                icon={<Boxes className="h-4 w-4" />}
+              />
+              <StatCard
+                label="기계(Machine)"
+                value={summary.machineCount.toLocaleString()}
+                sub="중복 제거"
+                tone="slate"
+                icon={<Cpu className="h-4 w-4" />}
+              />
             </div>
           </div>
         </div>
 
-        {/* ===== 보드 카드 ===== */}
+        {/* ===== 보드 카드 (스크롤/높이 그대로) ===== */}
         <div className="flex-1 min-h-0 rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
           <div className="h-full min-h-0 p-2">
-            {tab === "PRODUCT" ? (
-              productGroups.length ? (
+            {hasGroups ? (
+              tab === "PRODUCT" ? (
                 <GanttBoard groups={productGroups} />
               ) : (
-                <div className="h-full grid place-items-center text-sm text-slate-400">
-                  표시할 그룹이 없습니다. (시간 필드/파싱 확인)
-                </div>
+                <GanttBoardMachine groups={machineGroups} />
               )
-            ) : machineGroups.length ? (
-              <GanttBoardMachine groups={machineGroups} />
             ) : (
-              <div className="h-full grid place-items-center text-sm text-slate-400">
-                표시할 그룹이 없습니다. (시간 필드/파싱 확인)
+              <div className="h-full grid place-items-center px-6">
+                <div className="w-full max-w-[520px] rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+                  <div className="text-[13px] font-semibold text-indigo-700">
+                    표시할 그룹이 없습니다.
+                  </div>
+                  <div className="mt-2 text-[12px] text-slate-500 leading-5">
+                    시간 필드 파싱 결과가 유효하지 않거나(시작/끝),
+                    <br />
+                    1분 미만 작업은 필터링되어 제외될 수 있습니다.
+                  </div>
+
+                  <div className="mt-4 flex justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={fetchData}
+                      className="
+                        h-10 rounded-full px-4
+                        inline-flex items-center gap-2
+                        border border-slate-200 bg-white
+                        text-[12px] font-semibold text-slate-700
+                        hover:bg-slate-50 transition
+                      "
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      새로고침
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => router.push("/simulation")}
+                      className="
+                        h-10 rounded-full px-4
+                        inline-flex items-center gap-2
+                        bg-indigo-900 text-white
+                        text-[12px] font-semibold
+                        hover:bg-indigo-800 active:bg-indigo-950 transition
+                        active:scale-[0.98]
+                      "
+                    >
+                      목록으로
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

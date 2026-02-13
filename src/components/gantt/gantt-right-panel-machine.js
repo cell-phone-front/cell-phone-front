@@ -1,8 +1,17 @@
-// src/components/gantt-test/gantt-right-panel-machine.js
+// src/components/gantt-right-panel-machine.js
 "use client";
 
 import React from "react";
 import { calcBar } from "./gantt-utils";
+
+function toHM(v) {
+  if (!v) return "";
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
 
 export default function GanttRightPanelMachine({
   groups = [],
@@ -22,18 +31,16 @@ export default function GanttRightPanelMachine({
   rightXRef,
   onRightScrollX,
 }) {
-  const vLineCount = Math.floor(gridWidthPx / colWidth) + 1;
-
   return (
     <div className="flex-1 min-w-0 min-h-0 bg-white">
-      {/* ✅ 오른쪽이 “세로 스크롤 유일” */}
+      {/*  세로 스크롤” */}
       <div
         ref={rightYRef}
         onScroll={onRightScrollY}
         className="h-full min-h-0 overflow-y-auto overflow-x-hidden"
         style={{ paddingBottom: bottomScrollHeight }}
       >
-        {/* ✅ 내부 가로 이동은 가능하지만, 스크롤바는 숨김 */}
+        {/*  */}
         <div
           ref={rightXRef}
           onScroll={onRightScrollX}
@@ -43,7 +50,7 @@ export default function GanttRightPanelMachine({
             msOverflowStyle: "none",
           }}
         >
-          {/* 크롬 스크롤바 숨김 */}
+          {/* 크롬 스크롤바 숨김 (이 컴포넌트 안 div들에만 적용) */}
           <style jsx>{`
             div::-webkit-scrollbar {
               height: 0px;
@@ -74,37 +81,75 @@ export default function GanttRightPanelMachine({
                         gridWidthPx,
                       });
 
+                      const startHM = toHM(t.startAt);
+                      const endHM = toHM(t.endAt);
+
                       return (
                         <div
                           key={t.id}
                           className="relative border-t border-slate-100"
                           style={{ height: rowHeight }}
                         >
-                          {/* grid 세로선 */}
-                          {Array.from({ length: vLineCount }).map((_, i) => (
+                          {/* 바 */}
+                          {width > 0 && (
                             <div
-                              key={i}
-                              className="absolute top-0 bottom-0 w-px bg-slate-100"
-                              style={{ left: i * colWidth }}
-                            />
-                          ))}
+                              className={[
+                                "group", // ✅ hover 그룹
+                                "absolute top-1/2 -translate-y-1/2",
+                                "h-10 rounded-xl shadow-md",
+                                pickBarClass?.(gi) || "bg-indigo-500",
+                              ].join(" ")}
+                              style={{ left, width }}
+                              title={[
+                                t.taskId,
+                                t.workerName,
+                                startHM && endHM ? `${startHM}~${endHM}` : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")} // ✅ 브라우저 기본 툴팁(백업)
+                            >
+                              <div className="h-full w-full px-3 flex items-center gap-3 overflow-hidden">
+                                <span className="text-[12.5px] font-semibold text-white whitespace-nowrap">
+                                  {t.taskId || "-"}
+                                </span>
 
-                          {/* bar */}
-                          <div
-                            className={[
-                              "absolute top-1/2 -translate-y-1/2",
-                              "h-8 rounded-lg shadow-sm",
-                              "px-2 flex items-center gap-2",
-                              "text-[11px] font-semibold text-white",
-                              pickBarClass?.(gi) || "bg-indigo-500",
-                            ].join(" ")}
-                            style={{ left, width }}
-                            title={`${t.taskId} · ${t.workerName || "-"} · ${t.startAt} ~ ${t.endAt}`}
-                          >
-                            <span className="truncate">
-                              {t.workerName || "-"}
-                            </span>
-                          </div>
+                                {t.workerName && (
+                                  <span className="text-[11px] text-white/80 whitespace-nowrap">
+                                    {t.workerName}
+                                  </span>
+                                )}
+
+                                {startHM && endHM && (
+                                  <span className="ml-auto text-[11px] text-white/70 font-medium whitespace-nowrap">
+                                    {startHM}~{endHM}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* ✅ Hover Tooltip: 바에 갖다대면 전체 텍스트 표시 */}
+                              <div
+                                className={[
+                                  "pointer-events-none",
+                                  "absolute z-50",
+                                  "left-2 top-1/2 -translate-y-1/2",
+                                  "hidden group-hover:block",
+                                  "max-w-[520px]",
+                                  "rounded-xl border border-slate-200",
+                                  "bg-white px-3 py-2 shadow-lg",
+                                ].join(" ")}
+                              >
+                                <div className="text-[12px] font-semibold text-slate-900 whitespace-nowrap">
+                                  {(t.taskId || "-") +
+                                    (t.workerName ? ` · ${t.workerName}` : "")}
+                                </div>
+                                {startHM && endHM ? (
+                                  <div className="mt-0.5 text-[11px] text-slate-500 whitespace-nowrap">
+                                    {startHM} ~ {endHM}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

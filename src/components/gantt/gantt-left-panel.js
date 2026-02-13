@@ -15,6 +15,7 @@ export default function GanttLeftPanel({
   groupHeaderHeight,
   rowHeight,
 }) {
+  /* 그룹 컬러 바 */
   const groupTint = [
     "border-l-[#86DCF0]",
     "border-l-[#869AF0]",
@@ -24,7 +25,11 @@ export default function GanttLeftPanel({
 
   return (
     <div
-      className="shrink-0 bg-white border-r border-slate-200/80 flex flex-col"
+      className="
+        shrink-0 bg-white
+        border-r border-slate-200/80
+        flex flex-col
+      "
       style={{ width: leftWidth }}
     >
       {(groups || []).map((g, gi) => {
@@ -32,32 +37,48 @@ export default function GanttLeftPanel({
         const opCount = (g.operations || []).length;
 
         return (
-          <div key={g.id} className="border-b border-slate-200/60">
-            {/* ✅ product header: 아래선만 풀폭 */}
+          <div key={g.id}>
+            {/* ================== PRODUCT ================== */}
             <div
               style={{ height: groupHeaderHeight }}
               className={[
                 "relative bg-white",
-                "border-b border-slate-200/70", // ✅ 여기!
+                "border-b border-slate-200/70",
                 "border-l-[6px]",
                 groupTint[gi % 4],
               ].join(" ")}
             >
-              <div className="absolute inset-0 opacity-0 hover:opacity-100 bg-slate-50/70 transition-opacity" />
+              {/* hover layer */}
+              <div className="absolute inset-0 bg-slate-50/60 opacity-0 hover:opacity-100 transition" />
 
               <div className="relative h-full w-full px-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => toggleGroup(g.id)}
-                  className="w-full rounded-none px-2 h-full justify-start hover:bg-transparent"
+                  className="
+                    w-full h-full
+                    rounded-none
+                    px-2
+                    justify-start
+                    hover:bg-transparent
+                  "
                 >
-                  <span className="font-semibold truncate min-w-0 flex-1 text-left text-slate-900">
+                  <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-slate-900 text-left">
                     {g.title}
                   </span>
 
                   <span className="ml-2 flex items-center gap-2 shrink-0">
-                    <Badge className="h-6 px-2 text-[11px] bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                    <Badge
+                      className="
+                        h-6 px-2
+                        text-[11px]
+                        bg-slate-100
+                        text-slate-700
+                        border border-slate-200
+                        font-medium
+                      "
+                    >
                       {opCount}
                     </Badge>
 
@@ -71,10 +92,11 @@ export default function GanttLeftPanel({
               </div>
             </div>
 
-            {/* operations */}
+            {/* ================== OPERATIONS ================== */}
             {!isGroupCollapsed &&
               (g.operations || []).map((op) => {
                 const isOpCollapsed = opCollapsed?.[op.id] ?? false;
+
                 const planner = op.plannerName || "";
                 const opLabel = String(
                   op.operationName || op.name || op.operationId || op.id || "",
@@ -82,42 +104,56 @@ export default function GanttLeftPanel({
 
                 return (
                   <div key={op.id}>
-                    {/* ✅ operation row: 보더는 바깥(w-full)에 */}
-                    <div className="w-full border-b border-slate-200/70">
+                    {/* OP ROW */}
+                    <div
+                      className="w-full border-b border-slate-200"
+                      style={{ height: rowHeight }}
+                    >
                       <button
                         type="button"
                         onClick={() => toggleOperation(op.id)}
-                        className="w-full hover:bg-slate-50/70 transition-colors"
-                        style={{ height: rowHeight }}
-                        title={String(op.operationId || opLabel)}
+                        className="w-full h-full hover:bg-indigo-50/40 transition-colors"
+                        title={opLabel}
                       >
-                        {/* ✅ padding은 안쪽 wrapper로 */}
                         <div className="h-full px-3 flex items-center gap-2">
+                          {/* icon */}
                           {isOpCollapsed ? (
                             <ChevronRight className="h-4 w-4 text-slate-500 shrink-0" />
                           ) : (
                             <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                           )}
 
-                          <div className="min-w-0 flex-1">
+                          {/* text */}
+                          <div className="min-w-0 flex-1 leading-tight">
                             <div className="truncate text-[13px] font-medium text-slate-800">
                               {opLabel}
                             </div>
-                            {planner ? (
-                              <div className="text-[11px] text-slate-500 truncate font-normal">
+
+                            {planner && (
+                              <div className="truncate text-[11px] text-slate-500">
                                 {planner}
                               </div>
-                            ) : null}
+                            )}
                           </div>
 
-                          <Badge className="h-6 px-2 text-[11px] bg-white text-slate-600 border border-slate-200 font-medium">
+                          {/* count */}
+                          <Badge
+                            className="
+                              h-6 px-2
+                              text-[11px]
+                              bg-white
+                              text-slate-600
+                              border border-slate-200
+                              font-medium
+                            "
+                          >
                             {(op.tasks || []).length}
                           </Badge>
                         </div>
                       </button>
                     </div>
 
-                    {/* task rows */}
+                    {/* ================== TASKS ================== */}
                     {!isOpCollapsed &&
                       (op.tasks || []).map((t, ti) => {
                         const taskIdOnly = String(
@@ -125,26 +161,28 @@ export default function GanttLeftPanel({
                         );
 
                         return (
-                          // ✅ task row도 동일: 보더는 바깥(w-full)에
                           <div
-                            key={String(
-                              t.id || `${op.id}__${taskIdOnly}__${ti}`,
-                            )}
-                            className="w-full border-b border-slate-100 hover:bg-blue-50/30 transition-colors"
+                            key={String(t.id || `${op.id}_${taskIdOnly}_${ti}`)}
+                            className="
+                              w-full
+                              border-b border-slate-100
+                              hover:bg-blue-50/30
+                              transition-colors
+                            "
                             style={{ height: rowHeight }}
                             title={taskIdOnly}
                           >
-                            {/* ✅ padding은 안쪽 */}
                             <div className="h-full px-4 flex items-center justify-end">
-                              <div className="min-w-0 text-right">
+                              <div className="min-w-0 text-right leading-tight">
                                 <div className="truncate text-[12.5px] font-medium text-slate-700">
                                   {taskIdOnly || "-"}
                                 </div>
-                                {t.workerName ? (
-                                  <div className="text-[11px] text-slate-500 truncate font-normal">
+
+                                {t.workerName && (
+                                  <div className="truncate text-[11px] text-slate-500">
                                     {t.workerName}
                                   </div>
-                                ) : null}
+                                )}
                               </div>
                             </div>
                           </div>

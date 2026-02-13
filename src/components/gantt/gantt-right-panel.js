@@ -17,28 +17,23 @@ export default function GanttRightPanel({
   collapsed,
   opCollapsed,
   pickBarClass,
-
   gridWidthPx,
   colWidth,
   rowHeight,
   groupHeaderHeight,
-
   rangeStart,
   stepMinutes,
 
-  // ✅ 가로 스크롤만 이 패널이 담당
-  rightScrollXRef,
-  onRightScrollX,
+  // ✅ 추가: 외부(스크롤호스트)에서 전달
+  scrollLeft = 0,
 }) {
   const pxPerMinute = colWidth / stepMinutes;
 
   const calcLeftWidth = (startAt, endAt) => {
     const s = toMs(startAt);
     const e = toMs(endAt);
-
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) {
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s)
       return { left: 0, width: 0 };
-    }
 
     const base = rangeStart.getTime();
     const leftMin = (s - base) / 60000;
@@ -51,148 +46,149 @@ export default function GanttRightPanel({
     const visRight = Math.min(gridWidthPx, rawLeft + rawWidth);
     const visWidth = Math.max(0, visRight - visLeft);
 
-    if (visWidth <= 0) return { left: 0, width: 0 };
-    return { left: visLeft, width: Math.max(2, visWidth) };
+    return visWidth <= 0
+      ? { left: 0, width: 0 }
+      : { left: visLeft, width: Math.max(4, visWidth) };
   };
 
   const sortTasks = (tasks) => {
-    const arr = [...(tasks || [])];
-    arr.sort((a, b) => {
+    return [...(tasks || [])].sort((a, b) => {
       const as = toMs(a?.startAt);
       const bs = toMs(b?.startAt);
-
       if (Number.isFinite(as) && Number.isFinite(bs) && as !== bs)
         return as - bs;
-      if (Number.isFinite(as) && !Number.isFinite(bs)) return -1;
-      if (!Number.isFinite(as) && Number.isFinite(bs)) return 1;
-
-      const aid = String(a?.taskId || a?.id || a?.raw?.taskId || "");
-      const bid = String(b?.taskId || b?.id || b?.raw?.taskId || "");
-      return aid.localeCompare(bid);
+      return String(a?.taskId || "").localeCompare(String(b?.taskId || ""));
     });
-    return arr;
   };
 
   return (
     <div className="flex-1 min-w-0 bg-white">
-      {/* ✅ 세로 스크롤은 부모(보드 전체)에서 1개만 → 여기서는 X만 스크롤 */}
-      <div
-        ref={rightScrollXRef}
-        onScroll={onRightScrollX}
-        className="min-w-0 overflow-x-auto overflow-y-hidden"
-        style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-        }}
-      >
-        <style jsx>{`
-          .hide-x-scrollbar::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
+      {/* ✅ RightPanel은 스크롤을 가지지 않습니다 */}
+      <div className="min-w-0 overflow-x-hidden overflow-y-hidden">
+        {/* ✅ 가로 이동은 scrollLeft로 translate */}
+        <div
+          className="relative"
+          style={{
+            width: gridWidthPx,
+            minWidth: gridWidthPx,
+            transform: `translateX(${-scrollLeft}px)`,
+            willChange: "transform",
+          }}
+        >
+          {(groups || []).map((g, gi) => {
+            const isGroupCollapsed = !!collapsed?.[g.id];
 
-        <div className="hide-x-scrollbar">
-          <div
-            className="relative"
-            style={{
-              width: gridWidthPx,
-              minWidth: gridWidthPx,
-            }}
-          >
-            {(groups || []).map((g, gi) => {
-              const isGroupCollapsed = !!collapsed?.[g.id];
+            return (
+              <div key={g.id}>
+                <div
+                  className="border-b border-slate-200"
+                  style={{ height: groupHeaderHeight }}
+                />
 
-              return (
-                <div key={g.id}>
-                  {/* product header row (오른쪽은 높이만 맞춤) */}
-                  <div
-                    className="border-b border-slate-200/60 bg-white"
-                    style={{ height: groupHeaderHeight }}
-                  />
+                {isGroupCollapsed
+                  ? null
+                  : (g.operations || []).map((op) => {
+                      const isOpCollapsed = opCollapsed?.[op.id] ?? false;
 
-                  {isGroupCollapsed ? null : (
-                    <div>
-                      {(g.operations || []).map((op) => {
-                        const isOpCollapsed = opCollapsed?.[op.id] ?? false;
-
-                        return (
+                      return (
+                        <div key={op.id}>
                           <div
-                            key={op.id}
-                            className="border-b border-slate-100"
-                          >
-                            {/* operation row */}
-                            <div
-                              className="relative bg-white border-b border-slate-200/60"
-                              style={{ height: rowHeight }}
-                            />
+                            className="border-b border-slate-200"
+                            style={{ height: rowHeight }}
+                          />
 
-                            {/* task rows */}
-                            {isOpCollapsed
-                              ? null
-                              : sortTasks(op.tasks).map((t, ti) => {
-                                  const taskId = String(
-                                    t.taskId || t.id || t.raw?.taskId || "",
-                                  );
-                                  const worker = String(t.workerName || "");
+                          {isOpCollapsed
+                            ? null
+                            : sortTasks(op.tasks).map((t, ti) => {
+                                const { left, width } = calcLeftWidth(
+                                  t.startAt,
+                                  t.endAt,
+                                );
 
-                                  const { left, width } = calcLeftWidth(
-                                    t.startAt,
-                                    t.endAt,
-                                  );
+                                return (
+                                  <div
+                                    key={ti}
+                                    className="relative border-b border-slate-100"
+                                    style={{ height: rowHeight }}
+                                  >
+                                    {width > 0 && (
+                                      <div
+                                        className={[
+                                          "group", // ✅ hover 그룹
+                                          "absolute top-1/2 -translate-y-1/2",
+                                          "h-10 rounded-xl shadow-md",
+                                          pickBarClass(gi),
+                                        ].join(" ")}
+                                        style={{ left, width }}
+                                        title={[
+                                          t.taskId || "-",
+                                          t.workerName
+                                            ? `· ${t.workerName}`
+                                            : null,
+                                          fmtHM(t.startAt) && fmtHM(t.endAt)
+                                            ? `· ${fmtHM(t.startAt)}~${fmtHM(t.endAt)}`
+                                            : null,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" ")} // ✅ 기본 브라우저 툴팁(백업)
+                                      >
+                                        <div className="h-full w-full px-3 flex items-center gap-3 overflow-hidden">
+                                          <span className="text-[12.5px] font-semibold text-white whitespace-nowrap">
+                                            {t.taskId || "-"}
+                                          </span>
 
-                                  const st = fmtHM(t.startAt);
-                                  const et = fmtHM(t.endAt);
-                                  const timeText =
-                                    st && et ? `${st}~${et}` : st || et || "";
+                                          {t.workerName && (
+                                            <span className="text-[11px] text-white/80 whitespace-nowrap">
+                                              {t.workerName}
+                                            </span>
+                                          )}
 
-                                  const label = [
-                                    taskId,
-                                    worker || null,
-                                    timeText || null,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ");
+                                          {fmtHM(t.startAt) &&
+                                            fmtHM(t.endAt) && (
+                                              <span className="ml-auto text-[11px] text-white/70 font-medium whitespace-nowrap">
+                                                {fmtHM(t.startAt)}~
+                                                {fmtHM(t.endAt)}
+                                              </span>
+                                            )}
+                                        </div>
 
-                                  const showBar = width > 0;
-
-                                  return (
-                                    <div
-                                      key={String(
-                                        t.id || `${op.id}__${taskId}__${ti}`,
-                                      )}
-                                      className="relative border-b border-slate-100 bg-white"
-                                      style={{ height: rowHeight }}
-                                      title={label}
-                                    >
-                                      {showBar ? (
+                                        {/* ✅ hover 시 전체 텍스트 툴팁 */}
                                         <div
                                           className={[
-                                            "absolute top-1/2 -translate-y-1/2",
-                                            "h-9 rounded-lg", // ✅ 살짝 더 두툼하게
-                                            "shadow-sm",
-                                            pickBarClass(gi),
+                                            "pointer-events-none",
+                                            "absolute z-50",
+                                            "left-2 top-1/2 -translate-y-1/2",
+                                            "hidden group-hover:block",
+                                            "max-w-[520px]",
+                                            "rounded-xl border border-slate-200",
+                                            "bg-white px-3 py-2 shadow-lg",
                                           ].join(" ")}
-                                          style={{ left, width }}
                                         >
-                                          <div className="h-full w-full px-2 flex items-center text-[12px] font-medium text-slate-900 overflow-hidden">
-                                            <span className="truncate">
-                                              {label}
-                                            </span>
+                                          <div className="text-[12px] font-semibold text-slate-900 whitespace-nowrap">
+                                            {(t.taskId || "-") +
+                                              (t.workerName
+                                                ? ` · ${t.workerName}`
+                                                : "")}
                                           </div>
+                                          {fmtHM(t.startAt) &&
+                                          fmtHM(t.endAt) ? (
+                                            <div className="mt-0.5 text-[11px] text-slate-500 whitespace-nowrap">
+                                              {fmtHM(t.startAt)} ~{" "}
+                                              {fmtHM(t.endAt)}
+                                            </div>
+                                          ) : null}
                                         </div>
-                                      ) : null}
-                                    </div>
-                                  );
-                                })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                        </div>
+                      );
+                    })}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
