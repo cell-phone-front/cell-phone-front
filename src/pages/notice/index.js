@@ -261,10 +261,10 @@ export default function Notice() {
             : normalizeFiles(row || {}),
       };
 
-      // ✅ 모달에 서버 값 반영(조회수 포함)
+      // 모달에 서버 값 반영(조회수 포함)
       setSelected(merged);
 
-      // ✅ 목록에도 서버 값 반영(조회수 포함)
+      // 목록에도 서버 값 반영(조회수 포함)
       setNotices((prev) =>
         prev.map((n) => (n.id === row.id ? { ...n, ...normalized } : n)),
       );
