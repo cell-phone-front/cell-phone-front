@@ -1,6 +1,6 @@
 // src/components/table-modal/product.js
 import React, { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, Search, Package, Hash } from "lucide-react";
 import { getProducts } from "@/api/product-api";
 
 /* ===============================
@@ -30,6 +30,36 @@ function Clamp2({ children, className = "" }) {
     >
       {children}
     </div>
+  );
+}
+
+function Th({ className = "", children }) {
+  return (
+    <th
+      className={[
+        "border-b border-slate-200 bg-slate-50",
+        "px-4 py-3",
+        "text-left text-[12px] font-semibold text-slate-600",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({ className = "", children }) {
+  return (
+    <td
+      className={[
+        "border-b border-slate-100",
+        "px-4 py-2.5",
+        "text-[13px] text-slate-800",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </td>
   );
 }
 
@@ -93,66 +123,101 @@ export default function ProductFullModal({ open, onClose, token }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-6">
-      <div className="w-[min(1200px,95vw)] h-[min(760px,90vh)] rounded-2xl bg-white shadow-xl overflow-hidden flex flex-col">
-        {/* 헤더 */}
-        <div className="shrink-0 px-4 py-3 bg-indigo-900 text-white flex items-center gap-3">
-          <div className="text-[14px] font-extrabold shrink-0">
-            생산 대상 전체 보기
-          </div>
+    <div
+      className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-6"
+      onMouseDown={(e) => {
+        // 배경 클릭 닫기 (원치 않으면 이 블록 삭제)
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="w-[min(1200px,95vw)] h-[min(760px,90vh)] rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col ring-1 ring-black/5">
+        {/* ===== Header (Accounts 톤) ===== */}
+        <div className="shrink-0 px-5 py-4 border-b border-slate-100 bg-white">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white grid place-items-center shadow-sm shrink-0">
+                <Package className="h-5 w-5" />
+              </div>
 
-          <div className="ml-auto relative w-[360px]">
-            <input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색 (이름(EN / KR))"
-              className="
-                h-8 w-full rounded-md
-                bg-white text-slate-900
-                px-3 text-[12px]
-                outline-none
-                focus:ring-2 focus:ring-indigo-300
-                placeholder:text-slate-400
-              "
-            />
-            {keyword ? (
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="text-[18px] font-semibold text-slate-900 truncate">
+                    생산 대상 전체 보기
+                  </div>
+                </div>
+                <div className="mt-0.5 text-[12px] text-slate-500 truncate">
+                  검색은 품번/브랜드/이름(EN/KR) 기준으로 동작합니다.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="relative w-[380px]">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="검색 (품번/브랜드/이름 EN/KR)"
+                  className="
+                    h-10 w-full rounded-full
+                    border border-slate-200 bg-white
+                    pl-9 pr-10 text-[13px]
+                    outline-none transition
+                    hover:border-slate-300
+                    focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                    placeholder:text-[12px] placeholder:text-slate-400
+                  "
+                />
+                {keyword ? (
+                  <button
+                    type="button"
+                    onClick={() => setKeyword("")}
+                    className="
+                      absolute right-2 top-1/2 -translate-y-1/2
+                      h-8 w-8 rounded-full
+                      grid place-items-center
+                      text-slate-400 hover:text-indigo-600 hover:bg-indigo-50
+                    "
+                    aria-label="clear"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </div>
+
               <button
                 type="button"
-                onClick={() => setKeyword("")}
+                onClick={onClose}
                 className="
-                  absolute right-2 top-1/2 -translate-y-1/2
-                  h-7 w-7 rounded-lg
-                  text-slate-500 transition
-                  hover:bg-slate-100
+                  h-10 w-10 rounded-full
+                  border border-slate-200 bg-white
+                  text-slate-500
+                  hover:bg-slate-50 hover:text-slate-800
+                  transition grid place-items-center
                 "
-                aria-label="clear"
+                aria-label="close"
+                title="닫기"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
-            ) : null}
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 transition flex items-center justify-center shrink-0"
-            aria-label="close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {err ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+              {err}
+            </div>
+          ) : null}
         </div>
 
-        {err ? (
-          <div className="m-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-            {err}
-          </div>
-        ) : null}
-
-        {/* 표 */}
+        {/* ===== Table ===== */}
         <div className="flex-1 min-h-0 overflow-auto pretty-scroll">
-          <table className="w-full table-fixed border-collapse text-[12px]">
+          <table className="w-full table-fixed border-collapse">
             <colgroup>
-              <col style={{ width: "70px" }} />
+              <col style={{ width: "84px" }} />
               <col style={{ width: "18%" }} />
               <col style={{ width: "18%" }} />
               <col style={{ width: "18%" }} />
@@ -160,55 +225,46 @@ export default function ProductFullModal({ open, onClose, token }) {
             </colgroup>
 
             <thead className="sticky top-0 z-10">
-              <tr className="text-left">
-                <th className="border-b bg-slate-50 px-3 py-3 font-semibold text-center">
-                  번호
-                </th>
-                <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  생산 대상 품번
-                </th>
-                <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  브랜드 이름
-                </th>
-                <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  휴대폰 이름(EN)
-                </th>
-                <th className="border-b bg-slate-50 px-3 py-3 font-semibold">
-                  휴대폰 이름(KR)
-                </th>
+              <tr>
+                <Th className="!text-center !px-2">번호</Th>
+
+                <Th>생산 대상 품번</Th>
+                <Th>브랜드</Th>
+                <Th>이름(EN)</Th>
+                <Th>이름(KR)</Th>
               </tr>
             </thead>
 
             <tbody>
               {filteredData.map((r, i) => (
                 <tr key={r._rid} className="hover:bg-indigo-50 transition">
-                  <td className="border-b px-3 py-2 text-center text-slate-500">
+                  <Td className="!text-center !px-2 tabular-nums text-slate-500">
                     {i + 1}
-                  </td>
+                  </Td>
 
-                  <td className="border-b px-3 py-2">
+                  <Td>
                     <Clamp2 className="whitespace-normal break-words leading-5">
                       {r.id ?? "-"}
                     </Clamp2>
-                  </td>
+                  </Td>
 
-                  <td className="border-b px-3 py-2">
+                  <Td>
                     <Clamp2 className="whitespace-normal break-words leading-5">
                       {r.brand ?? "-"}
                     </Clamp2>
-                  </td>
+                  </Td>
 
-                  <td className="border-b px-3 py-2">
+                  <Td>
                     <Clamp2 className="whitespace-normal break-words leading-5">
                       {r.name ?? "-"}
                     </Clamp2>
-                  </td>
+                  </Td>
 
-                  <td className="border-b px-3 py-2">
+                  <Td>
                     <Clamp2 className="whitespace-normal break-words leading-5">
                       {r.description ?? "-"}
                     </Clamp2>
-                  </td>
+                  </Td>
                 </tr>
               ))}
 
@@ -216,7 +272,7 @@ export default function ProductFullModal({ open, onClose, token }) {
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-16 text-center text-slate-500"
+                    className="px-6 py-16 text-center text-[13px] text-slate-500"
                   >
                     데이터가 없습니다.
                   </td>
@@ -226,16 +282,35 @@ export default function ProductFullModal({ open, onClose, token }) {
           </table>
         </div>
 
-        {/* ✅ 하단: 총 개수 + 닫기 */}
-        <div className="shrink-0 px-4 py-3 border-t bg-white flex justify-between items-center">
+        {/* ===== Footer ===== */}
+        <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
           <div className="text-[12px] text-slate-500">
-            총 {data.length.toLocaleString()}건
+            총{" "}
+            <span className="font-semibold text-slate-900 tabular-nums">
+              {data.length.toLocaleString()}
+            </span>
+            건{" "}
+            {keyword ? (
+              <span className="text-slate-400">
+                · 검색 결과{" "}
+                <span className="font-semibold text-slate-900 tabular-nums">
+                  {filteredData.length.toLocaleString()}
+                </span>
+                건
+              </span>
+            ) : null}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl border text-[12px] font-semibold hover:bg-slate-50 transition"
+            className="
+              h-10 px-5 rounded-full
+              border border-slate-200 bg-white
+              text-[13px] font-semibold text-slate-700
+              hover:bg-slate-50
+              transition
+            "
           >
             닫기
           </button>
