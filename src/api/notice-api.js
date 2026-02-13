@@ -63,7 +63,7 @@ export async function updateNotice(id, payload, files = [], token) {
     }),
   );
 
-  // ✅ 파일 데이터
+  // 파일 데이터
   (files || []).forEach((file) => {
     formData.append("files", file);
   });
@@ -167,9 +167,7 @@ function extractFileNameFromCD(cd) {
 }
 
 /**
- * ✅ 호출부(NoticeModal)에서 지금처럼:
- * downloadNoticeAttachment(noticeId, fileObj, token)
- * 로 쓸 수 있게 시그니처를 맞췄습니다.
+
  *
  * fileObj: { id, url, name } 형태(지금 normalizeFiles 결과)
  */
@@ -228,11 +226,12 @@ export async function getNoticeNotifications(token) {
     },
   }).then((r) => r.json());
 }
+
 export async function deleteNoticeAttachment(noticeId, attachmentId, token) {
-  const res = await fetch(
-    `${serverAddr}/api/notice/${noticeId}/attachment/${attachmentId}`,
-    { method: "DELETE", headers: { Authorization: "Bearer " + token } },
-  );
+  const res = await fetch(`${serverAddr}/api/notice/${noticeId}}`, {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + token },
+  });
   if (!res.ok) throw new Error(`첨부 삭제 실패 (${res.status})`);
   return true;
 }
