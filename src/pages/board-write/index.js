@@ -139,7 +139,7 @@ export default function BoardWrite() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent={pageTitle}>
-      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden">
+      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-hidden px-5">
         <div className="w-full py-5 min-w-0">
           {/* 상단 헤더 카드 */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden w-full min-w-0">
@@ -266,7 +266,7 @@ export default function BoardWrite() {
                 onClick={onCancel}
                 className="
                   h-10 px-5 rounded-xl border border-slate-200 bg-white
-                  text-sm font-black text-slate-700
+                  text-sm font-semibold text-slate-700
                   hover:bg-slate-50 active:bg-slate-100 transition
                 "
               >
@@ -277,7 +277,7 @@ export default function BoardWrite() {
                 type="submit"
                 disabled={saving || !isValid || loading}
                 className={[
-                  "h-10 px-5 rounded-xl text-sm font-black transition inline-flex items-center gap-2",
+                  "h-10 px-5 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2",
                   saving || !isValid || loading
                     ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 cursor-pointer",

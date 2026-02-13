@@ -41,15 +41,54 @@ export async function createNotice(payload, token) {
 /* =========================
  * (4) 공지 수정
  * ========================= */
-export async function updateNotice(id, payload, token) {
+// export async function updateNotice(id, payload, token) {
+//   return fetch(`${serverAddr}/api/notice/${id}`, {
+//     method: "PUT",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: "Bearer " + token,
+//     },
+//     body: JSON.stringify(payload),
+//   }).then((r) => r.json());
+// }
+
+export async function updateNotice(id, payload, files = [], token) {
+  const formData = new FormData();
+
+  // ✅ JSON 데이터
+  formData.append(
+    "request",
+    new Blob([JSON.stringify(payload)], {
+      type: "application/json",
+    }),
+  );
+
+  // ✅ 파일 데이터
+  (files || []).forEach((file) => {
+    formData.append("files", file);
+  });
+
   return fetch(`${serverAddr}/api/notice/${id}`, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json",
       Authorization: "Bearer " + token,
+      // ❗ Content-Type 넣지 마세요
     },
-    body: JSON.stringify(payload),
-  }).then((r) => r.json());
+    body: formData,
+  }).then(async (r) => {
+    if (!r.ok) {
+      const text = await r.text().catch(() => "");
+      throw new Error(`수정 실패 (${r.status}) ${text}`.trim());
+    }
+
+    const ct = r.headers.get("content-type") || "";
+
+    if (ct.includes("application/json")) {
+      return r.json();
+    }
+
+    return true;
+  });
 }
 
 /* =========================

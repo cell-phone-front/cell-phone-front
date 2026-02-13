@@ -100,13 +100,17 @@ export default function Board() {
 
   // styles
   const GRID = "grid grid-cols-[72px_1fr_120px_120px_90px_140px]";
+
   const TABLE_WRAP =
     "w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm";
+
+  //
   const HEADER_ROW =
     GRID +
     " px-6 h-11 items-center " +
     "border-b border-slate-100 " +
-    "text-[11px] font-extrabold tracking-wide text-slate-500";
+    "text-[12px] font-semibold tracking-wide text-slate-500";
+
   const ROW_BASE =
     "w-full text-left " +
     GRID +
@@ -114,13 +118,18 @@ export default function Board() {
     "border-b border-slate-100 " +
     "hover:bg-slate-50 transition cursor-pointer group";
 
+  //
   const CELL_TITLE =
-    "min-w-0 truncate text-[14px] font-bold text-slate-800 " +
+    "min-w-0 truncate text-[14.5px] font-semibold text-slate-800 " +
     "group-hover:text-indigo-600 transition-colors";
+
   const CELL_TEXT = "truncate text-[12px] text-slate-700 whitespace-nowrap";
   const CELL_DATE = "truncate text-[12px] text-slate-600 whitespace-nowrap";
+
+  //
   const COUNT_CELL =
-    "text-right text-[12px] text-slate-700 whitespace-nowrap tabular-nums font-semibold";
+    "text-right text-[12px] text-slate-700 whitespace-nowrap tabular-nums font-medium";
+
   const ACTION_CELL = "flex items-center justify-end gap-1";
 
   function goWrite() {
@@ -295,7 +304,7 @@ export default function Board() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="자유게시판">
-      <div className="h-full w-full overflow-hidden px-5">
+      <div className="min-w-[1280px] h-full w-full overflow-x-auto px-5">
         {/* 상단 헤더 */}
         <div className="pt-4 pb-5">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -364,7 +373,7 @@ export default function Board() {
                       className="
                         h-10 px-4 rounded-xl
                         flex items-center gap-2 justify-center
-                        text-[13px] font-extrabold
+                        text-[13px] font-semibold
                         bg-indigo-600 text-white
                         hover:bg-indigo-500 active:bg-indigo-700
                         active:scale-[0.98]
@@ -446,7 +455,7 @@ export default function Board() {
                       }}
                       className={ROW_BASE}
                     >
-                      <div className="flex items-center justify-center text-[13px] font-semibold text-slate-500 tabular-nums">
+                      <div className="flex items-center justify-center text-[12px] font-medium text-slate-500 tabular-nums">
                         {pinnedRows.length + start + idx + 1}
                       </div>
 
@@ -496,7 +505,7 @@ export default function Board() {
             <div className="mt-4 flex items-center">
               <div className="ml-auto flex items-center gap-3">
                 <div className="text-xs text-slate-500">
-                  <span className="font-extrabold text-slate-800 tabular-nums">
+                  <span className="font-semibold text-slate-800 tabular-nums">
                     {safePage}
                   </span>{" "}
                   / <span className="tabular-nums">{pageCount}</span> 페이지

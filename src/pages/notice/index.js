@@ -1,3 +1,4 @@
+// pages/notice/index.js
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import {
@@ -161,11 +162,20 @@ function getWriterId(n) {
   const v =
     n.memberId ??
     n.member_id ??
+    n.memberNo ??
+    n.member_no ??
     n.writerId ??
     n.writer_id ??
+    n.writerNo ??
+    n.writer_no ??
     n.authorId ??
     n.author_id ??
+    n.createdBy ??
+    n.created_by ??
+    n.createdMemberId ??
+    n.created_member_id ??
     n.member?.id ??
+    n.member?.memberId ??
     n.author?.id ??
     n.writer?.id ??
     null;
@@ -198,6 +208,27 @@ function normalizeRow(n) {
   };
 }
 
+function isMineRow(row, account) {
+  if (!row) return false;
+  if (!account) return false;
+
+  // 내 정보
+  const myId = account.id != null ? String(account.id) : "";
+  const myName = account.name != null ? String(account.name) : "";
+
+  // 글 작성자 정보
+  const writerId = row.__writerId != null ? String(row.__writerId) : "";
+  const writerName = row.memberName != null ? String(row.memberName) : "";
+
+  // 1) writerId가 있으면 ID 비교
+  if (myId && writerId) return myId === writerId;
+
+  // 2) 지금 서버 구조: 이름 비교
+  if (myName && writerName) return myName === writerName;
+
+  return false;
+}
+
 /* ===============================
    page
 =============================== */
@@ -208,8 +239,6 @@ export default function Notice() {
 
   const role = String(account?.role || "").toLowerCase();
   const canWriteNotice = role === "admin" || role === "planner";
-
-  const meId = account?.id != null ? String(account.id) : null;
 
   const [query, setQuery] = useState("");
   const [notices, setNotices] = useState([]);
@@ -235,6 +264,7 @@ export default function Notice() {
   React.useEffect(() => {
     if (!token) return;
     loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const [open, setOpen] = useState(false);
@@ -261,10 +291,10 @@ export default function Notice() {
             : normalizeFiles(row || {}),
       };
 
-      // 모달에 서버 값 반영(조회수 포함)
+      // ✅ 모달에 서버 값 반영(조회수 포함)
       setSelected(merged);
 
-      // 목록에도 서버 값 반영(조회수 포함)
+      // ✅ 목록에도 서버 값 반영(조회수 포함)
       setNotices((prev) =>
         prev.map((n) => (n.id === row.id ? { ...n, ...normalized } : n)),
       );
@@ -366,14 +396,11 @@ export default function Notice() {
         ),
     [filtered],
   );
-
   const hasMine = useMemo(() => {
-    if (!meId) return false;
-    const all = [...(pinnedNotices || []), ...(normalNotices || [])];
-    return all.some(
-      (r) => r?.__writerId && String(r.__writerId) === String(meId),
-    );
-  }, [meId, pinnedNotices, normalNotices]);
+    if (!account) return false;
+    const all = pinnedNotices.concat(normalNotices);
+    return all.some((r) => isMineRow(r, account));
+  }, [account, pinnedNotices, normalNotices]);
 
   // pagination (일반만 페이징)
   const [page, setPage] = useState(1);
@@ -402,7 +429,7 @@ export default function Notice() {
     setPage((p) => Math.min(pageCount, p + 1));
   }
 
-  // styles
+  // styles (요청하신 톤: 살짝 덜 두껍게)
   const GRID = "grid grid-cols-[72px_1fr_120px_120px_78px_140px]";
 
   const TABLE_WRAP =
@@ -412,7 +439,7 @@ export default function Notice() {
     GRID +
     " px-6 h-11 items-center " +
     "border-b border-slate-100 " +
-    "text-[11px] font-extrabold tracking-wide text-slate-500";
+    "text-[12px] font-medium tracking-wide text-slate-500";
 
   const ROW_BASE =
     "w-full text-left " +
@@ -424,7 +451,7 @@ export default function Notice() {
   const ROW_PINNED = "bg-indigo-50/40 hover:bg-indigo-50/70";
 
   const CELL_TITLE =
-    "min-w-0 truncate text-[14px] font-bold text-slate-800 " +
+    "min-w-0 truncate text-[14.5px] font-semibold text-slate-800 " +
     "group-hover:text-indigo-600 transition-colors";
 
   const CELL_TEXT = "truncate text-[12px] text-slate-700 whitespace-nowrap";
@@ -439,7 +466,8 @@ export default function Notice() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="공지사항">
-      <div className="h-full w-full overflow-hidden px-5">
+      {/* ✅ 반응형 말고 전체창 가로 스크롤 */}
+      <div className="min-w-[1280px] h-full w-full overflow-x-auto px-5">
         {/* 상단 헤더 */}
         <div className="pt-4 pb-5 ">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -489,7 +517,7 @@ export default function Notice() {
                       className="
                         h-10 px-4 rounded-xl
                         flex items-center gap-2 justify-center
-                        text-[13px] font-extrabold
+                        text-[13px] font-semibold
                         bg-indigo-600 text-white
                         hover:bg-indigo-500 active:bg-indigo-700
                         active:scale-[0.98]
@@ -526,13 +554,13 @@ export default function Notice() {
               </div>
 
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold">
                   고정{" "}
                   <span className="tabular-nums text-slate-800">
                     {pinnedNotices.length}
                   </span>
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold">
                   일반{" "}
                   <span className="tabular-nums text-slate-800">
                     {normalNotices.length}
@@ -567,10 +595,7 @@ export default function Notice() {
 
               {/* pinned */}
               {pinnedNotices.map((r, idx) => {
-                const isMineNotice =
-                  meId &&
-                  r?.__writerId &&
-                  String(r.__writerId) === String(meId);
+                const isMineNotice = isMineRow(r, account);
 
                 return (
                   <div
@@ -665,10 +690,7 @@ export default function Notice() {
                 </div>
               ) : (
                 pageRows.map((r, idx) => {
-                  const isMineNotice =
-                    meId &&
-                    r?.__writerId &&
-                    String(r.__writerId) === String(meId);
+                  const isMineNotice = isMineRow(r, account);
 
                   return (
                     <div
@@ -681,7 +703,7 @@ export default function Notice() {
                       }}
                       className={ROW_BASE}
                     >
-                      <div className="flex items-center justify-center text-[13px] font-semibold text-slate-500 tabular-nums">
+                      <div className="flex items-center justify-center text-[12px] font-medium text-slate-500 tabular-nums">
                         {pinnedNotices.length + start + idx + 1}
                       </div>
 
@@ -736,7 +758,7 @@ export default function Notice() {
             <div className="mt-4 flex items-center">
               <div className="ml-auto flex items-center gap-3">
                 <div className="text-xs text-slate-500">
-                  <span className="font-extrabold text-slate-800 tabular-nums">
+                  <span className="font-semibold text-slate-800 tabular-nums">
                     {safePage}
                   </span>{" "}
                   / <span className="tabular-nums">{pageCount}</span> 페이지
