@@ -1,5 +1,5 @@
 // pages/simulation/index.js
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import DashboardShell from "@/components/dashboard-shell";
 import { useAccount, useToken } from "@/stores/account-store";
@@ -65,7 +65,7 @@ function normStatus(v) {
 }
 
 /* ===============================
-   list helpers (✅ 핵심: 응답키 유연화)
+   list helpers (✅ 응답키 유연화)
 =============================== */
 function pickList(json) {
   return (
@@ -103,7 +103,64 @@ function pickCreatedRow(created) {
     status: item.status || "READY",
     simulationStartDate: item.simulationStartDate || "",
     workTime: item.workTime ?? 0,
+
+    // ✅ 최신 정렬용(서버가 createdAt을 주면 그걸 써도 되고, 없으면 지금 시간)
+    _sortTs: Date.now(),
   };
+}
+
+/* ===============================
+   최신순 정렬 유틸 (✅ 핵심)
+   - 1순위: createdAt 있으면 createdAt
+   - 2순위: simulationStartDate
+   - 3순위: id(문자열) 내림차순
+=============================== */
+function toMs(v) {
+  if (v == null || v === "") return NaN;
+  const s = String(v).trim();
+  if (!s) return NaN;
+  const d = new Date(s);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function getRowSortTs(r) {
+  // createdAt 형태가 있으면 우선
+  const c =
+    r?.createdAt ||
+    r?.createAt ||
+    r?.created_date ||
+    r?.createdDate ||
+    r?.created_time;
+
+  const ct = toMs(c);
+  if (Number.isFinite(ct)) return ct;
+
+  // 없으면 startDate로
+  const st = toMs(r?.simulationStartDate || r?.startDate || "");
+  if (Number.isFinite(st)) return st;
+
+  // 마지막 fallback
+  const extra = Number(r?._sortTs);
+  if (Number.isFinite(extra) && extra > 0) return extra;
+
+  return 0;
+}
+
+function sortLatestFirst(list) {
+  const arr = Array.isArray(list) ? [...list] : [];
+  arr.sort((a, b) => {
+    const at = getRowSortTs(a);
+    const bt = getRowSortTs(b);
+    if (at !== bt) return bt - at;
+
+    const aid = String(a?.id ?? "");
+    const bid = String(b?.id ?? "");
+    if (aid !== bid) return bid.localeCompare(aid);
+
+    return 0;
+  });
+  return arr;
 }
 
 /* ===============================
@@ -278,6 +335,9 @@ export default function SimulationPage() {
     startTime: "09:00",
   });
 
+  // ✅ refresh 중복 방지(연속 호출로 순서 꼬이는 것 방지)
+  const refreshSeqRef = useRef(0);
+
   async function refreshWithRetry() {
     await refresh();
     await new Promise((r) => setTimeout(r, 800));
@@ -316,6 +376,13 @@ export default function SimulationPage() {
               Number(row.productCount) === 0
                 ? metaCount
                 : Number(row.productCount),
+
+            // ✅ meta에도 createdAt이 있을 수도 있으니 흡수(있으면 최신순 정렬 정확도↑)
+            createdAt:
+              row.createdAt ||
+              meta?.simulation?.createdAt ||
+              meta?.simulation?.createAt ||
+              row.createdAt,
           };
         } catch (e) {
           console.warn("[SIM][META] failed row:", row.id, e);
@@ -329,6 +396,8 @@ export default function SimulationPage() {
 
   async function refresh() {
     if (!token) return;
+
+    const mySeq = ++refreshSeqRef.current;
     setLoading(true);
 
     try {
@@ -350,18 +419,28 @@ export default function SimulationPage() {
           status: r.status || "-",
           simulationStartDate: r.simulationStartDate || r.startDate || "",
           workTime: r.workTime ?? 0,
+
+          // ✅ 최신순 정렬 힌트(서버가 주면 사용)
+          createdAt: r.createdAt || r.createAt || r.createdDate || "",
+          _sortTs: Number(r._sortTs) || 0,
         }))
         .filter((x) => x.id);
 
       const enriched = await enrichRowsWithMeta(baseRows);
 
-      setData(enriched);
+      // ✅ 최신순 정렬 적용
+      const sorted = sortLatestFirst(enriched);
+
+      // ✅ 오래된 refresh 결과가 나중에 도착하면 무시(레이스 방지)
+      if (mySeq !== refreshSeqRef.current) return;
+
+      setData(sorted);
       setSelectedIds(new Set());
       setPageIndex(0);
 
       setActiveId((prev) => {
-        if (prev && enriched.some((x) => x.id === prev)) return prev;
-        return enriched?.[0]?.id || "";
+        if (prev && sorted.some((x) => x.id === prev)) return prev;
+        return sorted?.[0]?.id || "";
       });
     } catch (e) {
       console.error("[SIM][LIST] refresh failed:", e);
@@ -371,7 +450,7 @@ export default function SimulationPage() {
       setPageIndex(0);
       setActiveId("");
     } finally {
-      setLoading(false);
+      if (mySeq === refreshSeqRef.current) setLoading(false);
     }
   }
 
@@ -413,7 +492,7 @@ export default function SimulationPage() {
     };
   }, [token]);
 
-  // 검색
+  // ✅ 검색 (data 자체가 이미 최신순이므로, filter 후에도 순서 유지됨)
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw) return data;
@@ -518,10 +597,18 @@ export default function SimulationPage() {
       const created = await createSimulation(payload, token);
       console.log("[SIM][CREATE] raw:", created);
 
-      // ✅ 생성 응답을 즉시 표에 추가(체감 개선 + 목록 API 형태 달라도 일단 보임)
+      // ✅ 생성 응답을 즉시 표에 "맨 위"로 반영 + 최신순 유지
       const createdRow = pickCreatedRow(created);
+
       if (createdRow?.id) {
-        setData((prev) => [createdRow, ...prev]);
+        setData((prev) => {
+          const next = [
+            createdRow,
+            ...(prev || []).filter((x) => x.id !== createdRow.id),
+          ];
+          return sortLatestFirst(next);
+        });
+
         setActiveId(createdRow.id);
         setSelectedIds(new Set());
         setPageIndex(0);
@@ -550,7 +637,11 @@ export default function SimulationPage() {
     if (!confirm("해당 시뮬레이션을 실행하시겠습니까?")) return;
 
     setData((prev) =>
-      prev.map((r) => (r.id === simId ? { ...r, status: "PENDING" } : r)),
+      sortLatestFirst(
+        (prev || []).map((r) =>
+          r.id === simId ? { ...r, status: "PENDING" } : r,
+        ),
+      ),
     );
 
     try {

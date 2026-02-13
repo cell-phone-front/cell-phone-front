@@ -61,14 +61,89 @@ function getId(sim) {
   );
 }
 
+/** ✅ 지금 실제 응답이 simulationList 라서 이것 반드시 처리 */
+function normalizeSimulationList(simJson) {
+  const a =
+    simJson?.simulationList ?? // ✅ 실제 응답
+    simJson?.simulationScheduleList ??
+    simJson?.simulations?.simulationList ??
+    simJson?.simulations?.simulationScheduleList ??
+    simJson?.data?.simulationList ??
+    simJson?.data?.simulationScheduleList ??
+    simJson?.result?.simulationList ??
+    simJson?.result?.simulationScheduleList ??
+    simJson?.items ??
+    simJson?.list ??
+    [];
+
+  return Array.isArray(a) ? a : [];
+}
+
+/** ✅ 스케줄 응답도 케이스 다양하게 흡수 */
+function normalizeScheduleList(res) {
+  const a =
+    res?.scheduleList ??
+    res?.simulationScheduleList ??
+    res?.data?.scheduleList ??
+    res?.data?.simulationScheduleList ??
+    res?.result?.scheduleList ??
+    res?.result?.simulationScheduleList ??
+    res?.items ??
+    res?.taskList ??
+    res?.tasks ??
+    [];
+
+  return Array.isArray(a) ? a : [];
+}
+
+function toTimeMs(d) {
+  const x = d instanceof Date ? d : new Date(d);
+  const t = x.getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/**
+ * ✅ 최신 시뮬 선택 기준(강화)
+ * 1) createdAt 우선 (있으면)
+ * 2) 없으면 simulationStartDate
+ * 3) 그래도 없으면 id fallback
+ */
 function pickLatestSim(list) {
   const arr = Array.isArray(list) ? [...list] : [];
   if (!arr.length) return null;
 
   arr.sort((a, b) => {
+    const aCreated = a?.createdAt ? toTimeMs(a.createdAt) : NaN;
+    const bCreated = b?.createdAt ? toTimeMs(b.createdAt) : NaN;
+
+    if (
+      Number.isFinite(aCreated) &&
+      Number.isFinite(bCreated) &&
+      aCreated !== bCreated
+    ) {
+      return bCreated - aCreated;
+    }
+
+    const aStart = a?.simulationStartDate
+      ? toTimeMs(a.simulationStartDate)
+      : NaN;
+    const bStart = b?.simulationStartDate
+      ? toTimeMs(b.simulationStartDate)
+      : NaN;
+
+    if (
+      Number.isFinite(aStart) &&
+      Number.isFinite(bStart) &&
+      aStart !== bStart
+    ) {
+      return bStart - aStart;
+    }
+
+    // 날짜가 문자열인 경우라도 대비(YYYY-MM-DD)
     const ad = String(a?.simulationStartDate || a?.createdAt || "");
     const bd = String(b?.simulationStartDate || b?.createdAt || "");
     if (ad && bd && ad !== bd) return bd.localeCompare(ad);
+
     return String(getId(b)).localeCompare(String(getId(a)));
   });
 
@@ -82,7 +157,6 @@ function SectionHeader({ title, desc, right = null }) {
   return (
     <div className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
-        {/* ✅ 긴 세로선 + 타이틀/설명 묶기 */}
         <div className="flex items-start gap-3">
           <span className="w-1.5 self-stretch rounded-full bg-slate-300/70 shrink-0" />
 
@@ -121,6 +195,8 @@ export default function LatestSimulationRow() {
   const TOP_N = 10;
 
   useEffect(() => {
+    let alive = true;
+
     const fetchLatest = async () => {
       if (!token) return;
 
@@ -129,8 +205,14 @@ export default function LatestSimulationRow() {
 
       try {
         const simJson = await getSimulations(token);
-        const simList = simJson?.simulationScheduleList || [];
+
+        // ✅ 콘솔로 키 확인하고 싶으면 주석 해제
+        // console.log("[SIM LIST KEYS]", Object.keys(simJson || {}), simJson);
+
+        const simList = normalizeSimulationList(simJson);
         const latest = pickLatestSim(simList);
+
+        if (!alive) return;
         setLatestSim(latest);
 
         const latestId = String(getId(latest) || "");
@@ -141,16 +223,25 @@ export default function LatestSimulationRow() {
         }
 
         const res = await getSimulationSchedule(latestId, token);
-        setScheduleList(res?.scheduleList ?? []);
+        if (!alive) return;
+
+        setScheduleList(normalizeScheduleList(res));
       } catch (e) {
+        if (!alive) return;
+        console.error("[DASH][LATEST_SIM] failed:", e);
         setErr(e?.message || "조회 실패");
         setScheduleList([]);
       } finally {
+        if (!alive) return;
         setLoading(false);
       }
     };
 
     fetchLatest();
+
+    return () => {
+      alive = false;
+    };
   }, [token]);
 
   const meta = latestSim
@@ -237,13 +328,11 @@ export default function LatestSimulationRow() {
 
   return (
     <div className="grid min-h-0 gap-5 md:grid-cols-[1fr_2fr_1fr] md:h-[380px]">
-      {/* (시뮬레이션 정보 */}
+      {/* (1) 시뮬레이션 정보 */}
       <section className="min-h-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 flex flex-col">
         <SectionHeader title="시뮬레이션 정보" desc="최신 실행 요약" />
 
-        {/*  헤더 아래는 flex-1 (h-full 금지) */}
         <div className="flex-1 min-h-0 px-3.5 pb-3">
-          {/*  내부 라운드/보더 제거: 라운드 1겹만 */}
           <div className="h-full min-h-0 p-3">
             <LeftMeta meta={meta} />
           </div>
@@ -261,7 +350,7 @@ export default function LatestSimulationRow() {
                 open={moreOpen}
                 onOpenChange={(v) => {
                   setMoreOpen(v);
-                  if (v) setMoreKey((k) => k + 1); // ✅ 열릴 때마다 key 변경 → 애니메이션 재생 보장
+                  if (v) setMoreKey((k) => k + 1);
                 }}
               >
                 <PopoverTrigger asChild>
@@ -289,7 +378,7 @@ export default function LatestSimulationRow() {
                       </div>
                     </div>
                   </div>
-                  {/*  key를 걸어서 열릴 때마다 이 블록이 새로 마운트됨 */}
+
                   <div key={moreKey} className="pop-slide-in-x">
                     <div className="pretty-scroll h-[320px] overflow-auto bg-white">
                       <div className="min-h-[320px] grid grid-cols-[35%_65%] gap-x-2 px-2 py-2">
@@ -320,7 +409,6 @@ export default function LatestSimulationRow() {
                         </div>
 
                         <div className="min-w-0 overflow-hidden">
-                          {/*  바 두께 올린 버전으로 아래에서 설명 */}
                           <RightBars rows={rowsAll} rowH={20} barH={10} />
                         </div>
                       </div>
@@ -332,7 +420,6 @@ export default function LatestSimulationRow() {
           }
         />
 
-        {/* ✅ 본문(TopN) */}
         <div className="flex-1 min-h-0 px-3.5 pb-3">
           <div className="h-full min-h-0">
             <div className="h-full min-h-0 grid grid-cols-[19%_81%] gap-x-1 px-2 py-2">
@@ -386,8 +473,8 @@ export default function LatestSimulationRow() {
               hideHeader={true}
               noFrame={true}
               size={230}
-              thickness={50} // ✅ 더 뚱뚱하게 (22 -> 30 추천)
-              spinOnce={true} // ✅ 아래 machine.js에 추가할 옵션
+              thickness={50}
+              spinOnce={true}
             />
           </div>
         </div>

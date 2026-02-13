@@ -66,7 +66,11 @@ export function AppSidebar({ onNavigate, ...props }) {
   const { account } = useAccount();
   const role = toRoleLower(account?.role);
 
+  // ✅ 테이블/시뮬레이션은 admin, planner가 볼 수 있음
   const canSeeAll = role === "admin" || role === "planner";
+
+  // ✅ 계정관리는 admin만 보이게
+  const canSeeAccounts = role === "admin";
 
   return (
     <Sidebar className="w-64" {...props}>
@@ -93,7 +97,8 @@ export function AppSidebar({ onNavigate, ...props }) {
 
         <NavCommunity label="게시판" items={data.community} />
 
-        {canSeeAll && <NavLinks label="계정관리" items={data.admin} />}
+        {/* ✅ PLANNER 로그인 시 계정관리 숨김 */}
+        {canSeeAccounts && <NavLinks label="계정관리" items={data.admin} />}
       </SidebarContent>
 
       <SidebarRail />
