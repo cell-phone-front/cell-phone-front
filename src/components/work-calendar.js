@@ -38,7 +38,7 @@ function shiftTime(label) {
 
 const MEMO_KEY = "aps_calendar_memo_v1";
 
-// ✅ 메모 프리뷰: 첫 줄만(길면 …)
+//  메모 프리뷰
 function memoPreview(text, max = 18) {
   const t = String(text || "").trim();
   if (!t) return "";
@@ -206,7 +206,7 @@ export function CalendarCustomDays() {
     <div className="h-full w-full flex flex-col">
       <div className="shrink-0 px-6 pt-6 pb-4">
         <div className="flex items-center gap-3">
-          <div className="text-3xl font-semibold tracking-tight text-slate-900">
+          <div className="text-4xl font-semibold tracking-tight text-slate-900 px-5">
             {monthLabel}
           </div>
 
@@ -216,12 +216,12 @@ export function CalendarCustomDays() {
               variant="ghost"
               size="sm"
               onClick={goToday}
-              className="h-8 rounded-full bg-slate-100 px-4 text-[12px] font-medium text-slate-800 hover:bg-slate-200 active:bg-slate-300"
+              className="h-8 rounded-full bg-white px-4 text-[12px] font-medium text-slate-800 hover:bg-slate-200 active:bg-slate-300"
             >
               오늘
             </Button>
 
-            <div className="flex items-center overflow-hidden rounded-full bg-slate-100 h-8">
+            <div className="flex items-center overflow-hidden rounded-full bg-white h-8">
               <Button
                 type="button"
                 variant="ghost"

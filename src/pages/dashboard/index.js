@@ -3,20 +3,29 @@ import DashboardShell from "@/components/dashboard-shell";
 import { DashboardCalendar } from "@/components/dashboard/calendar";
 import DashboardNotice from "@/components/dashboard/notice";
 import { useAccount } from "@/stores/account-store";
-import DashboardGantt from "@/components/dashboard/gantt";
 import { useMemo, useState } from "react";
 import LatestSimulationRow from "@/components/dashboard/latest-simulation-row";
+import WorkerDashboardRow from "@/components/dashboard/worker-row";
 
 function CardHeader({ title, desc, badge, badgeClass = "", right = null }) {
   return (
     <div className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
-        <div className="text-[13px] font-semibold leading-5 text-slate-900">
-          {title}
+        <div className="flex items-start gap-3">
+          {/* ✅ 쭉 긴 선 */}
+          <span className="w-1.5 self-stretch rounded-full bg-slate-300/70 shrink-0" />
+
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold leading-5 text-slate-900">
+              {title}
+            </div>
+            {desc ? (
+              <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                {desc}
+              </div>
+            ) : null}
+          </div>
         </div>
-        {desc ? (
-          <div className="text-[11px] leading-4 text-slate-500">{desc}</div>
-        ) : null}
       </div>
 
       {right ? (
@@ -64,10 +73,9 @@ function MyInfoCard() {
         badgeClass={roleTone}
       />
 
-      <div className="min-h-0 h-full px-4 pb-4 ">
-        <div className="h-full min-h-0 overflow-auto pr-1 ">
+      <div className="min-h-0 h-full px-4 pb-4">
+        <div className="h-full min-h-0 overflow-auto pr-1">
           <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-            {/* 1) 이름 / 권한 */}
             <div className="grid grid-cols-2 divide-x divide-slate-100">
               <div className="flex items-center gap-5 px-4 py-4">
                 <div className="text-[11px] font-medium text-slate-500">
@@ -88,7 +96,6 @@ function MyInfoCard() {
               </div>
             </div>
 
-            {/* 2) 부서 */}
             <div className="flex items-center gap-5 px-4 py-4">
               <div className="text-[11px] font-medium text-slate-500">부서</div>
               <div className="text-[13px] font-semibold text-slate-900 truncate">
@@ -96,7 +103,6 @@ function MyInfoCard() {
               </div>
             </div>
 
-            {/* 3) 이메일 */}
             <div className="flex items-center gap-5 px-4 py-4">
               <div className="text-[11px] font-medium text-slate-500">
                 이메일
@@ -106,7 +112,6 @@ function MyInfoCard() {
               </div>
             </div>
 
-            {/* 4) 오늘 근무/스케줄 */}
             <button
               type="button"
               onClick={() => (window.location.href = "/work")}
@@ -134,8 +139,16 @@ function MyInfoCard() {
 }
 
 export default function Page() {
-  const [calMonth, setCalMonth] = useState(() => new Date());
+  const account = useAccount((s) => s.account);
 
+  const role = useMemo(
+    () => String(account?.role || "").toUpperCase(),
+    [account?.role],
+  );
+  const isAdminOrPlanner = role === "ADMIN" || role === "PLANNER";
+  const isWorker = role === "WORKER";
+
+  const [calMonth, setCalMonth] = useState(() => new Date());
   const calMonthLabel = `${calMonth.getFullYear()}.${String(
     calMonth.getMonth() + 1,
   ).padStart(2, "0")}`;
@@ -150,7 +163,7 @@ export default function Page() {
 
   return (
     <DashboardShell crumbTop="메인 " crumbCurrent="대시보드">
-      <div className="h-full min-h-0 px-3 py-3">
+      <div className="h-full min-h-0 px-3 py-10">
         <div className="mx-auto flex h-full min-h-0 max-w-8xl flex-col gap-5">
           <div className="grid min-h-0 gap-5 md:grid-cols-3 md:auto-rows-[340px]">
             {/* Calendar */}
@@ -210,7 +223,7 @@ export default function Page() {
               </div>
             </section>
 
-            {/* Notice */}
+            {/* ✅ Notice (기존 위쪽 공지 블록 제거하고, DashboardNotice로 통일) */}
             <section className="min-h-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 flex flex-col">
               <CardHeader
                 title="공지"
@@ -236,7 +249,10 @@ export default function Page() {
 
               <div className="flex-1 min-h-0 p-0">
                 <div className="h-full min-h-0 overflow-hidden">
-                  <DashboardNotice onCountChange={setNoticeCount} />
+                  <DashboardNotice
+                    onCountChange={setNoticeCount}
+                    onGoNotice={() => (window.location.href = "/notice")}
+                  />
                 </div>
               </div>
             </section>
@@ -245,20 +261,38 @@ export default function Page() {
             <MyInfoCard />
           </div>
 
-          {/* Gantt */}
-          {/* Latest Simulation (1:2:1) */}
+          {/* ✅ Role 기반 하단 Row */}
           <section className="min-h-0 flex-1 overflow-visible">
-            <div className="px-2">
-              {/* <div className="text-[13px] font-semibold leading-5 text-slate-900">
-                최신 시뮬레이션
+            <div className="min-h-0 h-full relative">
+              {/* 실제 컨텐츠 */}
+              <div
+                className={[
+                  "min-h-0 h-full transition-all duration-200",
+                  isWorker
+                    ? "blur-md opacity-40 select-none pointer-events-none"
+                    : "",
+                ].join(" ")}
+                aria-hidden={isWorker ? "true" : "false"}
+              >
+                <LatestSimulationRow />
               </div>
-              <div className="text-[11px] leading-4 text-slate-500">
-                정보 · 작업량 · 기계분포
-              </div> */}
-            </div>
 
-            <div className="min-h-0 h-full ">
-              <LatestSimulationRow />
+              {/* WORKER 전용 블러 오버레이 */}
+              {isWorker && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm rounded-2xl">
+                  <div className="mx-4 w-full max-w-xl rounded-2xl border border-slate-200 bg-white/90 px-6 py-5 shadow-lg ring-1 ring-black/5">
+                    <div className="text-[14px] font-semibold text-slate-900">
+                      사용자 권한이 아닙니다.
+                    </div>
+
+                    <div className="mt-1 text-[12px] leading-5 text-slate-600">
+                      현재 계정(WORKER)은 이 기능을 사용할 수 없습니다.
+                      <br />
+                      관리자 또는 플래너 권한이 필요합니다.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </div>

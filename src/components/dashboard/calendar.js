@@ -4,8 +4,6 @@
 import * as React from "react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { addDays } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPersonalSchedule } from "@/api/simulation-api";
 import { useToken } from "@/stores/account-store";
@@ -31,6 +29,15 @@ function normalizeShift(v) {
   return s || null;
 }
 
+function shiftTone(label) {
+  // D: 주간 / S: 석간 / N: 야간 / 휴: 휴무
+  if (label === "D") return "bg-emerald-500";
+  if (label === "S") return "bg-amber-500";
+  if (label === "N") return "bg-indigo-500";
+  if (label === "휴") return "bg-slate-300";
+  return "bg-slate-400";
+}
+
 export function DashboardCalendar({ month, onMonthChange }) {
   const token = useToken((s) => s.token);
 
@@ -38,15 +45,6 @@ export function DashboardCalendar({ month, onMonthChange }) {
     const from = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     return { from, to: addDays(from, 10) };
   });
-
-  // const [month, setMonth] = React.useState(new Date());
-  // const monthLabel = `${month.getFullYear()}.${String(month.getMonth() + 1).padStart(2, "0")}`;
-
-  // const goPrev = () =>
-  //   setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1));
-  // const goNext = () =>
-  //   setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1));
-  // const goToday = () => setMonth(new Date());
 
   const [shiftMap, setShiftMap] = React.useState({});
 
@@ -102,52 +100,9 @@ export function DashboardCalendar({ month, onMonthChange }) {
   }, [token]);
 
   return (
-    <div className="h-full min-h-0 w-full overflow-hidden bg-white">
-      {/* 상단 툴바 */}
-      {/* <div className="shrink-0 px-5 pt-2 pb-2">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0">
-            <div className="text-base font-semibold tracking-tight text-slate-900">
-              {monthLabel}
-            </div>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goToday}
-              className="h-7 rounded-full bg-white px-3 text-[10px] font-medium text-slate-700 shadow-sm ring-1 ring-black/5 hover:bg-gray-50 active:bg-gray-100"
-            >
-              오늘
-            </Button>
-
-            <div className="flex items-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-black/5">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={goPrev}
-                className="h-7 w-9 hover:bg-gray-50 active:bg-gray-100"
-              >
-                <ChevronLeftIcon className="size-4 text-slate-700" />
-              </Button>
-              <div className="h-4 w-px bg-slate-200" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={goNext}
-                className="h-7 w-9 hover:bg-gray-50 active:bg-gray-100"
-              >
-                <ChevronRightIcon className="size-4 text-slate-700" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div> */}
-
-      {/* ✅ 달력 영역: 남은 높이 안에서만 렌더 + 필요 시 스크롤 */}
+    <div className="h-full min-h-0 w-full overflow-hidden bg-transparent">
       <div className="flex-1 min-h-0 px-4 pb-4">
-        <div className="h-full min-h-0 overflow-auto pr-1">
+        <div className="h-full min-h-0 overflow-auto pr-1 pretty-scroll">
           <Calendar
             mode="default"
             month={month}
@@ -155,10 +110,12 @@ export function DashboardCalendar({ month, onMonthChange }) {
             selected={range}
             onSelect={setRange}
             numberOfMonths={1}
-            className="p-0
-  [--cell-size:40px]
-  lg:[--cell-size:40px]
-"
+            className={[
+              "p-0",
+              // 셀 크기
+              "[--cell-size:40px]",
+              "lg:[--cell-size:40px]",
+            ].join(" ")}
             classNames={{
               month_caption: "hidden",
               caption_label: "hidden",
@@ -168,7 +125,6 @@ export function DashboardCalendar({ month, onMonthChange }) {
               weekday:
                 "flex-1 text-left pl-1 pb-1 text-[10px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
 
-              // ✅ 56 고정 제거 (var 기반)
               week: "flex w-full h-[var(--cell-size)]",
               day: "relative w-full h-[var(--cell-size)] text-left align-top",
             }}
@@ -194,10 +150,11 @@ export function DashboardCalendar({ month, onMonthChange }) {
                     className={cn(
                       "w-full h-[var(--cell-size)] p-0 overflow-hidden rounded-xl",
                       "flex flex-col items-stretch justify-start",
-                      "hover:bg-gray-100 active:bg-gray-200 transition-colors",
+                      "transition-colors",
+                      "hover:bg-slate-100/70 active:bg-slate-200/60",
                       isOutside && "opacity-40",
                       isToday &&
-                        "bg-transparent hover:bg-gray-100 active:bg-gray-200",
+                        "bg-indigo-50/60 ring-1 ring-indigo-100 hover:bg-indigo-50 active:bg-indigo-100/60",
                     )}
                   >
                     <div className="flex items-start justify-between px-2 pt-2">
@@ -221,10 +178,24 @@ export function DashboardCalendar({ month, onMonthChange }) {
                       </div>
                     </div>
 
-                    {/* 점 표시 */}
+                    {/* ✅ 근무/휴무 칩 표시 (최대 3개) */}
                     {hasWork && !isToday ? (
-                      <div className="mt-auto px-2 pb-2">
-                        <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      <div className="mt-auto px-2 pb-2 flex items-center gap-1">
+                        {labels.slice(0, 3).map((lb) => (
+                          <span
+                            key={lb}
+                            className={cn(
+                              "inline-block h-1.5 w-1.5 rounded-full",
+                              shiftTone(lb),
+                            )}
+                            title={lb}
+                          />
+                        ))}
+                        {labels.length > 3 ? (
+                          <span className="text-[9px] text-slate-400 leading-none">
+                            +{labels.length - 3}
+                          </span>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="mt-auto px-2 pb-2 opacity-0 select-none">
