@@ -126,7 +126,7 @@ export default function SimulationCreateDrawer({
                     시뮬레이션 생성
                   </DrawerTitle>
                   <div className="mt-0.5 text-[12px] text-slate-500 truncate">
-                    제목/생산대상/시작일시를 입력해 생성합니다.
+                    제목/설명/생산대상 입력해 생성합니다.
                   </div>
                 </div>
               </div>

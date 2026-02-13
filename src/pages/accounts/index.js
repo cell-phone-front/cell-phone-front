@@ -1,11 +1,11 @@
 // src/pages/accounts/index.js
 import { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/router";
 import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
-import { ArrowDownToLine, FileUp, X } from "lucide-react";
-
-import { getMembers, parseMemberXLS, postMembers } from "@/api/member-api";
+import { ChevronLeft, ChevronRight, Search, X, Pencil } from "lucide-react";
+import { getMembers } from "@/api/member-api";
 
 /* ===============================
    util
@@ -20,18 +20,30 @@ function cryptoId() {
   }
 }
 
-/** 전화번호 유틸: 하이픈/공백 제거 후 숫자만 11자리 */
-function normalizePhone(v) {
-  return String(v || "")
-    .replace(/\D/g, "")
-    .slice(0, 11);
-}
-function isValidPhone(phone) {
-  return /^010\d{8}$/.test(phone);
+function normalizeDate(v) {
+  if (v == null || v === "") return "";
+  if (typeof v === "number") {
+    const ms = (v - 25569) * 86400 * 1000;
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    return "";
+  }
+  const s = String(v).trim();
+  if (s.includes("T")) return s.split("T")[0];
+  if (s.includes(" ")) return s.split(" ")[0];
+  if (s.includes("/") || s.includes(".")) {
+    const parts = s.split(/[/\.]/);
+    if (parts.length >= 3) {
+      const y = parts[0];
+      const m = String(parts[1]).padStart(2, "0");
+      const d = String(parts[2]).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return s;
 }
 
-/** 서버 응답이 snake_case든 camelCase든 다 받아서 통일 */
-function normalizeMember(r, flag = "Y") {
+function normalizeMember(r) {
   return {
     _rid: r._rid || cryptoId(),
     id: r.id ?? "",
@@ -51,116 +63,76 @@ function normalizeMember(r, flag = "Y") {
         r.hire_dt ??
         "",
     ),
-    flag: r.flag ?? flag,
   };
 }
 
-function normalizeDate(v) {
-  if (v == null || v === "") return "";
+function RoleBadge({ role }) {
+  const r = String(role || "").toUpperCase();
+  if (!r) return <span className="text-slate-400">-</span>;
 
-  // 엑셀 Serial Date(숫자) 처리
-  if (typeof v === "number") {
-    const ms = (v - 25569) * 86400 * 1000;
-    const d = new Date(ms);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-    return "";
-  }
+  const cls =
+    r === "ADMIN"
+      ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+      : r === "PLANNER"
+        ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
+        : r === "WORKER"
+          ? "bg-slate-50 text-slate-700 ring-1 ring-slate-200"
+          : "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
 
-  const s = String(v).trim();
-  if (s.includes("T")) return s.split("T")[0];
-  if (s.includes(" ")) return s.split(" ")[0];
-
-  if (s.includes("/") || s.includes(".")) {
-    const parts = s.split(/[/\.]/);
-    if (parts.length >= 3) {
-      const y = parts[0];
-      const m = String(parts[1]).padStart(2, "0");
-      const d = String(parts[2]).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    }
-  }
-  return s;
-}
-
-function Badge({ color, children }) {
-  const map = {
-    green: "bg-green-50 text-green-600 border-green-200",
-    indigo: "bg-indigo-50 text-indigo-600 border-indigo-200",
-    gray: "bg-slate-50 text-slate-500 border-slate-200",
-  };
   return (
     <span
-      className={`
-        inline-flex justify-center min-w-[64px]
-        text-[11px] px-2 py-0.5 rounded-full
-        border font-medium
-        ${map[color] || map.gray}
-      `}
+      className={[
+        "inline-flex items-center justify-center",
+        "h-6 px-2.5 rounded-full",
+        "text-[11px] font-semibold whitespace-nowrap",
+        cls,
+      ].join(" ")}
+      title={r}
     >
-      {children}
+      {r}
     </span>
   );
 }
 
-/* ===============================
-   input + ... + (옵션) hover 툴팁
-   - Tasks 페이지 TruncInput 그대로
-=============================== */
-function TruncInput({
-  value,
-  onChange,
-  placeholder,
-  tooltip,
-  onClick,
-  className = "",
-  alignRight = false,
-  type = "text",
-  onBlur,
-}) {
-  const v = value ?? "";
+function StatCard({ title, value, sub, tone = "indigo" }) {
+  const toneMap = {
+    indigo: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    slate: "bg-slate-50 text-slate-700 ring-slate-100",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    rose: "bg-rose-50 text-rose-700 ring-rose-100",
+  };
   return (
-    <div className="group relative w-full">
-      <input
-        type={type}
-        value={v}
-        onChange={onChange}
-        onClick={onClick}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        title={tooltip ? "" : String(v)}
-        className={[
-          "h-9 w-full rounded-md border px-3 bg-white text-sm outline-none transition",
-          "hover:border-gray-300 focus:ring-2 focus:ring-gray-200",
-          "truncate whitespace-nowrap overflow-hidden",
-          alignRight ? "text-right" : "",
-          className,
-        ].join(" ")}
-      />
-      {tooltip ? (
-        <div
-          className="
-            pointer-events-none
-            absolute bottom-full left-0 mb-2
-            hidden group-hover:block
-            z-50
-            max-w-[520px]
-            rounded-lg border bg-white
-            px-3 py-2 text-[12px] text-gray-800
-            shadow-lg
-            whitespace-pre-wrap break-words
-          "
-        >
-          {String(v || "-")}
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-2 hover:shadow transition">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-slate-500">
+            {title}
+          </div>
+          <div className="mt-0.5 text-[18px] font-black text-slate-900 tabular-nums">
+            {value}
+          </div>
+          {sub ? (
+            <div className="mt-0.5 text-[10px] text-slate-500 truncate">
+              {sub}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+
+        <div
+          className={[
+            "shrink-0 h-9 w-9 rounded-2xl grid place-items-center ring-1",
+            toneMap[tone] || toneMap.indigo,
+          ].join(" ")}
+        >
+          <span className="text-[12px] font-black">#</span>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ===============================
-   Row Detail (모달처럼, Portal + fixed)
-   - 테이블/스크롤 절대 안 밀림
-   - 아래 공간 부족하면 위로 flip
+   Row Detail (Portal + fixed)
 =============================== */
 function RowDetailModalLine({ open, onClose, anchorEl, row }) {
   const [style, setStyle] = useState(null);
@@ -177,12 +149,9 @@ function RowDetailModalLine({ open, onClose, anchorEl, row }) {
       left = Math.min(left, window.innerWidth - width - 12);
       left = Math.max(12, left);
 
-      // 1줄 바 높이
-      const h = 46;
-
+      const h = 52;
       const downTop = a.bottom + gap;
       const canDown = downTop + h < window.innerHeight - 12;
-
       const top = canDown ? downTop : a.top - gap - h;
 
       setStyle({
@@ -208,60 +177,33 @@ function RowDetailModalLine({ open, onClose, anchorEl, row }) {
 
   return createPortal(
     <div style={style}>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-lg ring-2 ring-black/5 w-full">
-        <div className="flex items-center gap-2 px-5 py-3 w-full">
-          <span className="text-[12px] font-semibold text-slate-800 whitespace-nowrap">
-            상세
-          </span>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 w-full overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-3">
+          <div className="h-8 w-8 rounded-2xl bg-indigo-600 text-white grid place-items-center shadow-sm shrink-0">
+            <span className="text-[12px] font-black">i</span>
+          </div>
 
-          <span className="mx-3 h-3 w-px bg-slate-200" />
-
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-slate-700 flex-1 min-w-0">
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Id</span>:
-              <span className="ml-1 font-medium">{row.id || "-"}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold text-slate-900 truncate">
+              {row.name || "-"}{" "}
+              <span className="text-slate-400 font-medium">
+                · {row.id || "-"}
+              </span>
             </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Name</span>:
-              <span className="ml-1 font-medium">{row.name || "-"}</span>
+            <div className="mt-0.5 text-[11px] text-slate-600 truncate">
+              {row.email || "-"} · {row.phoneNumber || "-"} · {row.dept || "-"}{" "}
+              / {row.workTeam || "-"} · {row.hireDate || "-"}
             </div>
+          </div>
 
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Email</span>:
-              <span className="ml-1 font-medium">{row.email || "-"}</span>
-            </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Phone</span>:
-              <span className="ml-1 font-medium">{row.phoneNumber || "-"}</span>
-            </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Dept</span>:
-              <span className="ml-1 font-medium">{row.dept || "-"}</span>
-            </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Team</span>:
-              <span className="ml-1 font-medium">{row.workTeam || "-"}</span>
-            </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Role</span>:
-              <span className="ml-1 font-medium">{row.role || "-"}</span>
-            </div>
-
-            <div className="whitespace-nowrap">
-              <span className="font-semibold text-slate-900">Hire</span>:
-              <span className="ml-1 font-medium">{row.hireDate || "-"}</span>
-            </div>
+          <div className="shrink-0">
+            <RoleBadge role={row.role} />
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="shrink-0 h-9 w-9 rounded-xl grid place-items-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="close"
           >
             <X size={16} />
@@ -273,47 +215,47 @@ function RowDetailModalLine({ open, onClose, anchorEl, row }) {
   );
 }
 
+function CellText({ value, title }) {
+  const v = value == null || value === "" ? "-" : String(value);
+  return (
+    <div
+      className="h-10 w-full flex items-center px-2 text-[13px] text-slate-800 truncate"
+      title={title ? String(title) : v}
+    >
+      {v}
+    </div>
+  );
+}
+
 export default function AccountsPage() {
+  const router = useRouter();
   const token = useToken((s) => s.token);
 
   const [data, setData] = useState([]);
-  const [selected, setSelected] = useState(() => new Set());
-  const [dirty, setDirty] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
 
-  // ✅ 검색
   const [query, setQuery] = useState("");
 
-  const fileRef = useRef(null);
-
-  // ✅ 모달 라인 열림 상태
+  // 모달 라인
   const [openRid, setOpenRid] = useState(null);
   const rowRefs = useRef({}); // rid -> tr element
-
-  // ✅ 전화번호 touched(포커스 out 이후 빨강)
-  const [phoneTouched, setPhoneTouched] = useState(() => new Set());
 
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
     const t = setTimeout(() => {
-      // getMembers가 query를 안 받는 구조면, 아래에서 프론트 필터만 쓰셔도 됩니다.
-      // 여기서는 "getMembers(token)"로 받고 -> 아래 filteredData에서 검색합니다.
       getMembers(token)
         .then((json) => {
           if (!alive) return;
           const list =
             json.memberList || json.members || json.items || json.data || [];
-          const rows = (list || []).map((r) => normalizeMember(r, "Y"));
-
+          const rows = (list || []).map((r) => normalizeMember(r));
           setData(rows);
-          setSelected(new Set());
           setPageIndex(0);
-          setDirty(false);
           setLoadError("");
           setOpenRid(null);
         })
@@ -321,7 +263,7 @@ export default function AccountsPage() {
           console.error(err);
           setLoadError(err?.message || "Accounts 불러오기 실패");
         });
-    }, 200);
+    }, 150);
 
     return () => {
       alive = false;
@@ -329,7 +271,6 @@ export default function AccountsPage() {
     };
   }, [token]);
 
-  // ✅ 프론트 검색(서버 검색으로 바꾸고 싶으면 getMembers(token, query)로 바꾸면 됨)
   const filteredData = useMemo(() => {
     const q = String(query || "")
       .trim()
@@ -349,7 +290,6 @@ export default function AccountsPage() {
       ]
         .map((v) => String(v || "").toLowerCase())
         .join(" ");
-
       return hay.includes(q);
     });
   }, [data, query]);
@@ -363,141 +303,9 @@ export default function AccountsPage() {
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, pageIndex, pageSize, pageCount]);
 
-  const selectedCount = selected.size;
-
-  const isAllPageSelected =
-    pageRows.length > 0 && pageRows.every((r) => selected.has(r._rid));
-  const isSomePageSelected =
-    pageRows.some((r) => selected.has(r._rid)) && !isAllPageSelected;
-
-  const updateCell = (_rid, key, value) => {
-    setData((prev) =>
-      prev.map((r) => (r._rid === _rid ? { ...r, [key]: value } : r)),
-    );
-    setDirty(true);
-  };
-
-  const addRow = () => {
-    const row = {
-      _rid: cryptoId(),
-      id: "",
-      name: "",
-      email: "",
-      phoneNumber: "",
-      dept: "",
-      workTeam: "",
-      role: "",
-      hireDate: "",
-      flag: "new",
-    };
-    setData((prev) => [row, ...prev]);
-    setSelected(new Set());
-    setPageIndex(0);
-    setDirty(true);
-  };
-
-  const toggleOne = (_rid, checked) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(_rid);
-      else next.delete(_rid);
-      return next;
-    });
-  };
-
-  const toggleAllPage = (checked) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      pageRows.forEach((r) => {
-        if (checked) next.add(r._rid);
-        else next.delete(r._rid);
-      });
-      return next;
-    });
-  };
-
-  const deleteSelected = () => {
-    if (selected.size === 0) return;
-
-    const del = new Set(selected);
-    setData((prev) => prev.filter((r) => !del.has(r._rid)));
-    setSelected(new Set());
-    setDirty(true);
-
-    if (openRid && del.has(openRid)) setOpenRid(null);
-
-    setPageIndex((p) => {
-      const nextTotal = Math.max(0, totalRows - del.size);
-      const nextPageCount = Math.max(1, Math.ceil(nextTotal / pageSize));
-      return Math.min(p, nextPageCount - 1);
-    });
-  };
-
-  const uploadHandle = () => {
-    if (!token) {
-      window.alert("토큰이 없어서 업로드할 수 없어요. 다시 로그인 해주세요.");
-      return;
-    }
-    fileRef.current?.click();
-  };
-
-  const fileChangeHandle = (e) => {
-    const file = e?.target?.files?.[0];
-    if (!file || !token) return;
-
-    parseMemberXLS(file, token)
-      .then((json) => {
-        const list =
-          json.memberList || json.items || json.members || json.data || [];
-        const items = (list || []).map((r) => ({
-          ...normalizeMember(r, "pre"),
-          _rid: cryptoId(),
-          flag: "pre",
-        }));
-
-        setData((prev) => [...items, ...prev]);
-        setPageIndex(0);
-        setSelected(new Set());
-        setDirty(true);
-        setLoadError("");
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoadError(err?.message || "엑셀 파싱 실패");
-      });
-
-    e.target.value = "";
-  };
-
-  const saveHandle = () => {
-    if (!token) return;
-
-    // 저장 시점 검증(숫자만 기준)
-    const invalidPhones = data.filter((r) => {
-      const p = normalizePhone(r.phoneNumber);
-      return r.phoneNumber && !isValidPhone(p);
-    });
-    if (invalidPhones.length > 0) {
-      window.alert("전화번호는 010으로 시작하는 11자리 숫자여야 합니다.");
-      return;
-    }
-
-    const payload = data.map(({ _rid, flag, ...rest }) => ({
-      ...rest,
-      phoneNumber: normalizePhone(rest.phoneNumber),
-      hireDate: rest.hireDate === "" ? null : rest.hireDate,
-    }));
-
-    postMembers(payload, token)
-      .then((ok) => {
-        window.alert(ok ? "저장 완료" : "저장 실패");
-        if (ok) setDirty(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoadError(err?.message || "저장 실패");
-      });
-  };
+  useEffect(() => {
+    if (pageIndex > pageCount - 1) setPageIndex(Math.max(0, pageCount - 1));
+  }, [pageIndex, pageCount]);
 
   const goPrev = () => setPageIndex((p) => Math.max(0, p - 1));
   const goNext = () => setPageIndex((p) => Math.min(pageCount - 1, p + 1));
@@ -511,456 +319,338 @@ export default function AccountsPage() {
 
   const anchorEl = openRid ? rowRefs.current[openRid] : null;
 
+  const stats = useMemo(() => {
+    const all = filteredData;
+    const upper = (v) => String(v || "").toUpperCase();
+    const admin = all.filter((r) => upper(r.role) === "ADMIN").length;
+    const planner = all.filter((r) => upper(r.role) === "PLANNER").length;
+    const worker = all.filter((r) => upper(r.role) === "WORKER").length;
+    return { total: all.length, admin, planner, worker };
+  }, [filteredData]);
+
   return (
     <DashboardShell crumbTop="관리" crumbCurrent="accounts">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 px-3 py-3">
-        <div className="flex gap-4 items-center">
-          <h2 className="text-2xl font-bold tracking-tight">계정 관리</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            행 추가/ 파일 업로드 후 저장됩니다.
-          </p>
-        </div>
+      <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
+        <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
+          {/* ===== Top summary ===== */}
+          <div className="shrink-0 rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
+            <div className="px-5 py-4">
+              {/* title row */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white grid place-items-center shadow-sm shrink-0">
+                      <span className="text-[14px] font-black">A</span>
+                    </div>
 
-        {/* 검색 */}
-        <div className="relative mr-[10px]">
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPageIndex(0);
-            }}
-            placeholder="검색 (이름/부서/부서팀)"
-            className="
-              h-9 w-[320px] rounded-md border bg-white
-              px-3 pr-8 text-[12px] outline-none transition
-              hover:border-slate-300
-              focus:ring-2 focus:ring-gray-200
-              placeholder:text-[11px]
-              placeholder:text-gray-400
-            "
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setPageIndex(0);
-              }}
-              className="
-                absolute right-2 top-1/2 -translate-y-1/2
-                text-gray-400 transition
-                hover:text-indigo-500 active:text-indigo-700
-              "
-              aria-label="clear"
-            >
-              ✕
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 px-6">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-          <span>총 {totalRows.toLocaleString()}건</span>
-          <span className="mx-1 h-3 w-px bg-gray-400" />
-          <span>선택 {selectedCount.toLocaleString()}건</span>
-          <span className="mx-1 h-4 w-px" />
-
-          <button
-            type="button"
-            onClick={deleteSelected}
-            disabled={selectedCount === 0}
-            className={[
-              "h-9.5 rounded-md border px-5 text-sm transition",
-              selectedCount === 0
-                ? "bg-white text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
-                : "bg-white text-red-500 border-red-200 hover:bg-red-50 cursor-pointer",
-            ].join(" ")}
-          >
-            선택 삭제
-          </button>
-
-          {loadError ? (
-            <span className="ml-2 text-[12px] text-red-500">{loadError}</span>
-          ) : null}
-        </div>
-
-        <div className="ml-auto flex items-center gap-4">
-          <button
-            type="button"
-            onClick={uploadHandle}
-            className="flex items-center justify-center gap-2 text-slate-700 text-sm font-medium cursor-pointer"
-          >
-            <FileUp size={15} />
-            <span>XLS 파일</span>
-          </button>
-
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            accept=".xls,.xlsx"
-            onChange={fileChangeHandle}
-          />
-
-          <button
-            type="button"
-            onClick={addRow}
-            className="
-              h-9.5 rounded-md border border-gray-200 bg-white px-5 text-sm text-gray-600
-              transition cursor-pointer font-medium
-              hover:bg-gray-600 hover:text-white
-              focus:outline-none focus:ring-1 focus:ring-gray-500
-            "
-          >
-            + 행 추가
-          </button>
-
-          <button
-            type="button"
-            onClick={saveHandle}
-            disabled={!dirty}
-            className={`
-              h-9 px-5 rounded-md border
-              flex items-center gap-2 justify-center
-              text-sm font-semibold
-              transition-all duration-200
-              focus:outline-none
-              ${
-                dirty
-                  ? `
-                    bg-indigo-600 text-white border-indigo-600
-                    hover:bg-indigo-500 active:bg-indigo-700
-                    active:scale-[0.97]
-                    cursor-pointer shadow-sm
-                    focus:ring-2 focus:ring-indigo-200
-                  `
-                  : `
-                    bg-indigo-50 text-indigo-300 border-indigo-100
-                    cursor-not-allowed
-                  `
-              }
-            `}
-          >
-            <ArrowDownToLine size={16} className="shrink-0" />
-            <span>저장</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Card */}
-      <div className="px-4 pt-4">
-        <div className="rounded-md bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
-          <div className="relative overflow-x-hidden">
-            {/* ✅ 모달처럼 겹쳐서 뜨는 1줄 상세 */}
-            <RowDetailModalLine
-              open={!!openRid}
-              onClose={() => setOpenRid(null)}
-              anchorEl={anchorEl}
-              row={openRowData}
-            />
-
-            <div className="h-full overflow-auto">
-              <table className="w-full border-separate border-spacing-0 table-fixed">
-                <thead className="sticky top-0 z-10 bg-gray-600 text-white">
-                  <tr className="text-left text-sm">
-                    <th className="w-[44px] border-b border-slate-200 px-3 py-3">
-                      <div className="flex justify-center">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 accent-pink-700"
-                          checked={isAllPageSelected}
-                          ref={(el) => {
-                            if (!el) return;
-                            el.indeterminate = isSomePageSelected;
-                          }}
-                          onChange={(e) => toggleAllPage(e.target.checked)}
-                        />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="text-[18px] font-black text-slate-900 truncate">
+                          Accounts
+                        </div>
+                        <span className="text-[12px] font-semibold text-slate-400">
+                          전체보기
+                        </span>
                       </div>
-                    </th>
+                      <div className="text-[12px] text-slate-500 truncate">
+                        전체보기(읽기 전용)입니다. 수정은 ‘수정하기’에서
+                        진행해주세요.
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                    <th className="w-[110px] border-b border-slate-200 px-3 py-3 font-medium">
-                      사원번호
-                    </th>
-                    <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      이름
-                    </th>
-                    <th className="w-[200px] border-b border-slate-200 px-3 py-3 font-medium">
-                      이메일
-                    </th>
-                    <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      전화번호
-                    </th>
-                    <th className="w-[150px] border-b border-slate-200 px-3 py-3 font-medium">
-                      부서
-                    </th>
-                    <th className="w-[90px] border-b border-slate-200 px-3 py-3 font-medium">
-                      부서팀
-                    </th>
-                    <th className="w-[120px] border-b border-slate-200 px-3 py-3 font-medium">
-                      직급
-                    </th>
-                    <th className="w-[140px] border-b border-slate-200 px-3 py-3 font-medium">
-                      입사 일자
-                    </th>
-                    <th className="w-[90px] border-b border-slate-200 px-3 py-3 font-medium">
-                      상태
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="text-sm">
-                  {pageRows.map((row) => {
-                    const isUploaded = row.flag === "pre";
-                    const isNew = row.flag === "new";
-                    const isOpen = openRid === row._rid;
-
-                    const digits = normalizePhone(row.phoneNumber);
-                    const touched = phoneTouched.has(row._rid);
-                    const showRed =
-                      touched && digits.length > 0 && digits.length !== 11;
-
-                    return (
-                      <tr
-                        key={row._rid}
-                        ref={(el) => {
-                          if (el) rowRefs.current[row._rid] = el;
+                {/* actions */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="relative w-[420px]">
+                    <Search
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <input
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        setPageIndex(0);
+                      }}
+                      placeholder="검색 (Id/Name/Email/Phone/Dept/Team/Role/HireDate)"
+                      className="
+                        h-10 w-full rounded-full
+                        border border-slate-200 bg-white
+                        pl-9 pr-10 text-[13px]
+                        outline-none transition
+                        hover:border-slate-300
+                        focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                        placeholder:text-[12px] placeholder:text-slate-400
+                      "
+                    />
+                    {query ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery("");
+                          setPageIndex(0);
                         }}
-                        className={[
-                          "transition-colors hover:bg-gray-200 cursor-pointer",
-                          selected.has(row._rid) ? "bg-gray-300" : "",
-                          !selected.has(row._rid) && isOpen
-                            ? "bg-indigo-50/40"
-                            : "",
-                        ].join(" ")}
-                        onClick={(e) => {
-                          const tag = String(
-                            e.target?.tagName || "",
-                          ).toLowerCase();
-                          if (
-                            tag === "input" ||
-                            tag === "button" ||
-                            tag === "select" ||
-                            tag === "option" ||
-                            tag === "svg" ||
-                            tag === "path"
-                          )
-                            return;
-                          openRow(row._rid);
-                        }}
+                        className="
+                          absolute right-2 top-1/2 -translate-y-1/2
+                          h-8 w-8 rounded-full
+                          grid place-items-center
+                          text-slate-400 hover:text-indigo-600 hover:bg-indigo-50
+                        "
+                        aria-label="clear"
                       >
-                        {/* checkbox */}
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <div className="flex justify-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-pink-700 rounded cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-pink-200"
-                              checked={selected.has(row._rid)}
-                              onChange={(e) =>
-                                toggleOne(row._rid, e.target.checked)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                        </td>
+                        <X size={16} />
+                      </button>
+                    ) : null}
+                  </div>
 
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.id}
-                            placeholder="Id"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "id", e.target.value)
-                            }
-                          />
-                        </td>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/accounts/edit")}
+                    className="
+                      h-10 px-5 rounded-full
+                      bg-indigo-600 text-white
+                      text-[13px] font-semibold
+                      hover:bg-indigo-500 active:bg-indigo-700
+                      active:scale-[0.98]
+                      shadow-sm
+                      focus:outline-none focus:ring-2 focus:ring-indigo-200
+                      inline-flex items-center gap-2
+                    "
+                  >
+                    <Pencil size={15} />
+                    수정하기
+                  </button>
+                </div>
+              </div>
 
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.name}
-                            placeholder="Name"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "name", e.target.value)
-                            }
-                          />
-                        </td>
+              {/* stat cards */}
+              <div className="mt-4 grid grid-cols-4 gap-3">
+                <StatCard
+                  title="TOTAL"
+                  value={stats.total}
+                  sub="검색 조건이 적용된 전체 인원"
+                  tone="slate"
+                />
+                <StatCard
+                  title="ADMIN"
+                  value={stats.admin}
+                  sub="시스템 관리자"
+                  tone="rose"
+                />
+                <StatCard
+                  title="PLANNER"
+                  value={stats.planner}
+                  sub="계획/운영 담당"
+                  tone="indigo"
+                />
+                <StatCard
+                  title="WORKER"
+                  value={stats.worker}
+                  sub="현장 작업자"
+                  tone="emerald"
+                />
+              </div>
 
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.email}
-                            placeholder="Email"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "email", e.target.value)
-                            }
-                          />
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.phoneNumber}
-                            placeholder="010xxxxxxxx"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() =>
-                              setPhoneTouched((prev) => {
-                                const next = new Set(prev);
-                                next.add(row._rid);
-                                return next;
-                              })
-                            }
-                            onChange={(e) =>
-                              updateCell(
-                                row._rid,
-                                "phoneNumber",
-                                normalizePhone(e.target.value),
-                              )
-                            }
-                            className={showRed ? "border-red-400" : ""}
-                          />
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.dept}
-                            placeholder="Dept"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "dept", e.target.value)
-                            }
-                          />
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            value={row.workTeam}
-                            placeholder="Team"
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "workTeam", e.target.value)
-                            }
-                          />
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <select
-                            value={row.role ?? ""}
-                            onChange={(e) =>
-                              updateCell(row._rid, "role", e.target.value)
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                            className={[
-                              "h-9 w-full rounded-md border bg-white px-2 text-sm",
-                              row.role ? "" : "text-gray-500",
-                            ].join(" ")}
-                          >
-                            <option value="">-</option>
-                            <option value="ADMIN">ADMIN</option>
-                            <option value="PLANNER">PLANNER</option>
-                            <option value="WORKER">WORKER</option>
-                          </select>
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <TruncInput
-                            type="date"
-                            value={row.hireDate ?? ""}
-                            placeholder=""
-                            tooltip={false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              updateCell(row._rid, "hireDate", e.target.value)
-                            }
-                          />
-                        </td>
-
-                        <td className="border-b border-slate-100 px-3 py-2">
-                          <div className="flex items-center">
-                            {isUploaded ? (
-                              <Badge color="green">Imported</Badge>
-                            ) : isNew ? (
-                              <Badge color="indigo">New</Badge>
-                            ) : (
-                              <Badge color="gray">Saved</Badge>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {pageRows.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="p-0">
-                        <button
-                          type="button"
-                          onClick={addRow}
-                          className="
-                            w-full px-4 py-10 text-center text-sm text-gray-500
-                            hover:bg-indigo-50 focus:outline-none
-                            focus:ring-2 focus:ring-indigo-200 cursor-pointer
-                          "
-                        >
-                          <span className="font-medium text-indigo-700">
-                            클릭해서 행 추가
-                          </span>{" "}
-                          또는 XLS 업로드 해주세요.
-                        </button>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {loadError ? (
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+                  {loadError}
+                </div>
+              ) : null}
             </div>
           </div>
-        </div>
 
-        {/* 페이지네이션 footer (Tasks 스타일) */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={pageIndex === 0}
-            className={[
-              "h-8 px-3 text-[12px] rounded-md transition",
-              pageIndex === 0
-                ? "text-gray-300 cursor-not-allowed"
-                : "text-gray-700 hover:bg-gray-200 cursor-pointer",
-            ].join(" ")}
-          >
-            이전
-          </button>
+          {/* ===== Table ===== */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden flex-1 min-h-0 flex flex-col">
+              <RowDetailModalLine
+                open={!!openRid}
+                onClose={() => setOpenRid(null)}
+                anchorEl={anchorEl}
+                row={openRowData}
+              />
 
-          <div className="min-w-20 text-center text-[13px]">
-            <span className="font-medium">{pageIndex + 1}</span>
-            <span className="text-gray-500"> / {pageCount}</span>
+              {/* ✅ operation처럼: header table / body scroll table 분리 */}
+              <div className="shrink-0">
+                <table className="w-full table-fixed border-collapse">
+                  <colgroup>
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "240px" }} />
+                    <col style={{ width: "140px" }} />
+                    <col style={{ width: "150px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "140px" }} />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10">
+                    <tr className="text-left text-[12px] font-semibold text-slate-600 bg-slate-50">
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        사원번호
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        이름
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        Email
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        전화번호
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        부서
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        Team
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        직급
+                      </th>
+                      <th className="border-b border-slate-200 px-4 py-3">
+                        입사 일자
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+                <table className="w-full table-fixed border-collapse">
+                  <colgroup>
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "240px" }} />
+                    <col style={{ width: "140px" }} />
+                    <col style={{ width: "150px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "140px" }} />
+                  </colgroup>
+
+                  <tbody className="text-[13px]">
+                    {pageRows.map((row) => {
+                      const isOpen = openRid === row._rid;
+
+                      return (
+                        <tr
+                          key={row._rid}
+                          ref={(el) => {
+                            if (el) rowRefs.current[row._rid] = el;
+                          }}
+                          className={[
+                            "group transition-colors cursor-pointer",
+                            isOpen
+                              ? "bg-indigo-50/60"
+                              : "hover:bg-indigo-50/40",
+                          ].join(" ")}
+                          onClick={(e) => {
+                            const tag = String(
+                              e.target?.tagName || "",
+                            ).toLowerCase();
+                            if (tag === "button" || tag === "a") return;
+                            openRow(row._rid);
+                          }}
+                        >
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.id} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.name} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.email} title={row.email} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.phoneNumber} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.dept} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.workTeam} />
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <div className="h-10 flex items-center">
+                              <RoleBadge role={row.role} />
+                            </div>
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-2">
+                            <CellText value={row.hireDate} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {pageRows.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="px-6 py-14 text-center text-[13px] text-slate-500"
+                        >
+                          표시할 데이터가 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* footer */}
+              <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
+                <div className="text-[12px] text-slate-500">
+                  총{" "}
+                  <span className="font-semibold text-slate-900 tabular-nums">
+                    {totalRows}
+                  </span>
+                  건 · 페이지{" "}
+                  <span className="font-semibold text-slate-900 tabular-nums">
+                    {pageIndex + 1}
+                  </span>
+                  /{" "}
+                  <span className="font-semibold text-slate-900 tabular-nums">
+                    {pageCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={pageIndex === 0}
+                    className={[
+                      "h-9 px-3 rounded-xl text-[12px] font-semibold",
+                      "inline-flex items-center gap-1 transition",
+                      pageIndex === 0
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-slate-700 hover:bg-slate-100 cursor-pointer",
+                    ].join(" ")}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    이전
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={pageIndex >= pageCount - 1}
+                    className={[
+                      "h-9 px-3 rounded-xl text-[12px] font-semibold",
+                      "inline-flex items-center gap-1 transition",
+                      pageIndex >= pageCount - 1
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-slate-700 hover:bg-slate-100 cursor-pointer",
+                    ].join(" ")}
+                  >
+                    다음
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={pageIndex >= pageCount - 1}
-            className={[
-              "h-8 px-3 text-[12px] rounded-md transition",
-              pageIndex >= pageCount - 1
-                ? "text-gray-300 cursor-not-allowed"
-                : "text-gray-700 hover:bg-gray-200 cursor-pointer",
-            ].join(" ")}
-          >
-            다음
-          </button>
+          {/* /Table */}
         </div>
       </div>
-
-      <div className="h-4" />
     </DashboardShell>
   );
 }
