@@ -25,6 +25,11 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSearch,
+  Layers,
+  CheckCircle,
+  AlertCircle,
+  ClipboardList,
+  X,
 } from "lucide-react";
 
 /* ===============================
@@ -51,9 +56,15 @@ function buildStartDateTime(dateStr, timeStr) {
   if (!d) return "";
   return `${d}T${t}:00`;
 }
-
+function normStatus(v) {
+  const s = String(v || "")
+    .trim()
+    .toUpperCase();
+  if (s === "대기중") return "READY";
+  return s;
+}
 /* ===============================
-   UI pieces (폰트/굵기 낮춤)
+   UI (Tasks 톤)
 =============================== */
 function StatusPill({ status, clickable, onClick }) {
   const st = String(status || "").toUpperCase();
@@ -65,7 +76,7 @@ function StatusPill({ status, clickable, onClick }) {
         onClick={onClick}
         disabled={!clickable}
         className={[
-          "inline-flex items-center gap-1.5 min-w-[86px] justify-center",
+          "inline-flex items-center gap-1.5 min-w-[90px] justify-center",
           "text-[10px] px-2 py-1 rounded-full border font-medium",
           "transition",
           clickable
@@ -81,7 +92,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "PENDING") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200 font-medium">
+      <span className="inline-flex items-center gap-1.5 min-w-[90px] justify-center text-[10px] px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200 font-medium">
         PENDING <Spinner className="h-3.5 w-3.5" />
       </span>
     );
@@ -89,7 +100,7 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (st === "OPTIMAL") {
     return (
-      <span className="inline-flex items-center gap-1.5 min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+      <span className="inline-flex items-center gap-1.5 min-w-[90px] justify-center text-[10px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
         OPTIMAL <Check className="h-3.5 w-3.5" />
       </span>
     );
@@ -97,60 +108,77 @@ function StatusPill({ status, clickable, onClick }) {
 
   if (!st || st === "-") {
     return (
-      <span className="inline-flex items-center min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
+      <span className="inline-flex items-center min-w-[90px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
         -
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center min-w-[86px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
+    <span className="inline-flex items-center min-w-[90px] justify-center text-[10px] px-2 py-1 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
       {st}
     </span>
   );
 }
 
-function StatCard({ label, value, sub, tone = "slate", icon }) {
+function StatCard({
+  title,
+  value,
+  sub,
+  tone = "indigo",
+  icon = null,
+  valueClass = "",
+}) {
   const toneMap = {
-    slate: "text-slate-900",
-    indigo: "text-indigo-700",
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
+    indigo: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    slate: "bg-slate-50 text-slate-700 ring-slate-100",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    rose: "bg-rose-50 text-rose-700 ring-rose-100",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100",
   };
 
   return (
-    <div className="relative rounded-2xl border bg-white p-4 shadow-sm ring-black/5">
-      <div className="text-[10px] font-medium text-slate-500">{label}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 hover:shadow transition">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-slate-500">
+            {title}
+          </div>
 
-      {icon ? (
-        <div className="absolute right-4 top-4 h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
-          {icon}
+          <div
+            className={[
+              "mt-1 tabular-nums text-slate-900",
+              valueClass ? valueClass : "text-[25px] font-semibold",
+            ].join(" ")}
+          >
+            {value}
+          </div>
+
+          {sub ? (
+            <div className="mt-1 text-[11px] text-slate-500 truncate">
+              {sub}
+            </div>
+          ) : null}
         </div>
-      ) : null}
 
-      <div
-        className={[
-          "mt-1 text-[22px] font-semibold leading-tight",
-          toneMap[tone] || toneMap.slate,
-        ].join(" ")}
-      >
-        {value}
+        <div
+          className={[
+            "shrink-0 h-9 w-9 rounded-2xl grid place-items-center ring-1",
+            toneMap[tone] || toneMap.indigo,
+          ].join(" ")}
+        >
+          {icon ? icon : <ClipboardList className="h-4 w-4" />}
+        </div>
       </div>
-
-      {sub ? (
-        <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
-          {sub}
-        </div>
-      ) : null}
     </div>
   );
 }
 
 function Field({ label, value, mono, right, pill }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[10px] font-medium text-slate-500">{label}</div>
+        <div className="text-[11px] font-semibold text-slate-500">{label}</div>
         {right ? (
           <div className="text-[10px] text-slate-400">{right}</div>
         ) : null}
@@ -158,8 +186,8 @@ function Field({ label, value, mono, right, pill }) {
 
       <div
         className={[
-          "mt-1 text-[12px] font-medium text-slate-900 leading-snug",
-          mono ? "font-mono" : "",
+          "mt-1 text-[13px] text-slate-800 leading-5 break-words",
+          mono ? "font-mono text-[12px]" : "font-medium",
         ].join(" ")}
       >
         {pill ? pill : value == null || value === "" ? "-" : String(value)}
@@ -514,33 +542,29 @@ export default function SimulationPage() {
 
   // KPI
   const readyCount = useMemo(
-    () =>
-      filtered.filter((x) => String(x.status || "").toUpperCase() === "READY")
-        .length,
+    () => filtered.filter((x) => normStatus(x.status) === "READY").length,
     [filtered],
   );
+
   const pendingCount = useMemo(
-    () =>
-      filtered.filter((x) => String(x.status || "").toUpperCase() === "PENDING")
-        .length,
+    () => filtered.filter((x) => normStatus(x.status) === "PENDING").length,
     [filtered],
   );
+
   const optimalCount = useMemo(
-    () =>
-      filtered.filter((x) => String(x.status || "").toUpperCase() === "OPTIMAL")
-        .length,
+    () => filtered.filter((x) => normStatus(x.status) === "OPTIMAL").length,
     [filtered],
   );
 
   const selectedCount = selectedIds.size;
 
   const COLS = [
-    { key: "check", w: "5%" },
-    { key: "id", w: "15%" },
-    { key: "title", w: "35%" },
-    { key: "prod", w: "10%" },
-    { key: "status", w: "15%" },
-    { key: "start", w: "10%" },
+    { key: "check", w: "44px" },
+    { key: "id", w: "18%" },
+    { key: "title", w: "40%" },
+    { key: "prod", w: "110px" },
+    { key: "status", w: "140px" },
+    { key: "start", w: "140px" },
   ];
 
   const ColGroup = () => (
@@ -551,476 +575,577 @@ export default function SimulationPage() {
     </colgroup>
   );
 
+  const clearAllSearch = () => {
+    setQ("");
+    setPageIndex(0);
+  };
+
   return (
     <DashboardShell crumbTop="시뮬레이션" crumbCurrent="simulation">
-      <div className="px-4 pt-4 min-h-[calc(100vh-120px)] flex flex-col gap-4">
-        {/* ===== 상단 타이틀 + 검색 (폰트 낮춤) ===== */}
-        <div className="shrink-0">
-          <div className="flex justify-between items-end gap-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[28px] font-semibold tracking-tight text-slate-900">
-                시뮬레이션
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                생성 · 실행 · 결과(스케줄) 확인
-              </p>
-            </div>
+      {/* Tasks 틀: 좌우 스크롤 대응 + 고정 높이 */}
+      <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
+        <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
+          {/* ===== 상단 카드 (Tasks 톤) ===== */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-4">
+              {/* title row */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white grid place-items-center shadow-sm shrink-0">
+                      <span className="text-[14px] font-black">S</span>
+                    </div>
 
-            <div className="w-[445px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                <input
-                  value={q}
-                  onChange={(e) => {
-                    setQ(e.target.value);
-                    setPageIndex(0);
-                  }}
-                  placeholder="검색 (제목/설명/생성자)"
-                  className="
-                    h-10 w-full rounded-xl border
-                    pl-9 pr-9 text-[11px]
-                    outline-none transition
-                    hover:border-slate-300
-                    focus:ring-2 focus:ring-indigo-200
-                    placeholder:text-[10px]
-                    placeholder:text-slate-400
-                  "
-                />
-                {q ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQ("");
-                      setPageIndex(0);
-                    }}
-                    className="
-                      absolute right-2 top-1/2 -translate-y-1/2
-                      h-7 w-7 rounded-lg
-                      text-slate-400 transition
-                      hover:bg-slate-100 hover:text-indigo-700
-                      active:bg-slate-200
-                    "
-                    aria-label="clear"
-                  >
-                    ✕
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="text-[18px] font-black text-slate-900 truncate">
+                          시뮬레이션
+                        </div>
 
-          {/* ===== KPI + 작업 패널 (반응형 제거: 고정 12컬럼) ===== */}
-          <div className="mt-5 grid grid-cols-12 gap-4">
-            <div className="col-span-8 grid grid-cols-3 gap-4">
-              <StatCard
-                label="총 데이터"
-                value={totalRows.toLocaleString()}
-                sub="검색/필터 반영"
-                tone="slate"
-                icon={<FileSearch className="h-4 w-4" />}
-              />
-              <StatCard
-                label="선택됨"
-                value={selectedCount.toLocaleString()}
-                sub="선택된 항목 수"
-                tone="indigo"
-                icon={<Check className="h-4 w-4" />}
-              />
-              <StatCard
-                label="상태"
-                value={`${optimalCount}/${pendingCount}/${readyCount}`}
-                sub="OPTIMAL / PENDING / READY"
-                tone="slate"
-                icon={<span className="text-[10px] font-semibold">O/P/R</span>}
-              />
-            </div>
-
-            <div className="col-span-4">
-              <div className="rounded-2xl border bg-white p-4 shadow-sm ring-black/5 h-full flex flex-col">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="text-[10px] font-medium text-slate-500">
-                    작업
+                        <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                          목록
+                        </span>
+                      </div>
+                      <div className="text-[12px] text-slate-500 truncate">
+                        생성 · 실행 · 결과(스케줄) 확인
+                      </div>
+                    </div>
                   </div>
-                  <span className="items-center text-[10px] text-slate-400">
-                    controls
-                  </span>
                 </div>
 
-                <div className="mt-3 flex items-center gap-2 w-full">
+                {/* actions */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="relative w-[420px]">
+                    <Search
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <input
+                      value={q}
+                      onChange={(e) => {
+                        setQ(e.target.value);
+                        setPageIndex(0);
+                      }}
+                      placeholder="검색 (제목/설명/생성자/상태/제품)"
+                      className="
+                        h-10 w-full rounded-full
+                        border border-slate-200 bg-white
+                        pl-9 pr-10 text-[13px]
+                        outline-none transition
+                        hover:border-slate-300
+                        focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                        placeholder:text-[12px] placeholder:text-slate-400
+                      "
+                    />
+                    {q ? (
+                      <button
+                        type="button"
+                        onClick={clearAllSearch}
+                        className="
+                          absolute right-2 top-1/2 -translate-y-1/2
+                          h-8 w-8 rounded-full
+                          grid place-items-center
+                          text-slate-400 hover:text-indigo-600 hover:bg-indigo-50
+                        "
+                        aria-label="clear"
+                      >
+                        <X size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+
                   <button
                     type="button"
                     onClick={deleteSelectedHandle}
                     disabled={!canEdit || selectedCount === 0}
                     className={[
-                      "h-10 w-[110px] px-3",
-                      "text-[11px] font-medium transition",
-                      "inline-flex items-center justify-center gap-2 whitespace-nowrap",
+                      "h-10 px-4 rounded-full",
+                      "border bg-white",
+                      "text-[13px] font-semibold transition",
+                      "inline-flex items-center gap-2",
                       !canEdit || selectedCount === 0
-                        ? "text-slate-300 cursor-not-allowed"
-                        : "text-red-600 hover:bg-red-50 rounded-xl cursor-pointer",
+                        ? "border-slate-200 text-slate-300 cursor-not-allowed"
+                        : "border-rose-200 text-rose-600 hover:bg-rose-50",
                     ].join(" ")}
-                    title={!canEdit ? "권한 없음" : ""}
+                    title={!canEdit ? "권한 없음" : "선택 삭제"}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 size={16} />
                     선택 삭제
                   </button>
 
-                  {canEdit ? (
-                    <button
-                      type="button"
-                      onClick={() => setOpenNew(true)}
-                      className="
-                        h-10 flex-1 rounded-xl px-4
-                        bg-indigo-900 text-white
-                        text-[11px] font-medium
-                        inline-flex items-center justify-center gap-2
-                        transition hover:bg-indigo-800 active:bg-indigo-950
-                        active:scale-[0.98] cursor-pointer
-                        focus:outline-none focus:ring-2 focus:ring-indigo-300
-                      "
-                    >
-                      <Plus className="h-4 w-4" />
-                      생성
-                    </button>
-                  ) : (
-                    <div className="flex-1 h-10 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-400 flex items-center justify-center">
-                      권한: Admin/Planner
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 본문 */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          {/* ✅ 반응형 제거: 항상 [1fr_auto] + 상세패널 고정폭 */}
-          <div className="h-[485px] min-h-0 grid grid-cols-[1fr_auto] gap-4">
-            {/* ===== 테이블 카드 ===== */}
-            <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col">
-              <div className="shrink-0">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <thead>
-                    <tr className="text-left text-[12px]">
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 text-white">
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-white"
-                            checked={isAllPageSelected}
-                            ref={(el) => {
-                              if (!el) return;
-                              el.indeterminate = isSomePageSelected;
-                            }}
-                            onChange={(e) => toggleAllPage(e.target.checked)}
-                          />
-                        </div>
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        시뮬레이션 코드
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        시뮬레이션 제목
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white text-right">
-                        생산 대상
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        상태
-                      </th>
-                      <th className="border-b border-slate-200 bg-indigo-900 px-3 py-3 font-medium text-white">
-                        시작 날짜
-                      </th>
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-
-              <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
-                <table className="w-full table-fixed border-collapse">
-                  <ColGroup />
-                  <tbody className="text-[12px]">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-12 text-center text-[11px] text-slate-500"
-                        >
-                          불러오는 중...
-                        </td>
-                      </tr>
-                    ) : pageRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-0">
-                          <div className="px-4 py-16 text-center text-[11px] text-slate-600">
-                            <div className="font-semibold text-indigo-700">
-                              데이터가 없습니다.
-                            </div>
-                            {canEdit ? (
-                              <button
-                                type="button"
-                                onClick={() => setOpenNew(true)}
-                                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100 cursor-pointer"
-                              >
-                                <Plus className="h-4 w-4" />
-                                시뮬레이션 생성
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      pageRows.map((r) => {
-                        const st = String(r.status || "").toUpperCase();
-                        const isReady = st === "READY" || st === "대기중";
-                        const isPending = st === "PENDING";
-
-                        const isSelected = selectedIds.has(r.id);
-                        const isActive = activeId === r.id;
-
-                        return (
-                          <tr
-                            key={r.id}
-                            className={[
-                              "transition-colors cursor-pointer",
-                              isActive ? "bg-gray-200" : "hover:bg-gray-200",
-                            ].join(" ")}
-                            onClick={() => setActiveId(r.id)}
-                          >
-                            <td className="border-b border-slate-100 px-3 py-2">
-                              <div
-                                className="flex justify-center"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 accent-indigo-700 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                  checked={isSelected}
-                                  onChange={(e) =>
-                                    toggleOne(r.id, e.target.checked)
-                                  }
-                                />
-                              </div>
-                            </td>
-
-                            <td className="border-b border-slate-100 px-3 py-2">
-                              <div className="font-mono text-[11px] text-slate-700 truncate">
-                                {r.id}
-                              </div>
-                              <div className="text-[10px] text-slate-500 truncate">
-                                {r.memberName || "-"}
-                              </div>
-                            </td>
-
-                            <td className="border-b border-slate-100 px-3 py-2">
-                              <div
-                                className="font-medium text-slate-900 truncate"
-                                title={r.title || ""}
-                              >
-                                {r.title}
-                              </div>
-                              <div
-                                className="text-[10px] text-slate-500 truncate"
-                                title={r.description || ""}
-                              >
-                                {r.description || "-"}
-                              </div>
-                            </td>
-
-                            <td className="border-b border-slate-100 px-3 py-2 text-right tabular-nums">
-                              {Number(r.productCount ?? 0)}
-                            </td>
-
-                            <td
-                              className="border-b border-slate-100 px-3 py-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <StatusPill
-                                status={r.status}
-                                clickable={canEdit && isReady && !isPending}
-                                onClick={() => onRun(r.id)}
-                              />
-                            </td>
-
-                            <td className="border-b border-slate-100 px-3 py-2">
-                              <span className="text-slate-700 tabular-nums text-[11px]">
-                                {fmtDate(r.simulationStartDate)}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ===== 상세 패널 (고정폭) ===== */}
-            <div className="w-[445px] shrink-0 min-h-0">
-              <div className="rounded-2xl border bg-white shadow-sm ring-black/5 overflow-hidden flex min-h-0 flex-col h-full">
-                <div className="shrink-0 px-4 py-4 bg-white">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-[13px] font-semibold text-slate-900">
-                      상세 정보
-                    </div>
-                    <div className="text-[10px] font-semibold text-slate-400">
-                      {activeRow?.id ? `#${activeRow.id}` : ""}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
-                  {!activeRow ? (
-                    <div className="rounded-xl border bg-slate-50 p-6 text-[11px] text-slate-500">
-                      선택된 항목이 없습니다.
-                    </div>
-                  ) : (
-                    <>
-                      <Field label="제목" value={activeRow.title || "-"} />
-                      <Field
-                        label="설명"
-                        value={activeRow.description || "-"}
-                      />
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field
-                          label="생성자"
-                          value={activeRow.memberName || "-"}
-                        />
-                        <Field
-                          label="상태"
-                          value="-"
-                          pill={
-                            <StatusPill
-                              status={activeRow.status}
-                              clickable={false}
-                              onClick={() => {}}
-                            />
-                          }
-                        />
-                        <Field
-                          label="생산 대상 개수"
-                          value={Number(activeRow.productCount ?? 0)}
-                          right="ea"
-                        />
-                        <Field
-                          label="인원"
-                          value={Number(activeRow.requiredStaff || 0)}
-                          right="people"
-                        />
-                        <Field
-                          label="시작 날짜"
-                          value={fmtDate(activeRow.simulationStartDate)}
-                          mono
-                        />
-                        <Field
-                          label="작업 시간(분)"
-                          value={Number(activeRow.workTime || 0)}
-                          right="min"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="shrink-0 border-t bg-white p-3 flex gap-2 sticky bottom-0">
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => activeRow && onRun(activeRow.id)}
-                      disabled={
-                        !activeRow ||
-                        String(activeRow.status || "").toUpperCase() ===
-                          "PENDING"
-                      }
-                      className={[
-                        "h-10 w-[120px] rounded-xl px-4 text-[11px] font-medium transition",
-                        !activeRow ||
-                        String(activeRow.status || "").toUpperCase() ===
-                          "PENDING"
-                          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                          : "bg-indigo-900 text-white hover:bg-indigo-800 active:bg-indigo-950",
-                      ].join(" ")}
-                    >
-                      실행
-                    </button>
-                  )}
-
                   <button
                     type="button"
-                    onClick={() =>
-                      activeRow &&
-                      router.push(`/simulation/${activeRow.id}/gantt`)
-                    }
-                    disabled={!activeRow}
+                    onClick={() => setOpenNew(true)}
+                    disabled={!canEdit}
                     className={[
-                      "h-10 flex-1 rounded-xl px-4 text-[11px] font-medium transition",
-                      activeRow
-                        ? "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50"
-                        : "bg-slate-100 text-slate-300 cursor-not-allowed",
+                      "h-10 px-6 rounded-full",
+                      "inline-flex items-center gap-2 justify-center",
+                      "text-[13px] font-semibold transition",
+                      canEdit
+                        ? "bg-indigo-600 text-white hover:bg-indigo-500 active:bg-indigo-700 active:scale-[0.98] shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        : "bg-indigo-50 text-indigo-300 cursor-not-allowed border border-indigo-100",
                     ].join(" ")}
+                    title={canEdit ? "시뮬레이션 생성" : "권한: Admin/Planner"}
                   >
-                    결과 보기
+                    <Plus size={16} className="shrink-0" />
+                    생성
                   </button>
                 </div>
               </div>
+
+              {/* stat cards + work panel */}
+              <div className="mt-4 grid grid-cols-12 gap-3">
+                <div className="col-span-8 grid grid-cols-3 gap-3">
+                  <StatCard
+                    title="TOTAL"
+                    value={totalRows.toLocaleString()}
+                    sub="검색 조건이 적용된 전체"
+                    tone="slate"
+                    icon={<Layers className="h-4 w-4" />}
+                  />
+
+                  <StatCard
+                    title="SELECTED"
+                    value={selectedCount.toLocaleString()}
+                    sub="체크된 항목"
+                    tone="indigo"
+                    icon={<CheckCircle className="h-4 w-4" />}
+                  />
+
+                  <StatCard
+                    title="STATUS"
+                    value={`${optimalCount}/${pendingCount}/${readyCount}`}
+                    sub="OPTIMAL / PENDING / READY"
+                    tone="amber"
+                    icon={<AlertCircle className="h-4 w-4" />}
+                    valueClass="pt-1.5 pb-1.5 text-[18px] font-bold text-slate-800"
+                  />
+                </div>
+
+                <div className="col-span-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 h-full">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-[11px] font-semibold text-slate-500">
+                        안내
+                      </div>
+                      <span className="text-[10px] text-slate-400">tips</span>
+                    </div>
+
+                    <div className="mt-3 text-[12px] text-slate-600 leading-5">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        OPTIMAL: 결과 스케줄 생성 완료
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-amber-400" />
+                        PENDING: 실행 중
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-slate-300" />
+                        READY: 실행 가능(권한 필요)
+                      </div>
+
+                      {!canEdit ? (
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                          권한이 없어서 생성/삭제/실행이 비활성화됩니다.
+                          (Admin/Planner)
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* 페이지네이션 */}
-          <div className="shrink-0 flex items-center justify-end px-1 py-4">
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={pageIndex === 0}
-              className={[
-                "h-8 px-3 text-[11px] rounded-md transition inline-flex items-center gap-1",
-                pageIndex === 0
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-200 cursor-pointer",
-              ].join(" ")}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              이전
-            </button>
+          {/* ===== 테이블 + 상세패널 ===== */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto] gap-4 items-stretch">
+              {/* Table card */}
+              <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden flex min-h-0 flex-col">
+                {/* head */}
+                <div className="shrink-0">
+                  <table className="w-full table-fixed border-collapse">
+                    <ColGroup />
+                    <thead className="sticky top-0 z-10">
+                      <tr className="text-left text-[12px] font-semibold text-slate-600 bg-slate-50">
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          <div className="flex justify-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-indigo-600"
+                              checked={isAllPageSelected}
+                              ref={(el) => {
+                                if (!el) return;
+                                el.indeterminate = isSomePageSelected;
+                              }}
+                              onChange={(e) => toggleAllPage(e.target.checked)}
+                            />
+                          </div>
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          시뮬레이션 코드
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          시뮬레이션 제목
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3 text-right">
+                          생산 대상
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          상태
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          시작 날짜
+                        </th>
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
 
-            <div className="min-w-20 text-center text-[11px]">
-              <span className="font-medium">{pageIndex + 1}</span>
-              <span className="text-gray-500"> / {pageCount}</span>
+                {/* body */}
+                <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+                  <table className="w-full table-fixed border-collapse">
+                    <ColGroup />
+                    <tbody className="text-[13px]">
+                      {loading ? (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="px-4 py-12 text-center text-[12px] text-slate-500"
+                          >
+                            불러오는 중...
+                          </td>
+                        </tr>
+                      ) : pageRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-0">
+                            <div className="px-4 py-16 text-center text-[12px] text-slate-600">
+                              <div className="font-semibold text-indigo-700">
+                                데이터가 없습니다.
+                              </div>
+                              {canEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenNew(true)}
+                                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-[12px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  시뮬레이션 생성
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        pageRows.map((r) => {
+                          const st = String(r.status || "").toUpperCase();
+                          const isReady = st === "READY" || st === "대기중";
+                          const isPending = st === "PENDING";
+
+                          const isSelected = selectedIds.has(r.id);
+                          const isActive = activeId === r.id;
+
+                          return (
+                            <tr
+                              key={r.id}
+                              className={[
+                                "group transition-colors cursor-pointer",
+                                isActive
+                                  ? "bg-indigo-50/60"
+                                  : "hover:bg-indigo-50/40",
+                              ].join(" ")}
+                              onClick={() => setActiveId(r.id)}
+                            >
+                              {/* check */}
+                              <td className="border-b border-slate-100 px-3 py-2">
+                                <div
+                                  className="flex justify-center"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 accent-indigo-600 rounded cursor-pointer"
+                                    checked={isSelected}
+                                    onChange={(e) =>
+                                      toggleOne(r.id, e.target.checked)
+                                    }
+                                  />
+                                </div>
+                              </td>
+
+                              {/* id */}
+                              <td className="border-b border-slate-100 px-3 py-2">
+                                <div className="font-mono text-[12px] text-slate-800 truncate">
+                                  {r.id}
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate">
+                                  {r.memberName || "-"}
+                                </div>
+                              </td>
+
+                              {/* title */}
+                              <td className="border-b border-slate-100 px-3 py-2">
+                                <div
+                                  className="font-semibold text-slate-900 truncate"
+                                  title={r.title || ""}
+                                >
+                                  {r.title}
+                                </div>
+                                <div
+                                  className="text-[11px] text-slate-500 truncate"
+                                  title={r.description || ""}
+                                >
+                                  {r.description || "-"}
+                                </div>
+                              </td>
+
+                              {/* product count */}
+                              <td className="border-b border-slate-100 px-3 py-2 text-right tabular-nums text-slate-700">
+                                {Number(r.productCount ?? 0)}
+                              </td>
+
+                              {/* status */}
+                              <td
+                                className="border-b border-slate-100 px-3 py-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <StatusPill
+                                  status={r.status}
+                                  clickable={canEdit && isReady && !isPending}
+                                  onClick={() => onRun(r.id)}
+                                />
+                              </td>
+
+                              {/* start date */}
+                              <td className="border-b border-slate-100 px-3 py-2">
+                                <span className="text-slate-700 tabular-nums text-[12px]">
+                                  {fmtDate(r.simulationStartDate)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* table footer (Tasks 톤) */}
+                <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
+                  <div className="text-[12px] text-slate-500">
+                    총{" "}
+                    <span className="font-semibold text-slate-900 tabular-nums">
+                      {totalRows}
+                    </span>
+                    건 · 페이지{" "}
+                    <span className="font-semibold text-slate-900 tabular-nums">
+                      {pageIndex + 1}
+                    </span>
+                    /{" "}
+                    <span className="font-semibold text-slate-900 tabular-nums">
+                      {pageCount}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      disabled={pageIndex === 0}
+                      className={[
+                        "h-9 px-3 rounded-xl text-[12px] font-semibold",
+                        "inline-flex items-center gap-1 transition",
+                        pageIndex === 0
+                          ? "text-slate-300 cursor-not-allowed"
+                          : "text-slate-700 hover:bg-slate-100 cursor-pointer",
+                      ].join(" ")}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      이전
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      disabled={pageIndex >= pageCount - 1}
+                      className={[
+                        "h-9 px-3 rounded-xl text-[12px] font-semibold",
+                        "inline-flex items-center gap-1 transition",
+                        pageIndex >= pageCount - 1
+                          ? "text-slate-300 cursor-not-allowed"
+                          : "text-slate-700 hover:bg-slate-100 cursor-pointer",
+                      ].join(" ")}
+                    >
+                      다음
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== 상세 패널 (Tasks 톤) ===== */}
+              <div className="w-[445px] shrink-0 min-h-0 flex">
+                <div className="w-full h-full min-h-0 rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-black/5 overflow-hidden flex flex-col">
+                  {/* header */}
+                  <div className="shrink-0 px-4 py-3 border-b border-slate-100 bg-slate-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-slate-900 truncate">
+                          상세 정보
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {activeRow?.id
+                            ? `#${activeRow.id}`
+                            : "선택된 항목 없음"}
+                        </div>
+                      </div>
+
+                      {activeRow ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveId("");
+                            setSelectedIds(new Set());
+                          }}
+                          className="
+                            h-8 w-8 rounded-xl grid place-items-center
+                            text-slate-400 hover:text-indigo-600 hover:bg-indigo-50
+                            transition
+                          "
+                          aria-label="clear active"
+                          title="선택 해제"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* body */}
+                  <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll p-3 space-y-2">
+                    {!activeRow ? (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-[12px] font-semibold text-slate-700">
+                          선택된 항목이 없습니다.
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          왼쪽 표에서 시뮬레이션을 클릭하면 상세가 표시됩니다.
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Field label="제목" value={activeRow.title || "-"} />
+                        <Field
+                          label="설명"
+                          value={activeRow.description || "-"}
+                        />
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Field
+                            label="생성자"
+                            value={activeRow.memberName || "-"}
+                          />
+                          <Field
+                            label="상태"
+                            value="-"
+                            pill={
+                              <StatusPill
+                                status={activeRow.status}
+                                clickable={false}
+                                onClick={() => {}}
+                              />
+                            }
+                          />
+                          <Field
+                            label="생산 대상 개수"
+                            value={Number(activeRow.productCount ?? 0)}
+                            right="ea"
+                          />
+                          <Field
+                            label="인원"
+                            value={Number(activeRow.requiredStaff || 0)}
+                            right="people"
+                          />
+                          <Field
+                            label="시작 날짜"
+                            value={fmtDate(activeRow.simulationStartDate)}
+                            mono
+                          />
+                          <Field
+                            label="작업 시간(분)"
+                            value={Number(activeRow.workTime || 0)}
+                            right="min"
+                            mono
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* footer buttons */}
+                  <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 flex gap-2">
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => activeRow && onRun(activeRow.id)}
+                        disabled={
+                          !activeRow ||
+                          String(activeRow.status || "").toUpperCase() ===
+                            "PENDING"
+                        }
+                        className={[
+                          "h-10 px-5 rounded-full text-[13px] font-semibold transition",
+                          !activeRow ||
+                          String(activeRow.status || "").toUpperCase() ===
+                            "PENDING"
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            : "bg-indigo-600 text-white hover:bg-indigo-500 active:bg-indigo-700 active:scale-[0.98] shadow-sm",
+                        ].join(" ")}
+                      >
+                        실행
+                      </button>
+                    ) : (
+                      <div className="h-10 px-5 rounded-full border border-slate-200 bg-slate-50 text-[12px] text-slate-400 flex items-center">
+                        권한: Admin/Planner
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        activeRow &&
+                        router.push(`/simulation/${activeRow.id}/gantt`)
+                      }
+                      disabled={!activeRow}
+                      className={[
+                        "h-10 flex-1 rounded-full px-5 text-[13px] font-semibold transition",
+                        activeRow
+                          ? "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50"
+                          : "bg-slate-100 text-slate-300 cursor-not-allowed",
+                      ].join(" ")}
+                    >
+                      결과 보기
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={pageIndex >= pageCount - 1}
-              className={[
-                "h-8 px-3 text-[11px] rounded-md transition inline-flex items-center gap-1",
-                pageIndex >= pageCount - 1
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-200 cursor-pointer",
-              ].join(" ")}
-            >
-              다음
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
+
+          <SimulationCreateDrawer
+            open={openNew}
+            onOpenChange={setOpenNew}
+            canEdit={canEdit}
+            products={products}
+            prodLoading={prodLoading}
+            prodErr={prodErr}
+            newForm={newForm}
+            setNewForm={setNewForm}
+            onCreate={onCreate}
+          />
         </div>
       </div>
-
-      <SimulationCreateDrawer
-        open={openNew}
-        onOpenChange={setOpenNew}
-        canEdit={canEdit}
-        products={products}
-        prodLoading={prodLoading}
-        prodErr={prodErr}
-        newForm={newForm}
-        setNewForm={setNewForm}
-        onCreate={onCreate}
-      />
     </DashboardShell>
   );
 }
