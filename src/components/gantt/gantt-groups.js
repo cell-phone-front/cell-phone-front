@@ -1,4 +1,4 @@
-// src/components/gantt-test/gantt-groups.js
+// src/components/gantt-groups.js
 
 export function buildGroupsByProductOperation(scheduleList = []) {
   const prodMap = new Map();

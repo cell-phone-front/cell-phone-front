@@ -263,7 +263,6 @@ export default function MachinePage() {
     return filterRows(data, effectiveFilter, [
       (r) => r?.id,
       "name",
-      "koreanName",
       "description",
     ]);
   }, [data, effectiveFilter]);
@@ -426,9 +425,9 @@ export default function MachinePage() {
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="machine">
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
-        {/* ✅ Tasks와 동일 높이 고정 */}
+        {/*  */}
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
-          {/* ===== 상단 카드 (Tasks 톤) ===== */}
+          {/* =====  ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-5 py-4">
               {/* title row */}
@@ -677,9 +676,8 @@ export default function MachinePage() {
                       <col style={{ width: "44px" }} />
                       <col style={{ width: "22%" }} />
                       <col style={{ width: "22%" }} />
-                      <col style={{ width: "18%" }} />
-                      <col style={{ width: "26%" }} />
-                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "46%" }} />
+                      <col style={{ width: "140px" }} />
                     </colgroup>
 
                     <thead className="sticky top-0 z-10">
@@ -705,9 +703,7 @@ export default function MachinePage() {
                         <th className="border-b border-slate-200 px-3 py-3">
                           기계 이름
                         </th>
-                        <th className="border-b border-slate-200 px-3 py-3">
-                          기계 이름(KR)
-                        </th>
+
                         <th className="border-b border-slate-200 px-3 py-3">
                           기계 설명
                         </th>
@@ -726,9 +722,8 @@ export default function MachinePage() {
                       <col style={{ width: "44px" }} />
                       <col style={{ width: "22%" }} />
                       <col style={{ width: "22%" }} />
-                      <col style={{ width: "18%" }} />
-                      <col style={{ width: "26%" }} />
-                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "46%" }} />
+                      <col style={{ width: "140px" }} />
                     </colgroup>
 
                     <tbody className="text-[13px]">
@@ -799,21 +794,6 @@ export default function MachinePage() {
                                   updateCell(row._rid, "name", e.target.value)
                                 }
                                 placeholder="Name"
-                              />
-                            </td>
-
-                            <td className="border-b border-slate-100 px-3 py-2">
-                              <TruncInput
-                                value={row.koreanName ?? ""}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) =>
-                                  updateCell(
-                                    row._rid,
-                                    "koreanName",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Korean Name"
                               />
                             </td>
 

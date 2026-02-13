@@ -132,11 +132,12 @@ export default function GanttBoardMachine({ groups = [] }) {
   const gridWidthPx = totalCols * colWidth;
 
   const barPalette = [
-    "bg-[#86DCF0] border border-[#86DCF0]/60",
-    "bg-[#869AF0] border border-[#869AF0]/60",
-    "bg-[#85BAEF] border border-[#85BAEF]/60",
-    "bg-[#34F7DC] border border-[#34F7DC]/60",
+    "bg-indigo-500 border border-indigo-200/30",
+    "bg-blue-500 border border-blue-300/10",
+    "bg-slate-500 border border-slate-200/10",
+    "bg-teal-500 border border-teal-300/10",
   ];
+
   const pickBarClass = (gi) => barPalette[gi % barPalette.length];
 
   return (

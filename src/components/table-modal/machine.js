@@ -239,11 +239,10 @@ export default function MachineFullModal({ open, onClose, token }) {
         <div className="flex-1 min-h-0 overflow-auto pretty-scroll">
           <table className="w-full table-fixed border-collapse">
             <colgroup>
-              <col style={{ width: "72px" }} />
-              <col style={{ width: "220px" }} />
-              <col style={{ width: "220px" }} />
-              <col style={{ width: "220px" }} />
-              <col style={{ width: "auto" }} />
+              <col style={{ width: "84px" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "52%" }} />
             </colgroup>
 
             <thead className="sticky top-0 z-10">
@@ -251,7 +250,6 @@ export default function MachineFullModal({ open, onClose, token }) {
                 <Th className="!text-center !px-2">번호</Th>
                 <Th>기계 품번</Th>
                 <Th>기계 이름</Th>
-                <Th>기계 이름(KR)</Th>
                 <Th>기계 설명</Th>
               </tr>
             </thead>
@@ -272,12 +270,6 @@ export default function MachineFullModal({ open, onClose, token }) {
                   <Td className="align-top">
                     <Clamp2 className="whitespace-normal break-words leading-5 text-[13px]">
                       {r.name ?? "-"}
-                    </Clamp2>
-                  </Td>
-
-                  <Td className="align-top">
-                    <Clamp2 className="whitespace-normal break-words leading-5 text-[13px]">
-                      {r.koreanName ?? "-"}
                     </Clamp2>
                   </Td>
 

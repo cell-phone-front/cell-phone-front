@@ -14,18 +14,11 @@ export default function GanttBoard({ groups = [] }) {
   const stepMinutes = 60;
   const colWidth = 120;
 
-  // ✅ 요청: 표(행) 높이 더 크게
   const rowHeight = 62;
-
-  // ✅ 요청: 그룹 헤더는 과하게 크지 않게(살짝만)
   const groupHeaderHeight = 48;
-
   const leftWidth = 235;
-
-  // ✅ 요청: 위 네모칸(헤더) 높이 줄이기
   const headerHeight = 38;
 
-  // ✅ 하단 고정 가로 스크롤바 높이
   const bottomScrollHeight = 16;
 
   const [collapsed, setCollapsed] = useState({});
@@ -56,26 +49,28 @@ export default function GanttBoard({ groups = [] }) {
   const toggleOperation = (opKey) =>
     setOpCollapsed((p) => ({ ...p, [opKey]: !(p[opKey] ?? false) }));
 
-  // ====== scrollX ======
+  // ====== scroll ======
   const [scrollLeft, setScrollLeft] = useState(0);
 
-  // ====== refs ======
-  const rightScrollXRef = useRef(null); // 오른쪽 내용 가로 스크롤
-  const bottomXRef = useRef(null); // 하단 고정 가로 스크롤바
+  // ✅ 스크롤 호스트(가로+세로) 1개
+  const scrollHostRef = useRef(null);
+
+  // ✅ 하단 고정 가로 스크롤바(입력용)
+  const bottomXRef = useRef(null);
+
   const syncingRef = useRef(false);
 
-  // ✅ X 스크롤 싱크: 오른쪽 내용 <-> 하단 고정바
   const syncX = (x) => {
-    if (rightScrollXRef.current && rightScrollXRef.current.scrollLeft !== x) {
-      rightScrollXRef.current.scrollLeft = x;
-    }
-    if (bottomXRef.current && bottomXRef.current.scrollLeft !== x) {
-      bottomXRef.current.scrollLeft = x;
-    }
-    setScrollLeft(x); // 헤더 translateX 용
+    const host = scrollHostRef.current;
+    const bottom = bottomXRef.current;
+
+    if (host && host.scrollLeft !== x) host.scrollLeft = x;
+    if (bottom && bottom.scrollLeft !== x) bottom.scrollLeft = x;
+
+    setScrollLeft(x);
   };
 
-  const onRightScrollX = (e) => {
+  const onHostScroll = (e) => {
     if (syncingRef.current) return;
     syncingRef.current = true;
     syncX(e.currentTarget.scrollLeft);
@@ -89,8 +84,8 @@ export default function GanttBoard({ groups = [] }) {
     syncingRef.current = false;
   };
 
-  // ✅ range (데이터의 최소 startAt ~ 최대 endAt 기준)
-  const { rangeStart, rangeEnd, ticks } = useMemo(() => {
+  // ✅ range
+  const { rangeStart, ticks } = useMemo(() => {
     const allTasks = (groups || []).flatMap((g) =>
       (g.operations || []).flatMap((op) => op.tasks || []),
     );
@@ -105,34 +100,31 @@ export default function GanttBoard({ groups = [] }) {
       if (Number.isFinite(e)) max = Math.max(max, e);
     }
 
+    // fallback: 9시간
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      const start = new Date();
-      const end = new Date(start.getTime() + 9 * 60 * 60 * 1000);
-
-      const startAligned = floorToStep(start, stepMinutes);
-      const endAligned = ceilToStep(end, stepMinutes);
-
-      return {
-        rangeStart: startAligned,
-        rangeEnd: endAligned,
-        ticks: buildTicks(startAligned, endAligned, stepMinutes),
-      };
+      const start = floorToStep(new Date(), stepMinutes);
+      const end = ceilToStep(
+        new Date(start.getTime() + 9 * 60 * 60 * 1000),
+        stepMinutes,
+      );
+      return { rangeStart: start, ticks: buildTicks(start, end, stepMinutes) };
     }
 
     const startAligned = floorToStep(new Date(min), stepMinutes);
     let endAligned = ceilToStep(new Date(max), stepMinutes);
 
     if (endAligned.getTime() <= startAligned.getTime()) {
-      endAligned = new Date(startAligned.getTime() + 9 * 60 * 60 * 1000);
-      endAligned = ceilToStep(endAligned, stepMinutes);
+      endAligned = ceilToStep(
+        new Date(startAligned.getTime() + 9 * 60 * 60 * 1000),
+        stepMinutes,
+      );
     }
 
     return {
       rangeStart: startAligned,
-      rangeEnd: endAligned,
       ticks: buildTicks(startAligned, endAligned, stepMinutes),
     };
-  }, [groups, stepMinutes]);
+  }, [groups]);
 
   const totalCols = Math.max(1, (ticks || []).length);
   const gridWidthPx = totalCols * colWidth;
@@ -148,9 +140,8 @@ export default function GanttBoard({ groups = [] }) {
 
   return (
     <div className="h-full w-full min-h-0 overflow-hidden">
-      {/* ✅ 표 라운드: 카드 자체 + 내부도 자연스럽게 */}
       <Card className="h-full w-full border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-        <CardContent className="p-0 flex flex-col min-h-0">
+        <CardContent className="p-0 flex flex-col min-h-0 h-full">
           <GanttHeaderRow
             leftWidth={leftWidth}
             headerHeight={headerHeight}
@@ -163,8 +154,12 @@ export default function GanttBoard({ groups = [] }) {
             scrollLeft={scrollLeft}
           />
 
-          {/* ✅ 요청: 세로 스크롤은 “전체”에 1개만 */}
-          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
+          {/* ✅ 스크롤은 여기 1개만(가로+세로) */}
+          <div
+            ref={scrollHostRef}
+            onScroll={onHostScroll}
+            className="flex-1 min-h-0 overflow-auto"
+          >
             <div className="flex min-w-0">
               <GanttLeftPanel
                 groups={groups}
@@ -188,25 +183,21 @@ export default function GanttBoard({ groups = [] }) {
                 groupHeaderHeight={groupHeaderHeight}
                 rangeStart={rangeStart}
                 stepMinutes={stepMinutes}
-                rightScrollXRef={rightScrollXRef}
-                onRightScrollX={onRightScrollX}
+                scrollLeft={scrollLeft} // ✅ RightPanel은 translate로만 이동
               />
             </div>
 
-            {/* ✅ 세로 스크롤 여유(하단 고정바 겹침 방지) */}
+            {/* 하단 고정바 겹침 방지 */}
             <div style={{ height: bottomScrollHeight }} />
           </div>
 
-          {/* ✅ 요청: 하단 “고정” 가로 스크롤바는 ‘간트 그래프(오른쪽)’부터 시작 */}
+          {/* ✅ 하단 고정 가로바(그래프부터 시작) */}
           <div className="shrink-0 border-t border-slate-200/70 bg-white">
             <div className="flex" style={{ height: bottomScrollHeight }}>
-              {/* 왼쪽 영역은 가로 스크롤 시작에서 제외 */}
               <div
                 className="shrink-0 border-r border-slate-200/70"
                 style={{ width: leftWidth }}
               />
-
-              {/* 오른쪽(그래프)만 가로 스크롤 */}
               <div className="flex-1 min-w-0">
                 <div
                   ref={bottomXRef}

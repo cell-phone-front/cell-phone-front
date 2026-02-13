@@ -11,7 +11,7 @@ export default function AiSummaryModal({
   open,
   onClose,
   title = "AI Summary",
-  summary = "", // ✅ aiSummary 문자열 하나만 받기
+  summary = "",
 }) {
   useEffect(() => {
     if (!open) return;
@@ -29,87 +29,107 @@ export default function AiSummaryModal({
   const hasSummary = Boolean(String(summary || "").trim());
 
   return (
-    <div className="fixed inset-0 z-[200]">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* backdrop */}
       <button
         type="button"
-        className="absolute inset-0 bg-black/35"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-label="close"
       />
 
       {/* modal */}
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
-          {/* header */}
-          <div className="px-5 py-4 border-b bg-white/90 backdrop-blur flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div className="text-[14px] font-black text-slate-900">
-                  {title}
-                </div>
+      <div className="relative w-full max-w-3xl h-[80vh] rounded-2xl border bg-white shadow-2xl overflow-hidden flex flex-col">
+        {/* ================= Header ================= */}
+        <div className="shrink-0 px-5 py-4 border-b bg-indigo-900 text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
+                <Sparkles className="h-5 w-5" />
               </div>
-              <div className="mt-1 text-[12px] font-semibold text-slate-500">
-                시뮬레이션 결과의 aiSummary를 표시합니다.
+
+              <div className="min-w-0">
+                <div className="text-[15px] font-bold truncate">{title}</div>
+
+                <div className="mt-0.5 text-[11px] text-indigo-200 truncate">
+                  시뮬레이션 AI 분석 요약 결과
+                </div>
               </div>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 hover:bg-slate-50"
+              className="
+                shrink-0 h-9 w-9 rounded-xl
+                bg-white/10 hover:bg-white/20
+                transition grid place-items-center
+              "
               aria-label="close"
             >
-              <X className="h-4 w-4 text-slate-700" />
+              <X className="h-4 w-4" />
             </button>
           </div>
+        </div>
 
-          {/* body */}
-          <div className="max-h-[70vh] overflow-y-auto p-4">
-            {!hasSummary ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[13px] font-extrabold text-slate-800">
-                  표시할 aiSummary가 없습니다.
+        {/* ================= Body ================= */}
+        <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll p-5 bg-slate-50">
+          {!hasSummary ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
+                <div className="text-[14px] font-semibold text-slate-800">
+                  AI 요약이 없습니다
                 </div>
-                <div className="mt-1 text-[12px] font-semibold text-slate-500">
-                  아직 aiSummary가 null 이거나 비어있습니다.
+
+                <div className="mt-1 text-[12px] text-slate-500">
+                  아직 분석 결과가 생성되지 않았습니다.
                 </div>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-[12px] font-black text-slate-900">
-                    AI 코멘트
-                  </div>
-                  <div className="shrink-0 text-[11px] font-extrabold text-slate-400">
-                    AI
-                  </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border bg-white shadow-sm p-5 space-y-3">
+              {/* title */}
+              <div className="flex items-center justify-between">
+                <div className="text-[13px] font-semibold text-slate-900">
+                  AI 분석 코멘트
                 </div>
 
-                {/* ✅ 줄바꿈 유지 */}
-                <div className="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-slate-700">
-                  {summary}
-                </div>
+                <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  AI
+                </span>
               </div>
-            )}
-          </div>
 
-          {/* footer */}
-          <div className="px-5 py-3 border-t bg-slate-50 flex items-center justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className={cx(
-                "rounded-xl px-4 py-2 text-[12px] font-extrabold",
-                "border border-slate-200 bg-white hover:bg-slate-50",
-              )}
-            >
-              닫기
-            </button>
-          </div>
+              {/* content */}
+              <div
+                className="
+                  whitespace-pre-wrap
+                  text-[13px]
+                  leading-6
+                  text-slate-700
+                "
+              >
+                {summary}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ================= Footer ================= */}
+        <div className="shrink-0 px-5 py-3 border-t bg-white flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="
+              h-9 px-5 rounded-xl
+              border border-slate-200
+              bg-white
+              text-[12px] font-semibold text-slate-700
+              hover:bg-slate-50
+              transition
+            "
+          >
+            닫기
+          </button>
         </div>
       </div>
     </div>

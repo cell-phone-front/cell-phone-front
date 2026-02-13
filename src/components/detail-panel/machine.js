@@ -107,7 +107,6 @@ export default function MachineDetailPanel({ open, row, onToggle }) {
             <div className="grid grid-cols-1 gap-2">
               <Field label="기계 품번 (Machine Id)" value={row.id} mono />
               <Field label="기계 이름 (Name)" value={row.name} />
-              <Field label="기계 이름(KR)" value={row.koreanName} />
               <Field label="기계 설명 (Description)" value={row.description} />
             </div>
           )}
