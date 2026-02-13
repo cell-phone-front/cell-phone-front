@@ -8,7 +8,6 @@ import {
   getNoticeById,
   updateNotice,
   uploadNoticeFiles,
-  deleteNoticeAttachment,
 } from "@/api/notice-api";
 import {
   Pin,
@@ -202,16 +201,6 @@ export default function NoticeWrite() {
       let targetId = null;
 
       if (isEdit) {
-        // ✅ 1) 삭제 API를 실제로 호출 (id만 있을 때만)
-        const ids = (removedAttachments || []).filter(
-          (x) => x != null && x !== "",
-        );
-        if (ids.length > 0) {
-          await Promise.all(
-            ids.map((attId) => deleteNoticeAttachment(noticeId, attId, token)),
-          );
-        }
-
         // ✅ 2) 본문 + 새 파일(멀티파트) 수정 (한 번만!)
         await updateNotice(noticeId, payload, files, token);
         targetId = String(noticeId);

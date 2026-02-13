@@ -228,7 +228,7 @@ export async function getNoticeNotifications(token) {
 }
 
 export async function deleteNoticeAttachment(noticeId, attachmentId, token) {
-  const res = await fetch(`${serverAddr}/api/notice/${noticeId}}`, {
+  const res = await fetch(`${serverAddr}/api/notice/${noticeId}`, {
     method: "PUT",
     headers: { Authorization: "Bearer " + token },
   });
