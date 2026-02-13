@@ -82,15 +82,23 @@ function SectionHeader({ title, desc, right = null }) {
   return (
     <div className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
-        <div className="text-[13px] font-semibold leading-5 text-slate-900 truncate">
-          {title}
-        </div>
-        {desc ? (
-          <div className="text-[11px] leading-4 text-slate-500 truncate">
-            {desc}
+        {/* ✅ 긴 세로선 + 타이틀/설명 묶기 */}
+        <div className="flex items-start gap-3">
+          <span className="w-1.5 self-stretch rounded-full bg-slate-300/70 shrink-0" />
+
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold leading-5 text-slate-900 truncate">
+              {title}
+            </div>
+            {desc ? (
+              <div className="mt-0.5 text-[11px] leading-4 text-slate-500 truncate">
+                {desc}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
+
       {right ? <div className="shrink-0">{right}</div> : null}
     </div>
   );
@@ -228,14 +236,14 @@ export default function LatestSimulationRow() {
   }
 
   return (
-    <div className="grid min-h-0 gap-5 md:grid-cols-[1fr_2fr_1fr] ">
-      {/* (1) 시뮬레이션 정보 */}
+    <div className="grid min-h-0 gap-5 md:grid-cols-[1fr_2fr_1fr] md:h-[380px]">
+      {/* (시뮬레이션 정보 */}
       <section className="min-h-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 flex flex-col">
         <SectionHeader title="시뮬레이션 정보" desc="최신 실행 요약" />
 
-        {/* ✅ 헤더 아래는 flex-1 (h-full 금지) */}
+        {/*  헤더 아래는 flex-1 (h-full 금지) */}
         <div className="flex-1 min-h-0 px-3.5 pb-3">
-          {/* ✅ 내부 라운드/보더 제거: 라운드 1겹만 */}
+          {/*  내부 라운드/보더 제거: 라운드 1겹만 */}
           <div className="h-full min-h-0 p-3">
             <LeftMeta meta={meta} />
           </div>
@@ -281,7 +289,7 @@ export default function LatestSimulationRow() {
                       </div>
                     </div>
                   </div>
-                  {/* ✅ key를 걸어서 열릴 때마다 이 블록이 새로 마운트됨 */}
+                  {/*  key를 걸어서 열릴 때마다 이 블록이 새로 마운트됨 */}
                   <div key={moreKey} className="pop-slide-in-x">
                     <div className="pretty-scroll h-[320px] overflow-auto bg-white">
                       <div className="min-h-[320px] grid grid-cols-[35%_65%] gap-x-2 px-2 py-2">
@@ -312,7 +320,7 @@ export default function LatestSimulationRow() {
                         </div>
 
                         <div className="min-w-0 overflow-hidden">
-                          {/* ✅ 바 두께 올린 버전으로 아래에서 설명 */}
+                          {/*  바 두께 올린 버전으로 아래에서 설명 */}
                           <RightBars rows={rowsAll} rowH={20} barH={10} />
                         </div>
                       </div>

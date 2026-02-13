@@ -1,3 +1,6 @@
+// src/components/dashboard/notice.js
+"use client";
+
 import { useEffect, useMemo, useState } from "react";
 import { useToken } from "@/stores/account-store";
 import { getNotices } from "@/api/notice-api";
@@ -37,12 +40,21 @@ function toTs(v) {
   return 0;
 }
 
-export default function DashboardNotice({ onCountChange }) {
+export default function DashboardNotice({
+  onCountChange,
+  onGoNotice,
+  limit = 4, // ✅ 위 카드에 4개 정도가 보기 좋음
+}) {
   const token = useToken((s) => s.token);
 
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+
+  const goNotice =
+    typeof onGoNotice === "function"
+      ? onGoNotice
+      : () => (window.location.href = "/notice");
 
   useEffect(() => {
     if (!token) return;
@@ -58,13 +70,9 @@ export default function DashboardNotice({ onCountChange }) {
           json?.noticeList || json?.notices || json?.items || json?.data || [];
         const arr = Array.isArray(list) ? list : [];
         setNotices(arr);
-
-        if (typeof onCountChange === "function") {
-          onCountChange(arr.length);
-        }
+        if (typeof onCountChange === "function") onCountChange(arr.length);
       })
       .catch((err) => {
-        console.error(err);
         if (!alive) return;
         setLoadError(err?.message || "공지사항 불러오기 실패");
         setNotices([]);
@@ -79,85 +87,66 @@ export default function DashboardNotice({ onCountChange }) {
     };
   }, [token, onCountChange]);
 
-  // ✅ 최신순 5개
+  // ✅ 고정 먼저 + 최신순
   const rows = useMemo(() => {
-    const sorted = [...(notices || [])].sort((a, b) => {
+    const arr = Array.isArray(notices) ? [...notices] : [];
+    arr.sort((a, b) => {
+      const pa = isPinned(a) ? 1 : 0;
+      const pb = isPinned(b) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
       const ta = toTs(a?.createdAt ?? a?.date);
       const tb = toTs(b?.createdAt ?? b?.date);
-      return tb - ta; // 최신 먼저
+      return tb - ta;
     });
 
-    return sorted.slice(0, 5).map((n) => ({
+    return arr.slice(0, limit).map((n) => ({
       id: getId(n),
       title: n?.title ?? "",
-      writer: n?.memberName ?? n?.writer ?? "-",
       createdAt: fmtDate(n?.createdAt ?? n?.date ?? ""),
       pinned: isPinned(n),
     }));
-  }, [notices]);
+  }, [notices, limit]);
 
   return (
     <div className="h-full min-h-0 flex flex-col">
-      {/* ✅ 내부 헤더 완전 제거 */}
-
-      <div className="flex-1 min-h-0 overflow-auto px-4 py-0 pretty-scroll">
+      <div className="flex-1 min-h-0 overflow-auto px-4 pb-4 pretty-scroll">
         {loading ? (
           <div className="py-6 text-[11px] text-slate-500">불러오는 중…</div>
         ) : loadError ? (
-          <div className="py-6 text-[11px] text-red-600">{loadError}</div>
+          <div className="py-6 text-[11px] text-rose-600">{loadError}</div>
         ) : rows.length === 0 ? (
           <div className="py-10 text-center text-[11px] text-slate-500">
             공지사항이 없습니다.
           </div>
         ) : (
-          // ✅ 라운드 제거 + 더 깔끔한 테이블
-          <table className="w-full table-fixed text-[11px]">
-            <thead className="sticky top-0 z-10 bg-white">
-              <tr className="text-left text-[10px] font-semibold text-slate-500 border-b border-slate-200">
-                <th className="pt-1 pb-1.5">제목</th>
-                <th className=" w-[70px]">작성자</th>
-                <th className=" w-[90px]">작성일</th>
-              </tr>
-            </thead>
+          <div className="divide-y divide-slate-100">
+            {rows.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={goNotice}
+                className="w-full text-left py-3 hover:bg-slate-50/60 transition rounded-lg px-2 -mx-2"
+                title={r.title || ""}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {r.pinned ? (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700 shrink-0">
+                      <Pin className="h-3 w-3" />
+                      고정
+                    </span>
+                  ) : null}
 
-            <tbody>
-              {rows.map((r, idx) => (
-                <tr
-                  key={`${r.id}-${idx}`}
-                  className="cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100"
-                  onClick={() => {
-                    // 상세 페이지 있으면 교체
-                    // window.location.href = `/notice/${r.id}`;
-                    window.location.href = "/notice";
-                  }}
-                >
-                  <td className="py-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {r.pinned ? (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700">
-                          <Pin className="h-3 w-3" />
-                          고정
-                        </span>
-                      ) : null}
+                  <div className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-900 hover:text-indigo-700">
+                    {r.title || "-"}
+                  </div>
 
-                      <div
-                        className="pr-5 min-w-0 truncate font-semibold text-slate-900 hover:text-indigo-800"
-                        title={r.title || ""}
-                      >
-                        {r.title || "-"}
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="py-2 truncate text-slate-700">{r.writer}</td>
-
-                  <td className="py-2 tabular-nums text-slate-600">
+                  <div className="shrink-0 text-[10px] text-slate-400 tabular-nums">
                     {r.createdAt || "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>

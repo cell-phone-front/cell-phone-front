@@ -42,7 +42,7 @@ export default function RightBars({
             <div className="flex-1 min-w-0">
               <div
                 className="w-full rounded-full bg-slate-100 overflow-hidden"
-                style={{ height: finalBarH }} // ✅ 여기!
+                style={{ height: finalBarH }}
               >
                 <div
                   className={`h-full rounded-full ${r.barClass}`}
@@ -56,7 +56,7 @@ export default function RightBars({
               <span
                 className="inline-flex items-center justify-center rounded-full bg-slate-100 px-1 text-[10px] font-semibold text-slate-700 tabular-nums"
                 style={{
-                  height: finalPillH, // ✅ 여기!
+                  height: finalPillH,
                   minWidth: 22,
                   lineHeight: `${finalPillH}px`,
                 }}
