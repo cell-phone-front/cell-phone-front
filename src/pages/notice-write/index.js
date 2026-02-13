@@ -8,6 +8,7 @@ import {
   getNoticeById,
   updateNotice,
   uploadNoticeFiles,
+  deleteNoticeAttachment,
 } from "@/api/notice-api";
 import {
   Pin,
@@ -194,32 +195,38 @@ export default function NoticeWrite() {
         memberId,
         pinned,
         isPinned: pinned,
+        // ✅ 백엔드가 지원하면 이걸로도 삭제 가능
+        deleteAttachmentIds: removedAttachments,
       };
 
       let targetId = null;
 
       if (isEdit) {
-        await updateNotice(noticeId, payload, files, token); // ✅ files 추가
-        targetId = String(noticeId);
-      } else {
-        const created = await createNotice(payload, token);
-        targetId = pickNoticeId(created);
-      }
-
-      if (!targetId) {
-        throw new Error(
-          "공지 저장 후 id를 찾지 못했습니다. createNotice 응답을 확인해주세요.",
+        // ✅ 1) 삭제 API를 실제로 호출 (id만 있을 때만)
+        const ids = (removedAttachments || []).filter(
+          (x) => x != null && x !== "",
         );
-      }
+        if (ids.length > 0) {
+          await Promise.all(
+            ids.map((attId) => deleteNoticeAttachment(noticeId, attId, token)),
+          );
+        }
 
-      if (isEdit) {
-        await updateNotice(noticeId, payload, files, token); // 수정: 파일 포함
+        // ✅ 2) 본문 + 새 파일(멀티파트) 수정 (한 번만!)
+        await updateNotice(noticeId, payload, files, token);
         targetId = String(noticeId);
       } else {
+        // 생성
         const created = await createNotice(payload, token);
         targetId = pickNoticeId(created);
 
-        // 생성: 파일 업로드 별도
+        if (!targetId) {
+          throw new Error(
+            "공지 저장 후 id를 찾지 못했습니다. createNotice 응답을 확인해주세요.",
+          );
+        }
+
+        // 생성 시 파일 업로드 별도
         if (Array.isArray(files) && files.length > 0) {
           await uploadNoticeFiles(targetId, files, token);
         }
@@ -534,21 +541,25 @@ export default function NoticeWrite() {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      // 1) 화면에서 제거(표시용)
                                       setExistingFiles((prev) =>
-                                        prev.filter(
-                                          (x) =>
-                                            (x.id ?? x.url) !== (f.id ?? f.url),
-                                        ),
+                                        prev.filter((x) => x.id !== f.id),
                                       );
-                                      setRemovedAttachments((prev) =>
-                                        prev.concat(f.id ?? f.url),
-                                      );
+
+                                      // 2) 실제 삭제 대상 목록에 추가(id 있을 때만, 중복 방지)
+                                      if (f?.id != null && f.id !== "") {
+                                        setRemovedAttachments((prev) =>
+                                          prev.includes(f.id)
+                                            ? prev
+                                            : prev.concat(f.id),
+                                        );
+                                      }
                                     }}
                                     className="
-                        h-8 w-8 rounded-lg grid place-items-center
-                        text-slate-400 hover:text-rose-600 hover:bg-rose-50
-                        transition shrink-0
-                      "
+    h-8 w-8 rounded-lg grid place-items-center
+    text-slate-400 hover:text-rose-600 hover:bg-rose-50
+    transition shrink-0
+  "
                                     title="제거"
                                   >
                                     <X className="h-4 w-4" />

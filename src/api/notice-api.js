@@ -228,3 +228,11 @@ export async function getNoticeNotifications(token) {
     },
   }).then((r) => r.json());
 }
+export async function deleteNoticeAttachment(noticeId, attachmentId, token) {
+  const res = await fetch(
+    `${serverAddr}/api/notice/${noticeId}/attachment/${attachmentId}`,
+    { method: "DELETE", headers: { Authorization: "Bearer " + token } },
+  );
+  if (!res.ok) throw new Error(`첨부 삭제 실패 (${res.status})`);
+  return true;
+}

@@ -89,7 +89,7 @@ export default function Login() {
                         사원번호
                       </label>
                       <input
-                        type="text"
+                        type="password"
                         placeholder="사원번호를 입력하세요"
                         value={id}
                         onChange={(e) => setId(e.target.value)}
