@@ -8,6 +8,7 @@ import {
   getNoticeById,
   updateNotice,
   uploadNoticeFiles,
+  setNoticePin,
 } from "@/api/notice-api";
 import {
   Pin,
@@ -192,33 +193,35 @@ export default function NoticeWrite() {
         title: t,
         content: c,
         memberId,
-        pinned,
-        isPinned: pinned,
-        // ✅ 백엔드가 지원하면 이걸로도 삭제 가능
         deleteAttachmentIds: removedAttachments,
       };
 
       let targetId = null;
 
+      /* =====================
+       1. 저장
+    ===================== */
       if (isEdit) {
-        // ✅ 2) 본문 + 새 파일(멀티파트) 수정 (한 번만!)
         await updateNotice(noticeId, payload, files, token);
         targetId = String(noticeId);
       } else {
-        // 생성
         const created = await createNotice(payload, token);
         targetId = pickNoticeId(created);
 
         if (!targetId) {
-          throw new Error(
-            "공지 저장 후 id를 찾지 못했습니다. createNotice 응답을 확인해주세요.",
-          );
+          throw new Error("공지 ID를 찾지 못했습니다.");
         }
 
-        // 생성 시 파일 업로드 별도
         if (Array.isArray(files) && files.length > 0) {
           await uploadNoticeFiles(targetId, files, token);
         }
+      }
+
+      /* =====================
+       2. 핀 처리 (핵심)
+    ===================== */
+      if (targetId != null) {
+        await setNoticePin(targetId, pinned, token);
       }
 
       alert(isEdit ? "수정 완료!" : "등록 완료!");

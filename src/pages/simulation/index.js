@@ -24,7 +24,6 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  FileSearch,
   Layers,
   CheckCircle,
   AlertCircle,
@@ -56,6 +55,7 @@ function buildStartDateTime(dateStr, timeStr) {
   if (!d) return "";
   return `${d}T${t}:00`;
 }
+
 function normStatus(v) {
   const s = String(v || "")
     .trim()
@@ -63,6 +63,49 @@ function normStatus(v) {
   if (s === "대기중") return "READY";
   return s;
 }
+
+/* ===============================
+   list helpers (✅ 핵심: 응답키 유연화)
+=============================== */
+function pickList(json) {
+  return (
+    json?.simulationScheduleList ||
+    json?.simulationList ||
+    json?.simulations ||
+    json?.list ||
+    json?.data?.simulationScheduleList ||
+    json?.data?.simulationList ||
+    json?.data?.simulations ||
+    json?.data?.list ||
+    (Array.isArray(json) ? json : [])
+  );
+}
+
+function pickCreatedRow(created) {
+  const item =
+    created?.simulation ||
+    created?.data?.simulation ||
+    created?.result?.simulation ||
+    created?.notice || // 혹시 다른 래핑 대비(안쓰여도 무해)
+    null;
+
+  if (!item) return null;
+
+  return {
+    id: item.id ?? item.simulationId ?? item.simulation_id ?? "",
+    memberName: item.memberName || item.member?.name || "-",
+    title: item.title || "-",
+    description: item.description || "",
+    productId: "",
+    productName: "",
+    productCount: Array.isArray(item.productList) ? item.productList.length : 0,
+    requiredStaff: item.requiredStaff ?? 0,
+    status: item.status || "READY",
+    simulationStartDate: item.simulationStartDate || "",
+    workTime: item.workTime ?? 0,
+  };
+}
+
 /* ===============================
    UI (Tasks 톤)
 =============================== */
@@ -290,21 +333,25 @@ export default function SimulationPage() {
 
     try {
       const json = await getSimulations(token);
-      const list = json?.simulationScheduleList || [];
+      console.log("[SIM][LIST] raw:", json);
 
-      const baseRows = (list || []).map((r) => ({
-        id: r.id,
-        memberName: r.memberName || "-",
-        title: r.title || "-",
-        description: r.description || "",
-        productId: r.productId || "",
-        productName: r.productName || "",
-        productCount: r.productCount,
-        requiredStaff: r.requiredStaff,
-        status: r.status || "-",
-        simulationStartDate: r.simulationStartDate || "",
-        workTime: r.workTime ?? 0,
-      }));
+      const list = pickList(json);
+
+      const baseRows = (list || [])
+        .map((r) => ({
+          id: r.id ?? r.simulationId ?? r.simulation_id ?? "",
+          memberName: r.memberName || r.member?.name || "-",
+          title: r.title || "-",
+          description: r.description || "",
+          productId: r.productId || "",
+          productName: r.productName || "",
+          productCount: r.productCount,
+          requiredStaff: r.requiredStaff,
+          status: r.status || "-",
+          simulationStartDate: r.simulationStartDate || r.startDate || "",
+          workTime: r.workTime ?? 0,
+        }))
+        .filter((x) => x.id);
 
       const enriched = await enrichRowsWithMeta(baseRows);
 
@@ -468,7 +515,17 @@ export default function SimulationPage() {
     };
 
     try {
-      await createSimulation(payload, token);
+      const created = await createSimulation(payload, token);
+      console.log("[SIM][CREATE] raw:", created);
+
+      // ✅ 생성 응답을 즉시 표에 추가(체감 개선 + 목록 API 형태 달라도 일단 보임)
+      const createdRow = pickCreatedRow(created);
+      if (createdRow?.id) {
+        setData((prev) => [createdRow, ...prev]);
+        setActiveId(createdRow.id);
+        setSelectedIds(new Set());
+        setPageIndex(0);
+      }
 
       setOpenNew(false);
       setNewForm({
@@ -755,6 +812,16 @@ export default function SimulationPage() {
                   </div>
                 </div>
               </div>
+
+              {/* products load error (optional) */}
+              {prodErr ? (
+                <div className="mt-3 text-[12px] text-rose-600">{prodErr}</div>
+              ) : null}
+              {prodLoading ? (
+                <div className="mt-1 text-[12px] text-slate-400">
+                  제품 목록 불러오는 중...
+                </div>
+              ) : null}
             </div>
           </div>
 

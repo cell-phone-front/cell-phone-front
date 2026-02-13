@@ -36,7 +36,7 @@ export default function Login() {
     <div className="h-screen relative bg-white overflow-x-auto overflow-y-hidden">
       {/* 배경: 왼쪽 1/2 그라데이션 + 오른쪽 1/2 흰색 */}
       <div className="absolute inset-0 flex min-w-300">
-        <div className="w-1/2 bg-linear-to-r from-sky-50 via-lime-50 to-white" />
+        <div className="w-1/2 bg-linear-to-r from-sky-50  to-white" />
         <div className="w-1/2 bg-white" />
       </div>
 
@@ -48,7 +48,7 @@ export default function Login() {
               {/* 왼쪽: 그림 */}
               <div className="w-1/2 flex items-center justify-center">
                 <img
-                  src="/images/login-bp-2.png"
+                  src="/images/login-bp-1.png"
                   alt="Login illustration"
                   className="max-h-130 w-auto object-contain"
                   draggable={false}
