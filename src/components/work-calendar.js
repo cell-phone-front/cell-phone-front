@@ -49,10 +49,11 @@ function memoPreview(text, max = 18) {
 export function CalendarCustomDays() {
   const token = useToken((s) => s.token);
   const account = useAccount((s) => s.account);
-  const memberId = String(account?.id || "").trim(); // ✅ 내 id
+
+  // ✅ 토큰 주인과 같은 memberId를 써야 백에서 통과합니다.
+  const memberId = account?.id != null ? String(account.id).trim() : "";
 
   const [shiftMap, setShiftMap] = React.useState({});
-
   const [range, setRange] = React.useState(() => {
     const from = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     return { from, to: addDays(from, 10) };
@@ -100,7 +101,7 @@ export function CalendarCustomDays() {
     return () => window.removeEventListener("keydown", onKey);
   }, [panelOpen]);
 
-  // ✅ 여기 핵심: getPersonalSchedule(memberId, token)
+  // ✅ memberId + token 둘 다 있어야 호출
   React.useEffect(() => {
     if (!token) return;
     if (!memberId) return;
@@ -141,7 +142,6 @@ export function CalendarCustomDays() {
         const next = {};
         for (const [dateKey, set] of Object.entries(map)) {
           const labels = Array.from(set);
-
           if (labels.length === 1 && labels[0] === "휴") {
             next[dateKey] = { labels: ["휴"], textOnly: true };
           } else {
@@ -342,16 +342,18 @@ export function CalendarCustomDays() {
                         </div>
                       )}
 
+                      {/* ✅ (중요) button 제거: CalendarDayButton 안에 button 넣으면 hydration 에러 */}
                       {!isOutside && !info?.textOnly && label && (
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={-1}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             openPanel(key);
                           }}
                           className={cn(
-                            "mt-1 w-full",
+                            "mt-1 w-full cursor-pointer select-none",
                             "rounded-lg bg-slate-50 px-2 py-1",
                             "ring-1 ring-black/5",
                             "text-[11px] leading-4 text-left",
@@ -372,7 +374,7 @@ export function CalendarCustomDays() {
                               </span>
                             ) : null}
                           </div>
-                        </button>
+                        </div>
                       )}
 
                       {!isOutside && memoText ? (
@@ -382,8 +384,7 @@ export function CalendarCustomDays() {
                             "rounded-lg bg-slate-50 px-2 py-1",
                             "text-[11px] leading-4 text-slate-700",
                             "ring-1 ring-black/5",
-                            "text-left",
-                            "overflow-hidden",
+                            "text-left overflow-hidden",
                           )}
                           title={String(memo || "")}
                         >

@@ -165,7 +165,7 @@ export default function Page() {
     <DashboardShell crumbTop="메인 " crumbCurrent="대시보드">
       <div className="h-full min-h-0 px-3 py-10">
         <div className="mx-auto flex h-full min-h-0 max-w-8xl flex-col gap-5">
-          <div className="grid min-h-0 gap-5 md:grid-cols-3 md:auto-rows-[340px]">
+          <div className="grid min-h-0 gap-5 grid-cols-3 auto-rows-[340px]">
             {/* Calendar */}
             <section className="min-h-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
               <CardHeader

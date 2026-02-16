@@ -30,7 +30,6 @@ function normalizeShift(v) {
 }
 
 function shiftTone(label) {
-  // D: 주간 / S: 석간 / N: 야간 / 휴: 휴무
   if (label === "D") return "bg-emerald-500";
   if (label === "S") return "bg-amber-500";
   if (label === "N") return "bg-indigo-500";
@@ -81,9 +80,11 @@ export function DashboardCalendar({ month, onMonthChange }) {
         const next = {};
         for (const [dateKey, set] of Object.entries(map)) {
           const labels = Array.from(set);
-          if (labels.length === 1 && labels[0] === "휴")
+          if (labels.length === 1 && labels[0] === "휴") {
             next[dateKey] = { labels: ["휴"], textOnly: true };
-          else next[dateKey] = { labels };
+          } else {
+            next[dateKey] = { labels };
+          }
         }
 
         if (!alive) return;
@@ -102,7 +103,9 @@ export function DashboardCalendar({ month, onMonthChange }) {
   return (
     <div className="h-full min-h-0 w-full overflow-hidden bg-transparent">
       <div className="flex-1 min-h-0 px-4 pb-4">
-        <div className="h-full min-h-0 overflow-auto pr-1 pretty-scroll">
+        {/* ✅ 가로 스크롤 금지 */}
+        <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden pr-1 pretty-scroll">
+          {/* ✅ min-w 제거 (가로 넘침 원인) */}
           <Calendar
             mode="default"
             month={month}
@@ -111,10 +114,9 @@ export function DashboardCalendar({ month, onMonthChange }) {
             onSelect={setRange}
             numberOfMonths={1}
             className={[
-              "p-0",
-              // 셀 크기
+              "p-0 w-full max-w-full",
+              // ✅ 반응형 제거: 고정값만
               "[--cell-size:40px]",
-              "lg:[--cell-size:40px]",
             ].join(" ")}
             classNames={{
               month_caption: "hidden",
@@ -123,10 +125,11 @@ export function DashboardCalendar({ month, onMonthChange }) {
 
               weekdays: "flex mb-2",
               weekday:
-                "flex-1 text-left pl-1 pb-1 text-[10px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
+                "flex-1 min-w-0 text-left pl-1 pb-1 text-[10px] text-slate-500 font-medium border-b border-slate-200/70 [&:first-child]:text-rose-500",
 
               week: "flex w-full h-[var(--cell-size)]",
-              day: "relative w-full h-[var(--cell-size)] text-left align-top",
+              // ✅ 셀도 min-w-0로 가로 넘침 방지
+              day: "relative flex-1 min-w-0 h-[var(--cell-size)] text-left align-top",
             }}
             components={{
               DayButton: ({ children, day, modifiers, ...props }) => {
@@ -148,7 +151,7 @@ export function DashboardCalendar({ month, onMonthChange }) {
                     modifiers={modifiers}
                     {...props}
                     className={cn(
-                      "w-full h-[var(--cell-size)] p-0 overflow-hidden rounded-xl",
+                      "w-full max-w-full h-[var(--cell-size)] p-0 overflow-hidden rounded-xl",
                       "flex flex-col items-stretch justify-start",
                       "transition-colors",
                       "hover:bg-slate-100/70 active:bg-slate-200/60",
