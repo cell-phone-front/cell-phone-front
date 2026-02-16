@@ -38,6 +38,14 @@ function cryptoId() {
   }
 }
 
+function safeStr(v) {
+  return String(v ?? "");
+}
+
+function trimStr(v) {
+  return safeStr(v).trim();
+}
+
 function StatusPill({ flag }) {
   const f = String(flag || "");
   const map =
@@ -168,7 +176,6 @@ export default function ProductPage() {
       router.query?.keyword != null ? String(router.query.keyword) : "";
 
     const next = (focus || keyword).trim();
-
     setRouterFocus(next);
     setPageIndex(0);
   }, [router.isReady, router.query?.focus, router.query?.keyword]);
@@ -187,6 +194,7 @@ export default function ProductPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  // 초기 로딩
   useEffect(() => {
     if (!token) return;
 
@@ -226,7 +234,7 @@ export default function ProductPage() {
     };
   }, [token]);
 
-  // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
+  //  통합검색 + 페이지검색을 동시에 적용(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
 
   const filtered = useMemo(() => {
@@ -304,8 +312,12 @@ export default function ProductPage() {
     setDirty(true);
   };
 
+  //  선택 삭제: "화면에서 제거 + dirty=true" (실제 DB 반영은 저장 버튼에서 upsert)
   const deleteSelected = () => {
     if (selected.size === 0) return;
+
+    const ok = window.confirm(`선택한 ${selected.size}건을 삭제하시겠습니까?`);
+    if (!ok) return;
 
     setData((prev) => prev.filter((r) => !selected.has(r._rid)));
     setSelected(new Set());
@@ -322,23 +334,57 @@ export default function ProductPage() {
     }
   };
 
-  const saveHandle = () => {
+  // 저장: 현재 data를 서버 "정답 리스트"로 보내서 upsert + (없는 것 soft delete)
+  const saveHandle = async () => {
     if (!token) {
       window.alert("토큰이 없어서 저장할 수 없어요. 다시 로그인 해주세요.");
       return;
     }
 
-    const payload = data.map(({ _rid, flag, ...rest }) => rest);
+    // payload 만들기
+    const payload = data.map(({ _rid, flag, ...rest }) => ({
+      ...rest,
+      id: trimStr(rest?.id),
+      brand: trimStr(rest?.brand),
+      name: trimStr(rest?.name),
+      description: trimStr(rest?.description),
+    }));
 
-    postProducts(payload, token)
-      .then(() => {
-        window.alert("저장 완료");
-        setDirty(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        window.alert(err?.message || "저장 실패");
-      });
+    // 백에서 id 빈값이면 에러 내므로 사전 방지
+    const blank = payload.findIndex((p) => !trimStr(p?.id));
+    if (blank !== -1) {
+      window.alert("품번(id)이 비어있는 행이 있습니다. 품번(id)은 필수입니다.");
+      return;
+    }
+
+    try {
+      await postProducts(payload, token);
+      window.alert("저장 완료");
+      setDirty(false);
+
+      // 저장 후 다시 조회해서 서버 데이터로 동기화(권장)
+      const json = await getProducts(token, "");
+      const list = json.productList || json.items || json.data || [];
+      const rows = (list || []).map((r) => ({
+        ...r,
+        _rid: cryptoId(),
+        flag: "saved",
+        id: r.id ?? "",
+        brand: r.brand ?? "",
+        name: r.name ?? "",
+        description: r.description ?? r.desc ?? "",
+      }));
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || "저장 실패");
+    }
   };
 
   const uploadHandle = () => {
@@ -349,33 +395,32 @@ export default function ProductPage() {
     fileRef.current?.click();
   };
 
-  const fileChangeHandle = (e) => {
+  const fileChangeHandle = async (e) => {
     const file = e?.target?.files?.[0];
     if (!file || !token) return;
 
-    parseProductXLS(file, token)
-      .then((json) => {
-        const list = json.productList || json.items || json.data || [];
-        const items = (list || []).map((r) => ({
-          ...r,
-          _rid: cryptoId(),
-          flag: "pre",
-          id: r.id ?? "",
-          brand: r.brand ?? "",
-          name: r.name ?? "",
-          description: r.description ?? r.desc ?? "",
-        }));
+    try {
+      const json = await parseProductXLS(file, token);
+      const list = json.productList || json.items || json.data || [];
+      const items = (list || []).map((r) => ({
+        ...r,
+        _rid: cryptoId(),
+        flag: "pre",
+        id: r.id ?? "",
+        brand: r.brand ?? "",
+        name: r.name ?? "",
+        description: r.description ?? r.desc ?? "",
+      }));
 
-        setData((prev) => [...items, ...prev]);
-        setPageIndex(0);
-        setSelected(new Set());
-        setDirty(true);
-        setLoadError("");
-      })
-      .catch((err) => {
-        console.error(err);
-        window.alert(err?.message || "엑셀 파싱 실패");
-      });
+      setData((prev) => [...items, ...prev]);
+      setPageIndex(0);
+      setSelected(new Set());
+      setDirty(true);
+      setLoadError("");
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || "엑셀 파싱 실패");
+    }
 
     e.target.value = "";
   };
@@ -430,7 +475,8 @@ export default function ProductPage() {
                         )}
                       </div>
                       <div className="text-[12px] text-slate-500 truncate">
-                        행 추가/파일 업로드/수정 후 저장하면 서버에 반영됩니다.
+                        행 추가/파일 업로드/수정/삭제 후 저장하면 서버에
+                        반영됩니다.
                       </div>
                     </div>
                   </div>
