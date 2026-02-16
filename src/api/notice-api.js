@@ -27,16 +27,64 @@ export async function getNoticeById(id, token) {
 /* =========================
  * (3) 공지 작성
  * ========================= */
-export async function createNotice(payload, token) {
-  return fetch(`${serverAddr}/api/notice`, {
+// export async function createNotice(payload, token) {
+//   return fetch(`${serverAddr}/api/notice`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: "Bearer " + token,
+//     },
+//     body: JSON.stringify(payload),
+//   }).then((r) => r.json());
+// }
+
+export async function createNotice(payload, files, token) {
+  const formData = new FormData();
+
+  // ✅ JSON 문자열로 보내야 함
+  formData.append("request", JSON.stringify(payload));
+
+  // ✅ 파일 있으면 같이 전송
+  if (files && files.length) {
+    for (const f of files) {
+      formData.append("files", f);
+    }
+  }
+
+  const res = await fetch(`${serverAddr}/api/notice`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: "Bearer " + token,
+      // ❗ Content-Type 절대 넣지 마세요
     },
-    body: JSON.stringify(payload),
-  }).then((r) => r.json());
+    body: formData,
+  });
+
+  const text = await res.text();
+  let json;
+
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    throw new Error(json?.message || "공지사항 생성 실패");
+  }
+
+  return json;
 }
+
+// await createNotice(
+//   {
+//     title,
+//     content,
+//     pinned,
+//   },
+//   selectedFiles, // File[]
+//   token,
+// );
 
 /* =========================
  * (4) 공지 수정
@@ -118,15 +166,40 @@ export async function deleteNotice(id, token) {
 /* =========================
  * (6) 핀 설정
  * ========================= */
+// src/api/notice-api.js 상단에 추가
+async function safeJson(res) {
+  const text = await res.text().catch(() => "");
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { raw: text };
+  }
+}
+
+/* =========================
+ * (6) 핀 설정 ( 에러 메시지 제대로 받기)
+ * ========================= */
 export async function setNoticePin(id, pinned, token) {
-  return fetch(`${serverAddr}/api/notice/${id}/pin`, {
+  const res = await fetch(`${serverAddr}/api/notice/${id}/pin`, {
     method: "PATCH",
     headers: {
-      "Content-Type": "application/json",
+      // ⚠️ 지금 백 컨트롤러는 body를 안 받습니다(토글 방식).
+      // 그래도 보내도 되긴 하지만, Content-Type 때문에 preflight/파싱 이슈 생길 수 있어요.
       Authorization: "Bearer " + token,
     },
-    body: JSON.stringify({ pinned, isPinned: pinned }),
-  }).then((r) => r.json());
+  });
+
+  const json = await safeJson(res);
+
+  if (!res.ok) {
+    // 백이 {message:"..."} 로 내려주면 그걸 띄우고,
+    // 아니면 raw라도 보여주게 해서 디버그 가능하게 합니다.
+    throw new Error(
+      json?.message || json?.error || json?.raw || "핀 토글 실패",
+    );
+  }
+
+  return json;
 }
 
 /* =========================

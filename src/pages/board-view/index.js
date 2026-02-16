@@ -103,8 +103,8 @@ function getId(v) {
 }
 
 /**
- * ✅ 백엔드 엔티티 기준( Comment.member.id )까지 확실히 잡아서
- *    내 댓글(isMine) 판별이 항상 되도록 보강
+ * ✅ memberId 방어 강화
+ * - GET 목록 응답(SearchAllCommentResponse)에 memberId가 있어야 최종적으로 완벽합니다.
  */
 function normalizeComment(raw, fallbackIdx = 0) {
   if (!raw) return null;
@@ -131,11 +131,14 @@ function normalizeComment(raw, fallbackIdx = 0) {
   const anonymous =
     raw.anonymous ?? raw.anonymousName ?? raw.anonymous_label ?? "";
 
-  // ✅ memberId (백이 안 주면 null일 수 있음)
+  // ✅ memberId (키가 제각각일 수 있어 후보를 넓게)
   const memberId =
     raw.memberId ??
     raw.member_id ??
+    raw.commentMemberId ??
+    raw.comment_member_id ??
     raw.member?.id ??
+    raw.member?.memberId ??
     raw.authorId ??
     raw.author_id ??
     raw.writerId ??
@@ -147,7 +150,7 @@ function normalizeComment(raw, fallbackIdx = 0) {
     id: id != null ? String(id) : `tmp-${fallbackIdx}-${Date.now()}`,
     content: String(content || ""),
     createdAt,
-    anonymous: String(anonymous || ""), // ✅ 추가
+    anonymous: String(anonymous || ""),
     memberId: memberId != null ? String(memberId) : null,
   };
 }
@@ -179,6 +182,8 @@ function TinyAvatar({ label = "익명" }) {
 
 export default function BoardView() {
   const router = useRouter();
+
+  // ✅ store 구조가 { account } / { token } 형태라고 가정하고 그대로 사용
   const { account } = useAccount();
   const { token } = useToken();
 
@@ -213,7 +218,17 @@ export default function BoardView() {
   const canEditRole = role === "planner" || role === "worker";
 
   const meName = account?.name ? String(account.name) : "익명";
-  const meId = account?.id != null ? String(account.id) : null;
+
+  // ✅ 내 ID 추출 보강 (store/응답 키가 흔들려도 견딤)
+  const meId = useMemo(() => {
+    const v =
+      account?.id ??
+      account?.memberId ??
+      account?.member_id ??
+      account?._id ??
+      null;
+    return v != null ? String(v) : null;
+  }, [account]);
 
   function onBack() {
     router.push("/board");
@@ -233,6 +248,10 @@ export default function BoardView() {
     try {
       const json = await getCommentAll(communityId, token);
       const list = extractCommentList(json);
+
+      // ✅ (디버그) GET 응답에 memberId가 실제로 내려오는지 확인
+      // console.log("GET comments raw sample:", list?.[0]);
+
       const normalized = list
         .map((c, idx) => normalizeComment(c, idx))
         .filter(Boolean);
@@ -303,7 +322,8 @@ export default function BoardView() {
       author: meName,
       content: t,
       createdAt: new Date().toISOString(),
-      memberId: meId,
+      memberId: meId, // ✅ 내 id를 같이 넣어두면 즉시 아이콘 표시 가능
+      anonymous: "", // 서버 응답 오면 교체
       __optimistic: true,
     };
 
@@ -311,6 +331,7 @@ export default function BoardView() {
     setComments((prev) => [optimistic, ...(prev || [])]);
 
     try {
+      // POST 응답에는 memberId/anonymous가 있음
       await postComment(communityId, t, token);
       await loadComments();
     } catch (e) {
@@ -391,16 +412,13 @@ export default function BoardView() {
       const at = Date.parse(a.createdAt || "") || 0;
       const bt = Date.parse(b.createdAt || "") || 0;
       if (at !== bt) return at - bt; // 오래된 순
-      return String(a.id).localeCompare(String(a.id));
+      return String(a.id).localeCompare(String(b.id));
     });
 
     let next = 1;
     for (const c of sortedForLabel) {
-      const mid = c?.memberId ? String(c.memberId) : null;
+      const mid = c?.memberId != null ? String(c.memberId) : null;
       if (!mid) continue;
-
-      // 이름이 있으면 번호 필요 없음
-      if (c.author && String(c.author).trim()) continue;
 
       // 글 작성자는 "익명"
       if (ownerId && mid === ownerId) continue;
@@ -527,7 +545,7 @@ export default function BoardView() {
               </div>
             )}
 
-            {/* 본문: 높이/여백 줄임 */}
+            {/* 본문 */}
             <div className="px-6 py-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5">
                 <div className="text-[15px] text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[80px]">
@@ -582,25 +600,20 @@ export default function BoardView() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {comments.map((c, idx) => {
-                    console.log("===== 댓글 판별 디버깅 =====");
-                    console.log("내 아이디 meId:", meId);
-                    console.log("댓글 객체:", c);
-                    console.log("댓글 memberId:", c.memberId);
-                    console.log("같은가?", String(meId) === String(c.memberId));
-                    console.log("===========================");
+                    // 디버그
+                    // console.log("meId:", meId, "comment.memberId:", c.memberId);
 
                     const isMine = Boolean(
                       meId && c.memberId && String(c.memberId) === String(meId),
                     );
                     const editing = editingId === c.id;
+
                     const displayAuthor =
                       (c.anonymous && String(c.anonymous).trim()) ||
-                      (c.author && String(c.author).trim()) ||
                       (c.memberId &&
                         anonLabelByMemberId.get(String(c.memberId))) ||
                       "익명";
 
-                    // ✅ 내 댓글이면 항상 수정/삭제 노출
                     const canEditThis = canEditRole && isMine;
 
                     return (
@@ -747,7 +760,6 @@ export default function BoardView() {
                 </button>
               </div>
 
-              {/* ✅ 바닥 여유 */}
               <div className="h-10" />
             </div>
           </div>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon, X, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPersonalSchedule } from "@/api/simulation-api";
-import { useToken } from "@/stores/account-store";
+import { useToken, useAccount } from "@/stores/account-store";
 
 function ymdLocal(d) {
   if (!(d instanceof Date)) return "";
@@ -38,7 +38,6 @@ function shiftTime(label) {
 
 const MEMO_KEY = "aps_calendar_memo_v1";
 
-//  메모 프리뷰
 function memoPreview(text, max = 18) {
   const t = String(text || "").trim();
   if (!t) return "";
@@ -49,6 +48,8 @@ function memoPreview(text, max = 18) {
 
 export function CalendarCustomDays() {
   const token = useToken((s) => s.token);
+  const account = useAccount((s) => s.account);
+  const memberId = String(account?.id || "").trim(); // ✅ 내 id
 
   const [shiftMap, setShiftMap] = React.useState({});
 
@@ -99,14 +100,16 @@ export function CalendarCustomDays() {
     return () => window.removeEventListener("keydown", onKey);
   }, [panelOpen]);
 
+  // ✅ 여기 핵심: getPersonalSchedule(memberId, token)
   React.useEffect(() => {
     if (!token) return;
+    if (!memberId) return;
 
     let alive = true;
 
     (async () => {
       try {
-        const data = await getPersonalSchedule(token);
+        const data = await getPersonalSchedule(memberId, token);
 
         const list = Array.isArray(data)
           ? data
@@ -165,7 +168,7 @@ export function CalendarCustomDays() {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, memberId]);
 
   const openPanel = React.useCallback(
     (dateKey) => {
@@ -286,9 +289,8 @@ export function CalendarCustomDays() {
                   const label = labels[0];
                   const more = labels.length > 1 ? labels.length - 1 : 0;
 
-                  // ... DayButton 내부
                   const memo = memoMap?.[key];
-                  const memoText = memoPreview(memo, 18); // 기존 함수 그대로 사용
+                  const memoText = memoPreview(memo, 18);
                   const hasMemoDot = !isOutside && !!memoText;
 
                   return (
@@ -316,7 +318,6 @@ export function CalendarCustomDays() {
                           "text-rose-500!",
                       )}
                     >
-                      {/* 날짜 숫자 */}
                       <div
                         className={cn(
                           "text-sm font-medium leading-none text-slate-900",
@@ -335,15 +336,12 @@ export function CalendarCustomDays() {
                         </span>
                       </div>
 
-                      {/* 휴무 */}
                       {!isOutside && info?.textOnly && label === "휴" && (
                         <div className="mt-2 text-[13px] font-semibold text-rose-600 text-left w-full">
                           휴
                         </div>
                       )}
 
-                      {/* ✅ 근무 버튼이 먼저(위로) */}
-                      {/* ✅ 근무 버튼: 메모 바 스타일 기준으로 통일 */}
                       {!isOutside && !info?.textOnly && label && (
                         <button
                           type="button"
@@ -353,11 +351,11 @@ export function CalendarCustomDays() {
                             openPanel(key);
                           }}
                           className={cn(
-                            "mt-1 w-full", // ✅ mt-2 -> mt-1
+                            "mt-1 w-full",
                             "rounded-lg bg-slate-50 px-2 py-1",
                             "ring-1 ring-black/5",
                             "text-[11px] leading-4 text-left",
-                            "overflow-hidden", // ✅ 추가
+                            "overflow-hidden",
                             "hover:bg-slate-100 active:bg-slate-200 transition",
                           )}
                         >
@@ -377,21 +375,19 @@ export function CalendarCustomDays() {
                         </button>
                       )}
 
-                      {/* ✅ 메모 프리뷰는 마지막(아래로) + 왼쪽 정렬 */}
                       {!isOutside && memoText ? (
                         <div
                           className={cn(
-                            "mt-1 w-full", // ✅ mt-2 -> mt-1
+                            "mt-1 w-full",
                             "rounded-lg bg-slate-50 px-2 py-1",
                             "text-[11px] leading-4 text-slate-700",
                             "ring-1 ring-black/5",
                             "text-left",
-                            "overflow-hidden", // ✅ 추가
+                            "overflow-hidden",
                           )}
                           title={String(memo || "")}
                         >
-                          <div className="truncate">{memoText}</div>{" "}
-                          {/* ✅ 1줄로 잘라서 높이 고정 */}
+                          <div className="truncate">{memoText}</div>
                         </div>
                       ) : null}
                     </CalendarDayButton>
@@ -401,7 +397,6 @@ export function CalendarCustomDays() {
             />
           </div>
 
-          {/* 우측 패널(기존 그대로) */}
           {panelOpen ? (
             <>
               <button

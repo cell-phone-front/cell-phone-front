@@ -7,7 +7,6 @@ import {
   createNotice,
   getNoticeById,
   updateNotice,
-  uploadNoticeFiles,
   setNoticePin,
 } from "@/api/notice-api";
 import {
@@ -75,10 +74,25 @@ function pickNoticeId(created) {
   return id != null ? String(id) : null;
 }
 
+// pinned 값 안전 변환
+function toBool(v) {
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v === 1) return true;
+  if (v === 0) return false;
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase();
+  return s === "y" || s === "yes" || s === "true" || s === "1";
+}
+
 export default function NoticeWrite() {
   const router = useRouter();
-  const { account } = useAccount();
-  const { token } = useToken();
+
+  // ✅ store 구조가 token/account 형태라면 selector로 꺼내는 게 안전합니다.
+  // 만약 기존에 useToken()이 "문자열"을 바로 주는 구조라면 아래 2줄을 각각 useToken(), useAccount()로 바꾸셔도 됩니다.
+  const token = useToken((s) => s.token);
+  const account = useAccount((s) => s.account);
 
   const role = useMemo(
     () => String(account?.role || "").toLowerCase(),
@@ -100,13 +114,16 @@ export default function NoticeWrite() {
   const [files, setFiles] = useState([]);
   const [existingFiles, setExistingFiles] = useState([]);
   const [removedAttachments, setRemovedAttachments] = useState([]);
+
+  // 현재 UI 핀 상태
   const [pinned, setPinned] = useState(false);
+  // 상세에서 불러온 “원래 핀 상태” (수정 시 비교용)
+  const [originalPinned, setOriginalPinned] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const MAX_DESC = 255;
-  const memberId = account?.id;
 
   useEffect(() => {
     if (!hydrated) return;
@@ -142,7 +159,12 @@ export default function NoticeWrite() {
           item?.pinnedYn ??
           item?.pinned_yn;
 
-        setPinned(p === true || p === 1 || String(p).toLowerCase() === "y");
+        const boolP = toBool(p);
+
+        // ✅ 둘 다 동일하게 세팅 (수정 시 비교용)
+        setPinned(boolP);
+        setOriginalPinned(boolP);
+
         setExistingFiles(normalizeExistingFiles(item));
       } catch (e) {
         console.error(e);
@@ -183,8 +205,6 @@ export default function NoticeWrite() {
     if (!t) return setError("제목을 입력해주세요.");
     if (!c) return setError("내용을 입력해주세요.");
     if (!token) return setError("토큰이 없습니다. 다시 로그인 해주세요.");
-    if (!memberId && !isEdit)
-      return setError("memberId가 없습니다. 로그인 정보를 확인해주세요.");
 
     setSaving(true);
 
@@ -192,36 +212,37 @@ export default function NoticeWrite() {
       const payload = {
         title: t,
         content: c,
-        memberId,
         deleteAttachmentIds: removedAttachments,
       };
 
       let targetId = null;
 
-      /* =====================
-       1. 저장
-    ===================== */
+      // 1) 저장
       if (isEdit) {
         await updateNotice(noticeId, payload, files, token);
         targetId = String(noticeId);
       } else {
-        const created = await createNotice(payload, token);
+        // ✅ 작성은 multipart로 payload+files 같이 전송 (notice-api.js 시그니처: (payload, files, token))
+        const created = await createNotice(payload, files, token);
         targetId = pickNoticeId(created);
 
-        if (!targetId) {
-          throw new Error("공지 ID를 찾지 못했습니다.");
-        }
-
-        if (Array.isArray(files) && files.length > 0) {
-          await uploadNoticeFiles(targetId, files, token);
-        }
+        if (!targetId) throw new Error("공지 ID를 찾지 못했습니다.");
       }
 
-      /* =====================
-       2. 핀 처리 (핵심)
-    ===================== */
+      // 2) 핀 처리 (자동고정 방지 핵심)
+      // - 백이 토글 방식이어도 “불필요한 호출” 자체를 안 하면 자동고정이 안 됩니다.
       if (targetId != null) {
-        await setNoticePin(targetId, pinned, token);
+        if (!isEdit) {
+          // ✅ 작성: 사용자가 '고정'을 눌러서 pinned=true일 때만 호출
+          if (pinned === true) {
+            await setNoticePin(targetId, true, token);
+          }
+        } else {
+          // ✅ 수정: 원래 상태와 달라졌을 때만 호출
+          if (pinned !== originalPinned) {
+            await setNoticePin(targetId, pinned, token);
+          }
+        }
       }
 
       alert(isEdit ? "수정 완료!" : "등록 완료!");
@@ -238,9 +259,6 @@ export default function NoticeWrite() {
   const pageDesc = isEdit
     ? "공지 내용을 수정하고 첨부파일을 관리합니다."
     : "공지사항 제목/내용을 작성하고 첨부파일을 추가합니다.";
-
-  const fileCountLabel =
-    files.length > 0 ? `${files.length}개 선택됨` : "파일을 선택하세요";
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent={pageTitle}>
@@ -365,7 +383,7 @@ export default function NoticeWrite() {
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="공지사항 내용을 입력하세요"
                   className="
-                    h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3
+                    h-[170px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3
                     text-sm text-slate-900
                     outline-none transition
                     hover:border-slate-300
@@ -403,11 +421,11 @@ export default function NoticeWrite() {
 
                     <label
                       className="
-          h-9 px-4 rounded-lg border border-slate-200 bg-white
-          text-sm font-semibold text-slate-700
-          hover:bg-slate-50 active:bg-slate-100 transition
-          cursor-pointer inline-flex items-center gap-2 shrink-0
-        "
+                        h-9 px-4 rounded-lg border border-slate-200 bg-white
+                        text-sm font-semibold text-slate-700
+                        hover:bg-slate-50 active:bg-slate-100 transition
+                        cursor-pointer inline-flex items-center gap-2 shrink-0
+                      "
                     >
                       <Upload className="h-4 w-4" />
                       파일 선택
@@ -423,15 +441,14 @@ export default function NoticeWrite() {
                   </div>
                 </div>
 
-                {/* ✅ 통합 리스트(한 번만 스크롤) */}
+                {/* 통합 리스트 */}
                 <div
                   className="
-      mt-2 rounded-xl border border-slate-200 bg-slate-50
-      px-4 py-3 min-w-0
-      max-h-[220px] overflow-y-auto pr-1
-    "
+                    mt-2 rounded-xl border border-slate-200 bg-slate-50
+                    px-4 py-3 min-w-0
+                    max-h-[180px] overflow-y-auto pr-1
+                  "
                 >
-                  {/* 섹션이 완전히 비었을 때 */}
                   {files.length === 0 && existingFiles.length === 0 ? (
                     <div className="py-6 text-center text-[12px] text-slate-500">
                       첨부된 파일이 없습니다. 우측 상단에서 파일을 선택해
@@ -439,7 +456,7 @@ export default function NoticeWrite() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {/* ✅ 새로 선택한 파일 */}
+                      {/* 새 파일 */}
                       {files.length > 0 ? (
                         <div>
                           <div className="mb-2 text-[11px] font-black text-slate-600">
@@ -451,10 +468,10 @@ export default function NoticeWrite() {
                               <div
                                 key={f.name + String(f.size)}
                                 className="
-                    flex items-center justify-between gap-2
-                    rounded-lg bg-white border border-slate-200
-                    px-3 py-2 min-w-0
-                  "
+                                  flex items-center justify-between gap-2
+                                  rounded-lg bg-white border border-slate-200
+                                  px-3 py-2 min-w-0
+                                "
                               >
                                 <div className="min-w-0 flex-1">
                                   <div
@@ -476,10 +493,10 @@ export default function NoticeWrite() {
                                     )
                                   }
                                   className="
-                      h-8 w-8 rounded-lg grid place-items-center
-                      text-slate-400 hover:text-rose-600 hover:bg-rose-50
-                      transition shrink-0
-                    "
+                                    h-8 w-8 rounded-lg grid place-items-center
+                                    text-slate-400 hover:text-rose-600 hover:bg-rose-50
+                                    transition shrink-0
+                                  "
                                   title="제거"
                                 >
                                   <X className="h-4 w-4" />
@@ -490,7 +507,7 @@ export default function NoticeWrite() {
                         </div>
                       ) : null}
 
-                      {/* ✅ 기존 첨부파일 */}
+                      {/* 기존 파일 */}
                       {existingFiles.length > 0 ? (
                         <div>
                           <div className="mb-2 flex items-center gap-3">
@@ -513,10 +530,10 @@ export default function NoticeWrite() {
                                 <div
                                   key={key}
                                   className="
-                      flex items-center justify-between gap-2
-                      rounded-lg bg-white border border-slate-200
-                      px-3 py-2 min-w-0
-                    "
+                                    flex items-center justify-between gap-2
+                                    rounded-lg bg-white border border-slate-200
+                                    px-3 py-2 min-w-0
+                                  "
                                 >
                                   <div className="min-w-0 flex-1">
                                     <div
@@ -533,12 +550,9 @@ export default function NoticeWrite() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      // 1) 화면에서 제거(표시용)
                                       setExistingFiles((prev) =>
                                         prev.filter((x) => x.id !== f.id),
                                       );
-
-                                      // 2) 실제 삭제 대상 목록에 추가(id 있을 때만, 중복 방지)
                                       if (f?.id != null && f.id !== "") {
                                         setRemovedAttachments((prev) =>
                                           prev.includes(f.id)
@@ -548,10 +562,10 @@ export default function NoticeWrite() {
                                       }
                                     }}
                                     className="
-    h-8 w-8 rounded-lg grid place-items-center
-    text-slate-400 hover:text-rose-600 hover:bg-rose-50
-    transition shrink-0
-  "
+                                      h-8 w-8 rounded-lg grid place-items-center
+                                      text-slate-400 hover:text-rose-600 hover:bg-rose-50
+                                      transition shrink-0
+                                    "
                                     title="제거"
                                   >
                                     <X className="h-4 w-4" />

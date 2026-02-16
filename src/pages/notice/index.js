@@ -585,7 +585,7 @@ export default function Notice() {
             <div className={TABLE_WRAP}>
               {/* 컬럼 헤더 */}
               <div className={HEADER_ROW}>
-                <div className="flex items-center justify-center">고정</div>
+                <div className="flex items-center justify-center">번호</div>
                 <div className="pl-2">제목</div>
                 <div className="pl-2">작성자</div>
                 <div className="pl-2">작성일</div>

@@ -208,7 +208,8 @@ export async function getSimulationSchedule(simulationId, token) {
 //  백엔드: GET /api/simulation/schedule/{memberId}
 // (현재 컨트롤러가 memberId를 @PathVariable로 안 받지만, URL은 이렇게 맞춰야 404를 피합니다.)
 export async function getPersonalSchedule(memberId, token) {
-  const mid = (memberId || "").trim() || "me";
+  const mid = String(memberId || "").trim();
+  if (!mid) throw new Error("memberId가 없습니다.");
 
   const res = await fetch(`${serverAddr}/api/simulation/schedule/${mid}`, {
     method: "GET",

@@ -232,7 +232,9 @@ function StatCard({
           <div
             className={[
               "mt-1 tabular-nums text-slate-900",
-              valueClass ? valueClass : "text-[25px] font-semibold",
+              valueClass
+                ? valueClass
+                : "pt-1.5 pb-1.5 text-[26px] font-semibold ",
             ].join(" ")}
           >
             {value}
@@ -453,7 +455,7 @@ export default function SimulationPage() {
     };
   }, [token]);
 
-  // ✅ 검색 (data 자체가 최신순이므로, filter 후에도 순서 유지)
+  // 검색 (data 자체가 최신순이므로, filter 후에도 순서 유지)
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw) return data;
@@ -539,7 +541,7 @@ export default function SimulationPage() {
     const requiredStaffNum =
       newForm.requiredStaff === "" ? 0 : Number(newForm.requiredStaff || 0);
 
-    // ✅ 백 CreateSimulationRequest 기준으로만 전송 (불필요 필드 제거)
+    // 백 CreateSimulationRequest 기준으로만 전송 (불필요 필드 제거)
     const payload = {
       title: newForm.title.trim(),
       description: newForm.description || "",
@@ -819,7 +821,7 @@ export default function SimulationPage() {
                     sub="OPTIMAL / PENDING / READY"
                     tone="amber"
                     icon={<AlertCircle className="h-4 w-4" />}
-                    valueClass="pt-1.5 pb-1.5 text-[18px] font-bold text-slate-800"
+                    valueClass="pt-1.5 pb-1.5 text-[26px] font-bold text-slate-800"
                   />
                 </div>
 
