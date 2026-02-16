@@ -158,14 +158,13 @@ export default function OperationPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(10);
 
-  // search (페이지 검색창 전용)
+  // search
   const [query, setQuery] = useState("");
   const router = useRouter();
 
-  // 통합검색(라우터) 전용: 페이지 검색창(query)과 완전 분리
+  // 통합검색(라우터)
   const [routerFocus, setRouterFocus] = useState("");
 
-  // /operation?focus=... 또는 /operation?keyword=... 를 routerFocus로만 반영
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -192,13 +191,17 @@ export default function OperationPage() {
     setDetailOpen(false);
   };
 
+  /* =========================
+    load
+  ========================= */
   useEffect(() => {
     if (!token) return;
 
     let alive = true;
 
-    getOperations(token, "")
-      .then((json) => {
+    (async () => {
+      try {
+        const json = await getOperations(token, "");
         if (!alive) return;
 
         const list = json.operationList || json.items || json.data || [];
@@ -219,18 +222,18 @@ export default function OperationPage() {
 
         setSelectedRow(null);
         setDetailOpen(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
         setLoadError(err?.message || "Operation 불러오기 실패");
-      });
+      }
+    })();
 
     return () => {
       alive = false;
     };
   }, [token]);
 
-  // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
+  // ✅ 통합검색 + 페이지검색(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
 
   const filtered = useMemo(() => {
@@ -241,7 +244,7 @@ export default function OperationPage() {
     ]);
   }, [data, effectiveFilter]);
 
-  // pagination calc
+  // pagination
   const totalRows = filtered.length;
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
 
@@ -251,7 +254,7 @@ export default function OperationPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, pageIndex, pageSize, pageCount]);
 
-  // selection calc
+  // selection
   const selectedCount = selected.size;
 
   const isAllPageSelected =
@@ -306,6 +309,7 @@ export default function OperationPage() {
     setDirty(true);
   };
 
+  // ✅ 삭제: 화면에서만 제거 → 저장(upsert)하면 서버 notContains는 isDeleted=true 처리
   const deleteSelected = () => {
     if (selected.size === 0) return;
 
@@ -324,23 +328,34 @@ export default function OperationPage() {
     }
   };
 
-  const saveHandle = () => {
+  const saveHandle = async () => {
     if (!token) {
       window.alert("토큰이 없어서 저장할 수 없어요. 다시 로그인 해주세요.");
       return;
     }
 
-    const payload = data.map(({ _rid, flag, ...rest }) => rest);
+    // ✅ 서버로 보낼 payload
+    const payload = data.map(({ _rid, flag, ...rest }) => ({
+      id: String(rest.id ?? "").trim(),
+      name: String(rest.name ?? "").trim(),
+      description: String(rest.description ?? "").trim(),
+    }));
 
-    postOperations(payload, token)
-      .then(() => {
-        window.alert("저장 완료");
-        setDirty(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        window.alert(err?.message || "저장 실패");
-      });
+    // ✅ 서버도 막고 있으니 프론트에서 먼저 안내
+    const hasBlankId = payload.some((x) => !x.id);
+    if (hasBlankId) {
+      window.alert("공정 코드(id)는 필수입니다. 빈 값이 있습니다.");
+      return;
+    }
+
+    try {
+      await postOperations(payload, token);
+      window.alert("저장 완료");
+      setDirty(false);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || "저장 실패");
+    }
   };
 
   const uploadHandle = () => {
@@ -351,32 +366,32 @@ export default function OperationPage() {
     fileRef.current?.click();
   };
 
-  const fileChangeHandle = (e) => {
+  const fileChangeHandle = async (e) => {
     const file = e?.target?.files?.[0];
     if (!file || !token) return;
 
-    parseOperationXLS(file, token)
-      .then((json) => {
-        const list = json.operationList || json.items || json.data || [];
-        const items = (list || []).map((r) => ({
-          ...r,
-          _rid: cryptoId(),
-          flag: "pre",
-          id: r.id ?? "",
-          name: r.name ?? "",
-          description: r.description ?? r.desc ?? "",
-        }));
+    try {
+      const json = await parseOperationXLS(file, token);
 
-        setData((prev) => [...items, ...prev]);
-        setPageIndex(0);
-        setSelected(new Set());
-        setDirty(true);
-        setLoadError("");
-      })
-      .catch((err) => {
-        console.error(err);
-        window.alert(err?.message || "엑셀 파싱 실패");
-      });
+      const list = json.operationList || json.items || json.data || [];
+      const items = (list || []).map((r) => ({
+        ...r,
+        _rid: cryptoId(),
+        flag: "pre",
+        id: r.id ?? "",
+        name: r.name ?? "",
+        description: r.description ?? r.desc ?? "",
+      }));
+
+      setData((prev) => [...items, ...prev]);
+      setPageIndex(0);
+      setSelected(new Set());
+      setDirty(true);
+      setLoadError("");
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || "엑셀 파싱 실패");
+    }
 
     e.target.value = "";
   };
@@ -402,10 +417,9 @@ export default function OperationPage() {
     <DashboardShell crumbTop="테이블" crumbCurrent="operation">
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
-          {/* ===== 상단 카드 (Product 톤) ===== */}
+          {/* ===== 상단 카드 ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-5 py-4">
-              {/* title row */}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3 min-w-0">

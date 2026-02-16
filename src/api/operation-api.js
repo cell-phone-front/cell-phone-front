@@ -1,7 +1,7 @@
 // src/api/operation-api.js
 const serverAddr = "http://localhost:8080";
 
-// 공정단계 전체 조회 (+ 검색 조회)
+// 공정단계 전체 조회 (+ 검색)
 export async function getOperations(token, keyword = "") {
   const url = keyword
     ? `${serverAddr}/api/operation?keyword=${keyword}`
@@ -22,8 +22,10 @@ export async function postOperations(operations, token) {
       "Content-Type": "application/json",
       Authorization: "Bearer " + token,
     },
-    body: JSON.stringify({ operationList: operations }),
-  });
+    body: JSON.stringify({
+      operationList: operations,
+    }),
+  }).then((r) => r.json());
 }
 
 // 공정 단계 엑셀 파싱

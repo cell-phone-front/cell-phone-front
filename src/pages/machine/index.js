@@ -357,10 +357,32 @@ export default function MachinePage() {
       return;
     }
 
-    const payload = data.map(({ _rid, flag, ...rest }) => rest);
+    const payload = data
+      .map(({ _rid, flag, ...rest }) => ({
+        ...rest,
+        id: String(rest.id ?? "").trim(),
+        name: String(rest.name ?? "").trim(),
+        description: String(rest.description ?? "").trim(),
+      }))
+      // id 없는 행은 백에서 에러나니 제외(또는 저장 전에 막기)
+      .filter((m) => m.id);
+
+    if (payload.length === 0) {
+      window.alert("저장할 데이터가 없습니다. (id가 비어있음)");
+      return;
+    }
 
     postMachine(payload, token)
-      .then(() => {
+      .then(async (r) => {
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          throw new Error(txt || `저장 실패 (${r.status})`);
+        }
+
+        // ✅ 저장 후 서버에서 다시 불러와서 “진짜로 삭제됐는지” UI도 동기화
+        const json = await getMachine(token, "");
+        setData(normalizeMachineList(json));
+
         window.alert("저장 완료");
         setDirty(false);
       })
