@@ -1,4 +1,5 @@
 // src/pages/product-routing/index.js
+
 import DashboardShell from "@/components/dashboard-shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToken } from "@/stores/account-store";
@@ -16,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   Route,
+  RefreshCw, // ✅ 추가
 } from "lucide-react";
 
 import {
@@ -90,6 +92,7 @@ function StatCard({
     rose: "bg-rose-50 text-rose-700 ring-rose-100",
     amber: "bg-amber-50 text-amber-700 ring-amber-100",
   };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 hover:shadow transition">
       <div className="flex items-start justify-between gap-2">
@@ -173,7 +176,6 @@ export default function ProductRoutingPage() {
       router.query?.keyword != null ? String(router.query.keyword) : "";
 
     const next = (focus || keyword).trim();
-
     setRouterFocus(next);
     setPageIndex(0);
   }, [router.isReady, router.query?.focus, router.query?.keyword]);
@@ -193,61 +195,74 @@ export default function ProductRoutingPage() {
   };
 
   /* =========================
-    load
+    load / refresh
   ========================= */
-  useEffect(() => {
+  const fetchProductRoutings = async () => {
     if (!token) return;
 
-    let alive = true;
+    try {
+      const json = await getProductRoutings(token, "");
 
-    getProductRoutings(token, "")
-      .then((json) => {
-        if (!alive) return;
+      const list =
+        json.productRoutingList ||
+        json.routingList ||
+        json.items ||
+        json.data ||
+        [];
 
-        const list =
-          json.productRoutingList ||
-          json.routingList ||
-          json.items ||
-          json.data ||
-          [];
+      const rows = (list || []).map((r) => ({
+        ...r,
+        _rid: r._rid || cryptoId(),
+        flag: r.flag ?? "saved",
 
-        const rows = (list || []).map((r) => ({
-          ...r,
-          _rid: r._rid || cryptoId(),
-          flag: r.flag ?? "saved",
+        // ✅ 표준화 (필드명 차이 대응)
+        id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
+        name: r.name ?? r.routingName ?? r.productRoutingName ?? "",
+        productId: r.productId ?? r.product_id ?? "",
+        operationId: r.operationId ?? r.operation_id ?? "",
+        operationSeq:
+          r.operationSeq ??
+          r.operation_seq ??
+          r.seq ??
+          r.sequence ??
+          r.step ??
+          "",
+        description: r.description ?? r.desc ?? "",
+      }));
 
-          // ✅ 표준화 (필드명 차이 대응)
-          id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
-          productId: r.productId ?? r.product_id ?? "",
-          operationId: r.operationId ?? r.operation_id ?? "",
-          operationSeq:
-            r.operationSeq ??
-            r.operation_seq ??
-            r.seq ??
-            r.sequence ??
-            r.step ??
-            "",
-          description: r.description ?? r.desc ?? "",
-        }));
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+      setDirty(false);
 
-        setData(rows);
-        setSelected(new Set());
-        setPageIndex(0);
-        setLoadError("");
-        setDirty(false);
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      setLoadError(err?.message || "Product Routing 불러오기 실패");
+    }
+  };
 
-        setSelectedRow(null);
-        setDetailOpen(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoadError(err?.message || "Product Routing 불러오기 실패");
-      });
-
-    return () => {
-      alive = false;
-    };
+  // 초기 로딩
+  useEffect(() => {
+    fetchProductRoutings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // 새로고침(변경사항 있을 때 경고)
+  const refreshHandle = async () => {
+    if (!token) return;
+
+    if (dirty) {
+      const ok = window.confirm(
+        "저장하지 않은 변경사항이 있습니다. 새로고침하면 변경사항이 사라집니다. 진행할까요?",
+      );
+      if (!ok) return;
+    }
+
+    await fetchProductRoutings();
+  };
 
   // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
@@ -255,6 +270,7 @@ export default function ProductRoutingPage() {
   const filtered = useMemo(() => {
     return filterRows(data, effectiveFilter, [
       (r) => r?.id,
+      "name",
       "productId",
       "operationId",
       "operationSeq",
@@ -317,6 +333,7 @@ export default function ProductRoutingPage() {
       _rid: cryptoId(),
       flag: "new",
       id: "",
+      name: "",
       productId: "",
       operationId: "",
       operationSeq: "",
@@ -331,6 +348,9 @@ export default function ProductRoutingPage() {
 
   const deleteSelected = () => {
     if (selected.size === 0) return;
+
+    const ok = window.confirm(`선택한 ${selected.size}건을 삭제하시겠습니까?`);
+    if (!ok) return;
 
     setData((prev) => prev.filter((r) => !selected.has(r._rid)));
     setSelected(new Set());
@@ -353,12 +373,15 @@ export default function ProductRoutingPage() {
       return;
     }
 
+    // ✅ 배열만 만들고, API에서 { productRoutingList: [...] }로 감싸서 보냄
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
     postProductRoutings(payload, token)
       .then(() => {
         window.alert("저장 완료");
         setDirty(false);
+        // 저장 후 서버 데이터로 동기화(권장)
+        fetchProductRoutings();
       })
       .catch((err) => {
         console.error(err);
@@ -392,6 +415,7 @@ export default function ProductRoutingPage() {
           _rid: cryptoId(),
           flag: "pre",
           id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
+          name: r.name ?? r.routingName ?? r.productRoutingName ?? "",
           productId: r.productId ?? r.product_id ?? "",
           operationId: r.operationId ?? r.operation_id ?? "",
           operationSeq:
@@ -487,7 +511,7 @@ export default function ProductRoutingPage() {
                         setQuery(e.target.value);
                         setPageIndex(0);
                       }}
-                      placeholder="검색 (품번 / 공정코드 / 순서 / 설명)"
+                      placeholder="검색 (품번 / 공정경로 / 공정코드 / 순서 / 설명)"
                       className="
                         h-10 w-full rounded-full
                         border border-slate-200 bg-white
@@ -641,6 +665,7 @@ export default function ProductRoutingPage() {
                         onChange={fileChangeHandle}
                       />
 
+                      {/* ✅ 행추가 오른쪽에 새로고침 */}
                       <button
                         type="button"
                         onClick={addRow}
@@ -653,6 +678,21 @@ export default function ProductRoutingPage() {
                         "
                       >
                         <Plus size={16} />행 추가
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+                          h-10 w-10 rounded-full
+                          border border-slate-200 bg-white
+                          text-slate-600
+                          hover:bg-slate-100 hover:text-indigo-600
+                          transition inline-flex items-center justify-center
+                        "
+                        title="새로고침"
+                      >
+                        <RefreshCw size={16} />
                       </button>
                     </div>
 
@@ -686,12 +726,14 @@ export default function ProductRoutingPage() {
                     <colgroup>
                       <col style={{ width: "44px" }} />
                       <col style={{ width: "18%" }} />
-                      <col style={{ width: "22%" }} />
-                      <col style={{ width: "22%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "16%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: "18%" }} />
                       <col style={{ width: "140px" }} />
                     </colgroup>
+
                     <thead className="sticky top-0 z-10">
                       <tr className="text-left text-[12px] font-semibold text-slate-600 bg-slate-50">
                         <th className="border-b border-slate-200 px-3 py-3">
@@ -711,6 +753,9 @@ export default function ProductRoutingPage() {
 
                         <th className="border-b border-slate-200 px-3 py-3">
                           생산 대상 품번
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-3">
+                          공정 경로
                         </th>
                         <th className="border-b border-slate-200 px-3 py-3">
                           공정 코드
@@ -738,10 +783,11 @@ export default function ProductRoutingPage() {
                     <colgroup>
                       <col style={{ width: "44px" }} />
                       <col style={{ width: "18%" }} />
-                      <col style={{ width: "22%" }} />
-                      <col style={{ width: "22%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "16%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: "18%" }} />
                       <col style={{ width: "140px" }} />
                     </colgroup>
 
@@ -777,7 +823,6 @@ export default function ProductRoutingPage() {
                               setDetailOpen(true);
                             }}
                           >
-                            {/* check */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="flex justify-center"
@@ -794,7 +839,6 @@ export default function ProductRoutingPage() {
                               </div>
                             </td>
 
-                            {/* productId */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.productId ?? ""}
@@ -810,7 +854,17 @@ export default function ProductRoutingPage() {
                               />
                             </td>
 
-                            {/* operationId */}
+                            <td className="border-b border-slate-100 px-3 py-2">
+                              <TruncInput
+                                value={row.name ?? ""}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) =>
+                                  updateCell(row._rid, "name", e.target.value)
+                                }
+                                placeholder="Name"
+                              />
+                            </td>
+
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.operationId ?? ""}
@@ -826,7 +880,6 @@ export default function ProductRoutingPage() {
                               />
                             </td>
 
-                            {/* id */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.id ?? ""}
@@ -838,7 +891,6 @@ export default function ProductRoutingPage() {
                               />
                             </td>
 
-                            {/* seq */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.operationSeq ?? ""}
@@ -854,7 +906,6 @@ export default function ProductRoutingPage() {
                               />
                             </td>
 
-                            {/* description */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.description ?? ""}
@@ -870,7 +921,6 @@ export default function ProductRoutingPage() {
                               />
                             </td>
 
-                            {/* status */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div className="h-10 flex items-center">
                                 <StatusPill
@@ -886,7 +936,7 @@ export default function ProductRoutingPage() {
 
                       {pageRows.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="p-0">
+                          <td colSpan={8} className="p-0">
                             <button
                               type="button"
                               onClick={addRow}
@@ -909,7 +959,6 @@ export default function ProductRoutingPage() {
                   </table>
                 </div>
 
-                {/* table footer */}
                 <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
                   <div className="text-[12px] text-slate-500">
                     총{" "}
@@ -962,7 +1011,6 @@ export default function ProductRoutingPage() {
                 </div>
               </div>
 
-              {/* Detail panel */}
               <div
                 className="h-full min-h-0 flex"
                 onMouseDown={(e) => e.stopPropagation()}

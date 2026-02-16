@@ -1,8 +1,6 @@
 // src/api/product-routing-api.js
 
-const host =
-  typeof window !== "undefined" ? window.location.hostname : "localhost";
-const serverAddr = `http://${host}:8080`;
+const serverAddr = "http://localhost:8080";
 
 async function safeJson(res) {
   const text = await res.text();
@@ -61,9 +59,11 @@ export async function parseProductRoutingXLS(file, token) {
 /* =========================
  * (3) Upsert 저장
  * POST /api/operation/product/routing/upsert
- * body: JSON array
+ * body: { productRoutingList: [...] }
  * ========================= */
-export async function postProductRoutings(payload, token) {
+export async function postProductRoutings(productRoutingList, token) {
+  const body = { productRoutingList: productRoutingList || [] };
+
   const res = await fetch(
     `${serverAddr}/api/operation/product/routing/upsert`,
     {
@@ -72,7 +72,7 @@ export async function postProductRoutings(payload, token) {
         Authorization: "Bearer " + token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     },
   );
 

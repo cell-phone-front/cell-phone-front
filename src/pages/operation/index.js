@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertCircle,
   Cpu,
+  RefreshCw, // ✅ 추가
 } from "lucide-react";
 
 import {
@@ -192,46 +193,64 @@ export default function OperationPage() {
   };
 
   /* =========================
-    load
+    load / refresh
   ========================= */
-  useEffect(() => {
+  const fetchOperations = async () => {
     if (!token) return;
 
+    try {
+      const json = await getOperations(token, "");
+      const list = json.operationList || json.items || json.data || [];
+      const rows = (list || []).map((r) => ({
+        ...r,
+        _rid: r._rid || cryptoId(),
+        flag: r.flag ?? "saved",
+        id: r.id ?? "",
+        name: r.name ?? "",
+        description: r.description ?? r.desc ?? "",
+      }));
+
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+      setDirty(false);
+
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      setLoadError(err?.message || "Operation 불러오기 실패");
+    }
+  };
+
+  useEffect(() => {
     let alive = true;
+    if (!token) return;
 
     (async () => {
-      try {
-        const json = await getOperations(token, "");
-        if (!alive) return;
-
-        const list = json.operationList || json.items || json.data || [];
-        const rows = (list || []).map((r) => ({
-          ...r,
-          _rid: r._rid || cryptoId(),
-          flag: r.flag ?? "saved",
-          id: r.id ?? "",
-          name: r.name ?? "",
-          description: r.description ?? r.desc ?? "",
-        }));
-
-        setData(rows);
-        setSelected(new Set());
-        setPageIndex(0);
-        setLoadError("");
-        setDirty(false);
-
-        setSelectedRow(null);
-        setDetailOpen(false);
-      } catch (err) {
-        console.error(err);
-        setLoadError(err?.message || "Operation 불러오기 실패");
-      }
+      if (!alive) return;
+      await fetchOperations();
     })();
 
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const refreshHandle = async () => {
+    if (!token) return;
+
+    if (dirty) {
+      const ok = window.confirm(
+        "저장하지 않은 변경사항이 있습니다. 새로고침하면 변경사항이 사라집니다. 진행할까요?",
+      );
+      if (!ok) return;
+    }
+
+    await fetchOperations();
+  };
 
   // ✅ 통합검색 + 페이지검색(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
@@ -313,6 +332,9 @@ export default function OperationPage() {
   const deleteSelected = () => {
     if (selected.size === 0) return;
 
+    const ok = window.confirm(`선택한 ${selected.size}건을 삭제하시겠습니까?`);
+    if (!ok) return;
+
     setData((prev) => prev.filter((r) => !selected.has(r._rid)));
     setSelected(new Set());
     setPageIndex(0);
@@ -352,6 +374,8 @@ export default function OperationPage() {
       await postOperations(payload, token);
       window.alert("저장 완료");
       setDirty(false);
+      // ✅ 저장 후 동기화
+      await fetchOperations();
     } catch (err) {
       console.error(err);
       window.alert(err?.message || "저장 실패");
@@ -630,6 +654,22 @@ export default function OperationPage() {
                       >
                         <Plus size={16} />행 추가
                       </button>
+
+                      {/* ✅ 행추가 오른쪽: 새로고침 */}
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+                          h-10 w-10 rounded-full
+                          border border-slate-200 bg-white
+                          text-slate-600
+                          hover:bg-slate-100 hover:text-indigo-600
+                          transition inline-flex items-center justify-center
+                        "
+                        title="새로고침"
+                      >
+                        <RefreshCw size={16} />
+                      </button>
                     </div>
 
                     {loadError ? (
@@ -742,7 +782,6 @@ export default function OperationPage() {
                               setDetailOpen(true);
                             }}
                           >
-                            {/* check */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="flex justify-center"
@@ -759,7 +798,6 @@ export default function OperationPage() {
                               </div>
                             </td>
 
-                            {/* id */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.id ?? ""}
@@ -771,7 +809,6 @@ export default function OperationPage() {
                               />
                             </td>
 
-                            {/* name */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.name ?? ""}
@@ -783,7 +820,6 @@ export default function OperationPage() {
                               />
                             </td>
 
-                            {/* description */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <TruncInput
                                 value={row.description ?? ""}
@@ -799,7 +835,6 @@ export default function OperationPage() {
                               />
                             </td>
 
-                            {/* status */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div className="h-10 flex items-center">
                                 <StatusPill
@@ -838,7 +873,6 @@ export default function OperationPage() {
                   </table>
                 </div>
 
-                {/* table footer */}
                 <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
                   <div className="text-[12px] text-slate-500">
                     총{" "}
@@ -891,7 +925,6 @@ export default function OperationPage() {
                 </div>
               </div>
 
-              {/* Detail panel */}
               <div
                 className="h-full min-h-0 flex"
                 onMouseDown={(e) => e.stopPropagation()}

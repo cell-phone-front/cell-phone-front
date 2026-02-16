@@ -16,6 +16,7 @@ import {
   Layers,
   CheckCircle,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 import { getProducts, parseProductXLS, postProducts } from "@/api/product-api";
@@ -68,7 +69,7 @@ function StatusPill({ flag }) {
     <span
       className={[
         "inline-flex items-center justify-center",
-        "h-5  rounded-full",
+        "h-5 rounded-full",
         "text-[10px] font-medium whitespace-nowrap",
         map.cls,
       ].join(" ")}
@@ -185,56 +186,69 @@ export default function ProductPage() {
   // 전체보기 모달
   const [fullOpen, setFullOpen] = useState(false);
 
+  // 상세 패널
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+
   const clearSelection = () => {
     setSelectedRow(null);
     setDetailOpen(false);
   };
 
-  // 상세 패널
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState(null);
+  /* =========================
+    load / refresh
+  ========================= */
+  const fetchProducts = async () => {
+    if (!token) return;
+
+    try {
+      const json = await getProducts(token, "");
+      const list = json.productList || json.items || json.data || [];
+      const rows = (list || []).map((r) => ({
+        ...r,
+        _rid: cryptoId(),
+        flag: r.flag ?? "saved",
+        id: r.id ?? "",
+        brand: r.brand ?? "",
+        name: r.name ?? "",
+        description: r.description ?? r.desc ?? "",
+      }));
+
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+      setDirty(false);
+
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      setLoadError(err?.message || "Product 불러오기 실패");
+    }
+  };
 
   // 초기 로딩
   useEffect(() => {
-    if (!token) return;
-
-    let alive = true;
-
-    getProducts(token, "")
-      .then((json) => {
-        if (!alive) return;
-
-        const list = json.productList || json.items || json.data || [];
-        const rows = (list || []).map((r) => ({
-          ...r,
-          _rid: r._rid || cryptoId(),
-          flag: r.flag ?? "saved",
-          id: r.id ?? "",
-          brand: r.brand ?? "",
-          name: r.name ?? "",
-          description: r.description ?? r.desc ?? "",
-        }));
-
-        setData(rows);
-        setSelected(new Set());
-        setPageIndex(0);
-        setLoadError("");
-        setDirty(false);
-
-        setSelectedRow(null);
-        setDetailOpen(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoadError(err?.message || "Product 불러오기 실패");
-      });
-
-    return () => {
-      alive = false;
-    };
+    fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  //  통합검색 + 페이지검색을 동시에 적용(AND)
+  // 새로고침(변경사항 있을 때 경고)
+  const refreshHandle = async () => {
+    if (!token) return;
+
+    if (dirty) {
+      const ok = window.confirm(
+        "저장하지 않은 변경사항이 있습니다. 새로고침하면 변경사항이 사라집니다. 진행할까요?",
+      );
+      if (!ok) return;
+    }
+
+    await fetchProducts();
+  };
+
+  // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
 
   const filtered = useMemo(() => {
@@ -312,7 +326,7 @@ export default function ProductPage() {
     setDirty(true);
   };
 
-  //  선택 삭제: "화면에서 제거 + dirty=true" (실제 DB 반영은 저장 버튼에서 upsert)
+  // 선택 삭제: "화면에서 제거 + dirty=true" (실제 DB 반영은 저장 버튼에서 upsert)
   const deleteSelected = () => {
     if (selected.size === 0) return;
 
@@ -363,24 +377,7 @@ export default function ProductPage() {
       setDirty(false);
 
       // 저장 후 다시 조회해서 서버 데이터로 동기화(권장)
-      const json = await getProducts(token, "");
-      const list = json.productList || json.items || json.data || [];
-      const rows = (list || []).map((r) => ({
-        ...r,
-        _rid: cryptoId(),
-        flag: "saved",
-        id: r.id ?? "",
-        brand: r.brand ?? "",
-        name: r.name ?? "",
-        description: r.description ?? r.desc ?? "",
-      }));
-      setData(rows);
-      setSelected(new Set());
-      setPageIndex(0);
-      setLoadError("");
-
-      setSelectedRow(null);
-      setDetailOpen(false);
+      await fetchProducts();
     } catch (err) {
       console.error(err);
       window.alert(err?.message || "저장 실패");
@@ -661,6 +658,21 @@ export default function ProductPage() {
                         "
                       >
                         <Plus size={16} />행 추가
+                      </button>
+                      {/* ✅ 새로고침 버튼 */}
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+                          h-10 w-10 rounded-full
+                          border border-slate-200 bg-white
+                          text-slate-600
+                          hover:bg-slate-100 hover:text-indigo-600
+                          transition inline-flex items-center justify-center
+                        "
+                        title="새로고침"
+                      >
+                        <RefreshCw size={16} />
                       </button>
                     </div>
 

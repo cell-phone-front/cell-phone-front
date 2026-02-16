@@ -16,16 +16,12 @@ function cryptoId() {
   }
 }
 
-function Clamp2({ children, className = "" }) {
+function Clamp1({ children, className = "" }) {
   return (
     <div
-      className={className}
-      style={{
-        display: "-webkit-box",
-        WebkitBoxOrient: "vertical",
-        WebkitLineClamp: 2,
-        overflow: "hidden",
-      }}
+      className={["truncate whitespace-nowrap overflow-hidden", className].join(
+        " ",
+      )}
       title={typeof children === "string" ? children : undefined}
     >
       {children}
@@ -53,7 +49,7 @@ function Td({ className = "", children }) {
     <td
       className={[
         "border-b border-slate-100",
-        "px-4 py-2.5",
+        "px-4 py-2", // ✅ 컴팩트 + 줄높이 안정
         "text-[13px] text-slate-800",
         className,
       ].join(" ")}
@@ -84,10 +80,14 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
           json.items ||
           json.data ||
           [];
+
         const mapped = (list || []).map((r) => ({
           ...r,
           _rid: r._rid || cryptoId(),
+
+          // ✅ 표준화
           id: r.id ?? r.routingId ?? r.productRoutingId ?? "",
+          name: r.name ?? r.routingName ?? r.productRoutingName ?? "",
           productId: r.productId ?? r.product_id ?? "",
           operationId: r.operationId ?? r.operation_id ?? "",
           operationSeq:
@@ -99,6 +99,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
             "",
           description: r.description ?? r.desc ?? "",
         }));
+
         setRows(mapped);
       })
       .catch((e) => {
@@ -128,7 +129,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
     if (!q) return data;
 
     return data.filter((r) =>
-      [r.productId, r.operationId, r.id, r.operationSeq, r.description]
+      [r.productId, r.name, r.operationId, r.id, r.operationSeq, r.description]
         .map((v) => String(v ?? ""))
         .join(" ")
         .toLowerCase()
@@ -161,7 +162,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
                   </div>
                 </div>
                 <div className="mt-0.5 text-[12px] text-slate-500 truncate">
-                  검색은 품번/공정코드/순서/설명 기준으로 동작합니다.
+                  검색은 품번/공정경로/공정코드/순서/설명 기준으로 동작합니다.
                 </div>
               </div>
             </div>
@@ -175,7 +176,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
                 <input
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="검색 (품번/공정코드/순서/설명)"
+                  placeholder="검색 (품번/공정경로/공정코드/순서/설명)"
                   className="
                     h-10 w-full rounded-full
                     border border-slate-200 bg-white
@@ -231,19 +232,22 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
         {/* ===== Table ===== */}
         <div className="flex-1 min-h-0 overflow-auto pretty-scroll">
           <table className="w-full table-fixed border-collapse">
+            {/* ✅ 두 줄 방지용 폭 재배치 */}
             <colgroup>
-              <col style={{ width: "84px" }} />
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "24%" }} />
+              <col style={{ width: "70px" }} /> {/* 번호 */}
+              <col style={{ width: "16%" }} /> {/* productId */}
+              <col style={{ width: "20%" }} /> {/* name */}
+              <col style={{ width: "16%" }} /> {/* operationId */}
+              <col style={{ width: "16%" }} /> {/* id */}
+              <col style={{ width: "8%" }} /> {/* seq */}
+              <col style={{ width: "24%" }} /> {/* desc */}
             </colgroup>
 
             <thead className="sticky top-0 z-10">
               <tr>
                 <Th className="!text-center !px-2">번호</Th>
                 <Th>생산 대상 품번</Th>
+                <Th>공정 경로</Th>
                 <Th>공정 코드</Th>
                 <Th>공정 순서 ID</Th>
                 <Th className="!text-center">순서</Th>
@@ -259,31 +263,27 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
                   </Td>
 
                   <Td>
-                    <Clamp2 className="whitespace-normal break-words leading-5">
-                      {r.productId ?? "-"}
-                    </Clamp2>
+                    <Clamp1>{r.productId ?? "-"}</Clamp1>
                   </Td>
 
                   <Td>
-                    <Clamp2 className="whitespace-normal break-words leading-5">
-                      {r.operationId ?? "-"}
-                    </Clamp2>
+                    <Clamp1>{r.name ?? "-"}</Clamp1>
                   </Td>
 
                   <Td>
-                    <Clamp2 className="whitespace-normal break-words leading-5">
-                      {r.id ?? "-"}
-                    </Clamp2>
+                    <Clamp1>{r.operationId ?? "-"}</Clamp1>
+                  </Td>
+
+                  <Td>
+                    <Clamp1>{r.id ?? "-"}</Clamp1>
                   </Td>
 
                   <Td className="!text-center tabular-nums">
-                    {r.operationSeq ?? "-"}
+                    <Clamp1>{r.operationSeq ?? "-"}</Clamp1>
                   </Td>
 
                   <Td>
-                    <Clamp2 className="whitespace-normal break-words leading-5">
-                      {r.description ?? "-"}
-                    </Clamp2>
+                    <Clamp1>{r.description ?? "-"}</Clamp1>
                   </Td>
                 </tr>
               ))}
@@ -291,7 +291,7 @@ export default function ProductRoutingFullModal({ open, onClose, token }) {
               {filteredData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-16 text-center text-[13px] text-slate-500"
                   >
                     데이터가 없습니다.

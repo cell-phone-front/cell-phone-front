@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 
 import { filterRows } from "@/lib/table-filter";
@@ -36,10 +37,6 @@ function cryptoId() {
   } catch {
     return `rid-${Date.now()}-${Math.random()}`;
   }
-}
-
-function safeStr(v) {
-  return String(v ?? "").trim();
 }
 
 function normalizeMachineList(payload) {
@@ -193,7 +190,7 @@ export default function MachinePage() {
   // search (페이지 검색창 전용)
   const [query, setQuery] = useState("");
 
-  // 통합검색(라우터) 전용 (Tasks와 동일: query와 분리)
+  // 통합검색(라우터) 전용
   const [routerFocus, setRouterFocus] = useState("");
 
   useEffect(() => {
@@ -220,17 +217,37 @@ export default function MachinePage() {
     setDetailOpen(false);
   };
 
-  /* =========================
-   * load
-   ========================= */
-  useEffect(() => {
+  // ✅ 공용 로더(초기 로드/새로고침)
+  const fetchMachines = async (opts = {}) => {
+    const { silent = false } = opts;
     if (!token) return;
 
+    try {
+      const json = await getMachine(token, "");
+      const rows = normalizeMachineList(json);
+
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+      setDirty(false);
+
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      if (!silent) setLoadError(err?.message || "Machine 불러오기 실패");
+    }
+  };
+
+  // ✅ 초기 로드
+  useEffect(() => {
     let alive = true;
 
-    // Tasks처럼: 일단 전체 로드 → 프론트 필터
-    getMachine(token, "")
-      .then((json) => {
+    (async () => {
+      if (!token) return;
+      try {
+        const json = await getMachine(token, "");
         if (!alive) return;
 
         const rows = normalizeMachineList(json);
@@ -243,16 +260,28 @@ export default function MachinePage() {
 
         setSelectedRow(null);
         setDetailOpen(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
+        if (!alive) return;
         setLoadError(err?.message || "Machine 불러오기 실패");
-      });
+      }
+    })();
 
     return () => {
       alive = false;
     };
   }, [token]);
+
+  // ✅ 새로고침
+  const refreshHandle = () => {
+    if (dirty) {
+      const ok = window.confirm(
+        "저장되지 않은 변경사항이 있습니다. 새로고침하면 사라집니다. 계속할까요?",
+      );
+      if (!ok) return;
+    }
+    fetchMachines();
+  };
 
   /* =========================
    * filters (AND)
@@ -263,6 +292,7 @@ export default function MachinePage() {
     return filterRows(data, effectiveFilter, [
       (r) => r?.id,
       "name",
+      "koreanName",
       "description",
     ]);
   }, [data, effectiveFilter]);
@@ -362,9 +392,9 @@ export default function MachinePage() {
         ...rest,
         id: String(rest.id ?? "").trim(),
         name: String(rest.name ?? "").trim(),
+        koreanName: String(rest.koreanName ?? "").trim(),
         description: String(rest.description ?? "").trim(),
       }))
-      // id 없는 행은 백에서 에러나니 제외(또는 저장 전에 막기)
       .filter((m) => m.id);
 
     if (payload.length === 0) {
@@ -374,17 +404,17 @@ export default function MachinePage() {
 
     postMachine(payload, token)
       .then(async (r) => {
-        if (!r.ok) {
-          const txt = await r.text().catch(() => "");
-          throw new Error(txt || `저장 실패 (${r.status})`);
+        // 기존 코드 유지: postMachine이 fetch Response를 반환한다고 가정
+        if (!r?.ok) {
+          const txt = await r?.text?.().catch(() => "");
+          throw new Error(txt || `저장 실패 (${r?.status ?? "unknown"})`);
         }
-
-        // ✅ 저장 후 서버에서 다시 불러와서 “진짜로 삭제됐는지” UI도 동기화
-        const json = await getMachine(token, "");
-        setData(normalizeMachineList(json));
 
         window.alert("저장 완료");
         setDirty(false);
+
+        // ✅ 저장 후 서버 데이터로 동기화(권장)
+        await fetchMachines({ silent: true });
       })
       .catch((err) => {
         console.error(err);
@@ -447,9 +477,8 @@ export default function MachinePage() {
   return (
     <DashboardShell crumbTop="테이블" crumbCurrent="machine">
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
-        {/*  */}
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
-          {/* =====  ===== */}
+          {/* ===== 상단 카드 ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-5 py-4">
               {/* title row */}
@@ -497,7 +526,7 @@ export default function MachinePage() {
                         setQuery(e.target.value);
                         setPageIndex(0);
                       }}
-                      placeholder="검색 (기계/이름/설명)"
+                      placeholder="검색 (기계/이름/한글명/설명)"
                       className="
                         h-10 w-full rounded-full
                         border border-slate-200 bg-white
@@ -665,6 +694,22 @@ export default function MachinePage() {
                       >
                         <Plus size={16} />행 추가
                       </button>
+
+                      {/* ✅ 새로고침 (행 추가 오른쪽) */}
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+                          h-10 w-10 rounded-full
+                          border border-slate-200 bg-white
+                          text-slate-600
+                          hover:bg-slate-100 hover:text-indigo-600
+                          transition inline-flex items-center justify-center
+                        "
+                        title="새로고침"
+                      >
+                        <RefreshCw size={16} />
+                      </button>
                     </div>
 
                     {loadError ? (
@@ -725,7 +770,6 @@ export default function MachinePage() {
                         <th className="border-b border-slate-200 px-3 py-3">
                           기계 이름
                         </th>
-
                         <th className="border-b border-slate-200 px-3 py-3">
                           기계 설명
                         </th>
@@ -780,7 +824,6 @@ export default function MachinePage() {
                               setDetailOpen(true);
                             }}
                           >
-                            {/* check */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="flex justify-center"
@@ -849,7 +892,7 @@ export default function MachinePage() {
 
                       {pageRows.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-0">
+                          <td colSpan={5} className="p-0">
                             <button
                               type="button"
                               onClick={addRow}
@@ -872,7 +915,7 @@ export default function MachinePage() {
                   </table>
                 </div>
 
-                {/* table footer (Tasks와 동일 톤) */}
+                {/* footer */}
                 <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
                   <div className="text-[12px] text-slate-500">
                     총{" "}
@@ -925,7 +968,7 @@ export default function MachinePage() {
                 </div>
               </div>
 
-              {/* Detail panel (높이 고정 + 내부 스크롤) */}
+              {/* Detail panel */}
               <div
                 className="h-full min-h-0 flex"
                 onMouseDown={(e) => e.stopPropagation()}

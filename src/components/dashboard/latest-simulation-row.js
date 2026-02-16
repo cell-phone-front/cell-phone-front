@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useToken } from "@/stores/account-store";
+import { useToken, useAccount } from "@/stores/account-store"; // ✅ role 체크용 추가
 import { getSimulations, getSimulationSchedule } from "@/api/simulation-api";
 
 import LeftMeta from "@/components/dashboard-gantt/left";
@@ -184,6 +184,11 @@ function SectionHeader({ title, desc, right = null }) {
 export default function LatestSimulationRow() {
   const token = useToken((s) => s.token);
 
+  // ✅ 권한 체크(없으면 아예 API 호출 안 함)
+  const account = useAccount((s) => s.account);
+  const role = account?.role;
+  const canSeeSim = role === "ADMIN" || role === "PLANNER";
+
   const [scheduleList, setScheduleList] = useState([]);
   const [latestSim, setLatestSim] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -198,16 +203,30 @@ export default function LatestSimulationRow() {
     let alive = true;
 
     const fetchLatest = async () => {
-      if (!token) return;
+      if (!token) {
+        if (!alive) return;
+        setLoading(false);
+        setErr("");
+        setLatestSim(null);
+        setScheduleList([]);
+        return;
+      }
+
+      // ✅ WORKER 등 권한 없는 경우: 호출 스킵(대시보드 런타임 에러 방지)
+      if (!canSeeSim) {
+        if (!alive) return;
+        setLoading(false);
+        setErr(""); // 안내문은 아래 UI 분기에서 처리
+        setLatestSim(null);
+        setScheduleList([]);
+        return;
+      }
 
       setLoading(true);
       setErr("");
 
       try {
         const simJson = await getSimulations(token);
-
-        // ✅ 콘솔로 키 확인하고 싶으면 주석 해제
-        // console.log("[SIM LIST KEYS]", Object.keys(simJson || {}), simJson);
 
         const simList = normalizeSimulationList(simJson);
         const latest = pickLatestSim(simList);
@@ -242,7 +261,7 @@ export default function LatestSimulationRow() {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, canSeeSim]);
 
   const meta = latestSim
     ? {
@@ -309,6 +328,23 @@ export default function LatestSimulationRow() {
     () => buildGroupsByMachine(scheduleList),
     [scheduleList],
   );
+
+  // ✅ 권한/로그인 UI 분기(대시보드 런타임 에러 방지 + UX)
+  if (!token) {
+    return (
+      <div className="h-full grid place-items-center text-[12px] text-slate-500">
+        로그인이 필요합니다.
+      </div>
+    );
+  }
+
+  if (!canSeeSim) {
+    return (
+      <div className="h-full grid place-items-center text-[12px] text-slate-500">
+        시뮬레이션 요약은 ADMIN/PLANNER만 볼 수 있습니다.
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -1,4 +1,5 @@
 // pages/simulation/index.js
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import DashboardShell from "@/components/dashboard-shell";
@@ -49,13 +50,6 @@ function roleOk(role) {
   return r === "admin" || r === "planner";
 }
 
-function buildStartDateTime(dateStr, timeStr) {
-  const d = (dateStr || "").trim();
-  const t = (timeStr || "00:00").trim();
-  if (!d) return "";
-  return `${d}T${t}:00`;
-}
-
 function normStatus(v) {
   const s = String(v || "")
     .trim()
@@ -65,16 +59,16 @@ function normStatus(v) {
 }
 
 /* ===============================
-   list helpers (✅ 응답키 유연화)
+   list helpers (✅ 백 응답키 반영)
 =============================== */
 function pickList(json) {
   return (
+    json?.simulationList || // ✅ 백: GetAllSimulationResponse.simulationList
     json?.simulationScheduleList ||
-    json?.simulationList ||
     json?.simulations ||
     json?.list ||
-    json?.data?.simulationScheduleList ||
     json?.data?.simulationList ||
+    json?.data?.simulationScheduleList ||
     json?.data?.simulations ||
     json?.data?.list ||
     (Array.isArray(json) ? json : [])
@@ -86,10 +80,11 @@ function pickCreatedRow(created) {
     created?.simulation ||
     created?.data?.simulation ||
     created?.result?.simulation ||
-    created?.notice || // 혹시 다른 래핑 대비(안쓰여도 무해)
     null;
 
   if (!item) return null;
+
+  const prodList = Array.isArray(item.productList) ? item.productList : [];
 
   return {
     id: item.id ?? item.simulationId ?? item.simulation_id ?? "",
@@ -98,49 +93,39 @@ function pickCreatedRow(created) {
     description: item.description || "",
     productId: "",
     productName: "",
-    productCount: Array.isArray(item.productList) ? item.productList.length : 0,
+    productCount:
+      item.productCount != null ? Number(item.productCount) : prodList.length,
     requiredStaff: item.requiredStaff ?? 0,
-    status: item.status || "READY",
+    status: item.status || "대기중",
     simulationStartDate: item.simulationStartDate || "",
     workTime: item.workTime ?? 0,
 
-    // ✅ 최신 정렬용(서버가 createdAt을 주면 그걸 써도 되고, 없으면 지금 시간)
+    // ✅ 백에 createdAt이 없으니, 생성 직후만 정렬 힌트로 사용
     _sortTs: Date.now(),
   };
 }
 
 /* ===============================
-   최신순 정렬 유틸 (✅ 핵심)
-   - 1순위: createdAt 있으면 createdAt
-   - 2순위: simulationStartDate
-   - 3순위: id(문자열) 내림차순
+   정렬 유틸 (✅ createdAt 없음 → startDate 중심)
+   - 1순위: simulationStartDate (내림차순)
+   - 2순위: _sortTs (내림차순)
+   - 3순위: id (내림차순)
 =============================== */
 function toMs(v) {
   if (v == null || v === "") return NaN;
   const s = String(v).trim();
   if (!s) return NaN;
+
+  // "YYYY-MM-DD"도 Date 파싱 가능
   const d = new Date(s);
   const t = d.getTime();
   return Number.isFinite(t) ? t : NaN;
 }
 
 function getRowSortTs(r) {
-  // createdAt 형태가 있으면 우선
-  const c =
-    r?.createdAt ||
-    r?.createAt ||
-    r?.created_date ||
-    r?.createdDate ||
-    r?.created_time;
-
-  const ct = toMs(c);
-  if (Number.isFinite(ct)) return ct;
-
-  // 없으면 startDate로
   const st = toMs(r?.simulationStartDate || r?.startDate || "");
   if (Number.isFinite(st)) return st;
 
-  // 마지막 fallback
   const extra = Number(r?._sortTs);
   if (Number.isFinite(extra) && extra > 0) return extra;
 
@@ -157,14 +142,13 @@ function sortLatestFirst(list) {
     const aid = String(a?.id ?? "");
     const bid = String(b?.id ?? "");
     if (aid !== bid) return bid.localeCompare(aid);
-
     return 0;
   });
   return arr;
 }
 
 /* ===============================
-   UI (Tasks 톤)
+   UI
 =============================== */
 function StatusPill({ status, clickable, onClick }) {
   const st = String(status || "").toUpperCase();
@@ -335,12 +319,12 @@ export default function SimulationPage() {
     startTime: "09:00",
   });
 
-  // ✅ refresh 중복 방지(연속 호출로 순서 꼬이는 것 방지)
+  // ✅ refresh 중복 방지
   const refreshSeqRef = useRef(0);
 
   async function refreshWithRetry() {
     await refresh();
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 600));
     await refresh();
   }
 
@@ -350,18 +334,10 @@ export default function SimulationPage() {
         try {
           const meta = await getSimulationMetaJson(row.id, token);
 
-          const pList =
-            meta?.simulation?.productList ||
-            meta?.simulation?.productIds ||
-            null;
+          const sim = meta?.simulation || meta?.data?.simulation || null;
+          const spl = sim?.simulationProductList || [];
 
-          const spl = meta?.simulation?.simulationProductList || [];
-
-          const metaCount = Array.isArray(pList)
-            ? pList.length
-            : Array.isArray(spl)
-              ? spl.length
-              : 0;
+          const metaCount = Array.isArray(spl) ? spl.length : 0;
 
           const firstIdFromSPL = spl?.[0]?.product?.id || "";
           const firstNameFromSPL = spl?.[0]?.product?.name || "";
@@ -376,13 +352,6 @@ export default function SimulationPage() {
               Number(row.productCount) === 0
                 ? metaCount
                 : Number(row.productCount),
-
-            // ✅ meta에도 createdAt이 있을 수도 있으니 흡수(있으면 최신순 정렬 정확도↑)
-            createdAt:
-              row.createdAt ||
-              meta?.simulation?.createdAt ||
-              meta?.simulation?.createAt ||
-              row.createdAt,
           };
         } catch (e) {
           console.warn("[SIM][META] failed row:", row.id, e);
@@ -401,9 +370,7 @@ export default function SimulationPage() {
     setLoading(true);
 
     try {
-      const json = await getSimulations(token);
-      console.log("[SIM][LIST] raw:", json);
-
+      const json = await getSimulations(token, "");
       const list = pickList(json);
 
       const baseRows = (list || [])
@@ -416,22 +383,16 @@ export default function SimulationPage() {
           productName: r.productName || "",
           productCount: r.productCount,
           requiredStaff: r.requiredStaff,
-          status: r.status || "-",
+          status: r.status || "대기중",
           simulationStartDate: r.simulationStartDate || r.startDate || "",
           workTime: r.workTime ?? 0,
-
-          // ✅ 최신순 정렬 힌트(서버가 주면 사용)
-          createdAt: r.createdAt || r.createAt || r.createdDate || "",
           _sortTs: Number(r._sortTs) || 0,
         }))
         .filter((x) => x.id);
 
       const enriched = await enrichRowsWithMeta(baseRows);
-
-      // ✅ 최신순 정렬 적용
       const sorted = sortLatestFirst(enriched);
 
-      // ✅ 오래된 refresh 결과가 나중에 도착하면 무시(레이스 방지)
       if (mySeq !== refreshSeqRef.current) return;
 
       setData(sorted);
@@ -470,7 +431,7 @@ export default function SimulationPage() {
     (async () => {
       try {
         const json = await getProducts(token);
-        const list = json?.productList || [];
+        const list = json?.productList || json?.data?.productList || [];
         const normalized = (list || []).map((p) => ({
           id: p.id,
           name: p.name,
@@ -492,7 +453,7 @@ export default function SimulationPage() {
     };
   }, [token]);
 
-  // ✅ 검색 (data 자체가 이미 최신순이므로, filter 후에도 순서 유지됨)
+  // ✅ 검색 (data 자체가 최신순이므로, filter 후에도 순서 유지)
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw) return data;
@@ -575,29 +536,22 @@ export default function SimulationPage() {
       return;
     }
 
-    const startDateTime = buildStartDateTime(
-      newForm.startDate,
-      newForm.startTime,
-    );
-
     const requiredStaffNum =
       newForm.requiredStaff === "" ? 0 : Number(newForm.requiredStaff || 0);
 
+    // ✅ 백 CreateSimulationRequest 기준으로만 전송 (불필요 필드 제거)
     const payload = {
       title: newForm.title.trim(),
       description: newForm.description || "",
       productList: selected,
       requiredStaff: Number.isNaN(requiredStaffNum) ? 0 : requiredStaffNum,
-      simulationStartDate: newForm.startDate,
+      simulationStartDate: newForm.startDate, // LocalDate 문자열(YYYY-MM-DD)
       workTime: 0,
-      startDateTime,
     };
 
     try {
       const created = await createSimulation(payload, token);
-      console.log("[SIM][CREATE] raw:", created);
 
-      // ✅ 생성 응답을 즉시 표에 "맨 위"로 반영 + 최신순 유지
       const createdRow = pickCreatedRow(created);
 
       if (createdRow?.id) {
@@ -730,10 +684,9 @@ export default function SimulationPage() {
 
   return (
     <DashboardShell crumbTop="시뮬레이션" crumbCurrent="simulation">
-      {/* Tasks 틀: 좌우 스크롤 대응 + 고정 높이 */}
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
-          {/* ===== 상단 카드 (Tasks 톤) ===== */}
+          {/* ===== 상단 카드 ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-5 py-4">
               {/* title row */}
@@ -841,7 +794,7 @@ export default function SimulationPage() {
                 </div>
               </div>
 
-              {/* stat cards + work panel */}
+              {/* stat cards + 안내 */}
               <div className="mt-4 grid grid-cols-12 gap-3">
                 <div className="col-span-8 grid grid-cols-3 gap-3">
                   <StatCard
@@ -904,7 +857,6 @@ export default function SimulationPage() {
                 </div>
               </div>
 
-              {/* products load error (optional) */}
               {prodErr ? (
                 <div className="mt-3 text-[12px] text-rose-600">{prodErr}</div>
               ) : null}
@@ -1089,7 +1041,7 @@ export default function SimulationPage() {
                   </table>
                 </div>
 
-                {/* table footer (Tasks 톤) */}
+                {/* table footer */}
                 <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
                   <div className="text-[12px] text-slate-500">
                     총{" "}
@@ -1142,7 +1094,7 @@ export default function SimulationPage() {
                 </div>
               </div>
 
-              {/* ===== 상세 패널 (Tasks 톤) ===== */}
+              {/* ===== 상세 패널 ===== */}
               <div className="w-[445px] shrink-0 min-h-0 flex">
                 <div className="w-full h-full min-h-0 rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-black/5 overflow-hidden flex flex-col">
                   {/* header */}

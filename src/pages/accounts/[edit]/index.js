@@ -6,7 +6,6 @@ import DashboardShell from "@/components/dashboard-shell";
 import { useToken } from "@/stores/account-store";
 import {
   ArrowDownToLine,
-  FileUp,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +18,8 @@ import {
   ClipboardList,
   HardHat,
   AlertCircle,
+  RefreshCw,
+  FileUp,
 } from "lucide-react";
 
 import { getMembers, parseMemberXLS, postMembers } from "@/api/member-api";
@@ -507,6 +508,29 @@ export default function AccountsEditPage() {
     e.target.value = "";
   };
 
+  const refreshHandle = () => {
+    if (!token) return;
+
+    // (원하시면 dirty일 때 confirm도 넣어드릴 수 있습니다)
+    setLoadError("");
+    getMembers(token)
+      .then((json) => {
+        const list =
+          json.memberList || json.members || json.items || json.data || [];
+        const rows = (list || []).map((r) => normalizeMember(r, "Y"));
+
+        setData(rows);
+        setSelected(new Set());
+        setPageIndex(0);
+        setDirty(false);
+        setOpenRid(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoadError(err?.message || "Accounts 불러오기 실패");
+      });
+  };
+
   const saveHandle = () => {
     if (!token) return;
 
@@ -613,7 +637,7 @@ export default function AccountsEditPage() {
                   </div>
                 </div>
 
-                {/* actions */}
+                {/* actions (우측 상단) */}
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="relative w-[420px]">
                     <Search
@@ -657,29 +681,6 @@ export default function AccountsEditPage() {
                       </button>
                     ) : null}
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={uploadHandle}
-                    className="
-                      h-10 px-4 rounded-full
-                      border border-slate-200 bg-white
-                      text-[13px] font-semibold text-slate-700
-                      hover:bg-slate-50
-                      inline-flex items-center gap-2
-                    "
-                  >
-                    <FileUp size={15} />
-                    XLS 업로드
-                  </button>
-
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    className="hidden"
-                    accept=".xls,.xlsx"
-                    onChange={fileChangeHandle}
-                  />
 
                   <button
                     type="button"
@@ -752,7 +753,9 @@ export default function AccountsEditPage() {
                       </span>
                     </div>
 
+                    {/*  */}
                     <div className="mt-3 flex items-center gap-2">
+                      {/* 선택 삭제 */}
                       <button
                         type="button"
                         onClick={deleteSelected}
@@ -760,40 +763,84 @@ export default function AccountsEditPage() {
                         className={[
                           "h-10 px-4 rounded-full text-[13px] font-semibold transition inline-flex items-center gap-2",
                           selectedCount === 0
-                            ? "bg-white text-slate-300 border border-slate-200 cursor-not-allowed"
-                            : "bg-white text-rose-600 border border-rose-200 hover:bg-rose-50",
+                            ? "bg-slate-50 text-slate-300 border border-slate-200 cursor-not-allowed"
+                            : "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100",
                         ].join(" ")}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={16} className="shrink-0" />
                         선택 삭제
                       </button>
 
+                      {/* XLS 업로드 */}
+                      <button
+                        type="button"
+                        onClick={uploadHandle}
+                        className="
+                      h-10 px-4 rounded-full
+                      border border-slate-200 bg-white
+                      text-[13px] font-semibold text-slate-700
+                      hover:bg-slate-50
+                      inline-flex items-center gap-2
+                    "
+                      >
+                        <FileUp size={15} />
+                        XLS 업로드
+                      </button>
+
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        className="hidden"
+                        accept=".xls,.xlsx"
+                        onChange={fileChangeHandle}
+                      />
+
+                      {/* 행 추가 */}
                       <button
                         type="button"
                         onClick={addRow}
                         className="
-                          h-10 px-5 rounded-full
-                          border border-indigo-200 bg-white
-                          text-[13px] font-semibold text-indigo-600
-                          hover:bg-indigo-600 hover:text-white
-                          transition inline-flex items-center gap-2
-                        "
+          h-10 px-4 rounded-full
+          border border-indigo-200 bg-white
+          text-[13px] font-semibold text-indigo-600
+          hover:bg-indigo-600 hover:text-white
+          transition inline-flex items-center gap-2
+        "
                       >
-                        <Plus size={16} />행 추가
+                        <Plus size={16} className="shrink-0" />행 추가
                       </button>
-                      {loadError ? (
-                        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
-                          {loadError}
-                        </div>
-                      ) : null}
 
-                      {dirty ? (
-                        <div className="mt-3 flex items-center gap-2 rounded-xl  px-3 py-2 text-[10px] text-amber-700">
-                          <AlertCircle className="h-4 w-4" />
-                          변경 사항이 있습니다. 저장 후 반영됩니다.
-                        </div>
-                      ) : null}
+                      {/*  우측 끝: 새로고침 아이콘 전용 버튼 */}
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+          ml-auto h-10 w-10 rounded-full
+          border border-slate-200 bg-white
+          grid place-items-center
+          text-slate-500 hover:bg-slate-50 hover:text-slate-700
+          transition
+        "
+                        title="새로고침"
+                        aria-label="새로고침"
+                      >
+                        <RefreshCw size={16} />
+                      </button>
                     </div>
+
+                    {/*  메시지는 버튼 줄 아래 (스샷처럼 버튼 줄 깨지지 않게) */}
+                    {loadError ? (
+                      <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+                        {loadError}
+                      </div>
+                    ) : null}
+
+                    {dirty ? (
+                      <div className="mt-2 flex items-center gap-2 rounded-xl px-1 py-1 text-[10px] text-amber-700">
+                        <AlertCircle className="h-4 w-4" />
+                        변경 사항이 있습니다. 저장 후 반영됩니다.
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1090,7 +1137,7 @@ export default function AccountsEditPage() {
                             <span className="font-semibold text-indigo-700">
                               클릭해서 행 추가
                             </span>{" "}
-                            또는 XLS 업로드 해주세요.
+                            또는 엑셀 업로드 해주세요.
                           </button>
                         </td>
                       </tr>

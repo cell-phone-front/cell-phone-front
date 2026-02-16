@@ -31,10 +31,8 @@ function fmtDate(v) {
 
   let d = v;
 
-  // 문자열이면 Date로 파싱되기 쉬운 형태로 정리
   if (typeof d === "string") {
     let s = d.trim();
-    // "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm:ss"
     if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
     d = new Date(s);
   } else if (!(d instanceof Date)) {
@@ -42,7 +40,6 @@ function fmtDate(v) {
   }
 
   if (!(d instanceof Date) || isNaN(d.getTime())) {
-    // 파싱 실패 시 최소 방어(원래 하던 날짜만)
     const s = String(v);
     let only = s;
     if (only.includes("T")) only = only.split("T")[0];
@@ -60,18 +57,13 @@ function fmtDate(v) {
   return `${y}.${m}.${day} ${hh}:${mm}`;
 }
 
-// ✅ 서버가 writer/author에 "id"를 내려주는 경우 화면에 잠깐 보이는 깜빡임 방지
+// 서버가 writer/author에 "id"를 내려주는 경우 화면에 잠깐 보이는 깜빡임 방지
 function isIdLike(v) {
   const s = String(v ?? "").trim();
   if (!s) return false;
-
-  // 숫자만(1, 23) -> ID로 간주
   if (/^\d+$/.test(s)) return true;
-
-  // uuid 형태 -> ID로 간주
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s))
     return true;
-
   return false;
 }
 
@@ -88,7 +80,7 @@ function pickWriter(item, fallback = "익명") {
   );
 }
 
-// ✅ 작성자 id 뽑기 (글/댓글 공통 방어)
+// 작성자 id 뽑기 (글/댓글 공통 방어)
 function pickWriterId(item) {
   if (!item) return null;
   const v =
@@ -110,15 +102,14 @@ function getId(v) {
   return v.id ?? v.commentId ?? v.comment_id ?? v._id ?? null;
 }
 
+/**
+ * ✅ 백엔드 엔티티 기준( Comment.member.id )까지 확실히 잡아서
+ *    내 댓글(isMine) 판별이 항상 되도록 보강
+ */
 function normalizeComment(raw, fallbackIdx = 0) {
   if (!raw) return null;
 
   const id = getId(raw);
-
-  // ✅ 서버가 author/writer에 id를 내려주는 경우가 있어서 필터링
-  //    (익명/익명1 라벨링은 렌더링 단계에서 처리)
-  const picked = pickWriter(raw, "");
-  const author = !picked || isIdLike(picked) ? "" : String(picked);
 
   const content =
     raw.content ??
@@ -136,15 +127,27 @@ function normalizeComment(raw, fallbackIdx = 0) {
     raw.date ??
     null;
 
+  // ✅ 백에서 내려주는 익명 라벨
+  const anonymous =
+    raw.anonymous ?? raw.anonymousName ?? raw.anonymous_label ?? "";
+
+  // ✅ memberId (백이 안 주면 null일 수 있음)
   const memberId =
-    raw.memberId ?? raw.member_id ?? raw.member?.id ?? raw.authorId ?? null;
+    raw.memberId ??
+    raw.member_id ??
+    raw.member?.id ??
+    raw.authorId ??
+    raw.author_id ??
+    raw.writerId ??
+    raw.writer_id ??
+    null;
 
   return {
     ...raw,
     id: id != null ? String(id) : `tmp-${fallbackIdx}-${Date.now()}`,
-    author, // ✅ 여기서 "익명"을 넣지 않음(라벨링에서 처리)
     content: String(content || ""),
     createdAt,
+    anonymous: String(anonymous || ""), // ✅ 추가
     memberId: memberId != null ? String(memberId) : null,
   };
 }
@@ -158,6 +161,20 @@ function extractCommentList(apiJson) {
     apiJson;
 
   return Array.isArray(base) ? base : [];
+}
+
+function clsx(...arr) {
+  return arr.filter(Boolean).join(" ");
+}
+
+function TinyAvatar({ label = "익명" }) {
+  const t = String(label || "익명").trim();
+  const ch = t ? t.slice(0, 1) : "익";
+  return (
+    <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 grid place-items-center shrink-0">
+      <span className="text-[11px] font-extrabold text-indigo-700">{ch}</span>
+    </div>
+  );
 }
 
 export default function BoardView() {
@@ -174,7 +191,6 @@ export default function BoardView() {
   const [error, setError] = useState("");
 
   const [post, setPost] = useState(null);
-
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
@@ -182,7 +198,6 @@ export default function BoardView() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentError, setCommentError] = useState("");
   const [comments, setComments] = useState([]);
-
   const [newComment, setNewComment] = useState("");
 
   // 댓글 수정 UI 상태
@@ -222,7 +237,7 @@ export default function BoardView() {
         .map((c, idx) => normalizeComment(c, idx))
         .filter(Boolean);
 
-      // ✅ 기존 정렬 그대로 유지(요구사항: 정렬 건드리지 마)
+      // ✅ 정렬 유지(최신순)
       normalized.sort((a, b) => {
         const at = Date.parse(a.createdAt || "") || 0;
         const bt = Date.parse(b.createdAt || "") || 0;
@@ -283,7 +298,6 @@ export default function BoardView() {
     if (!t) return;
     if (!token || !communityId) return;
 
-    // ✅ optimistic에선 내 이름 표시(여긴 깜빡일 수 없게 normalize 단계에서 id-like 방지)
     const optimistic = {
       id: `local-${Date.now()}`,
       author: meName,
@@ -360,29 +374,27 @@ export default function BoardView() {
     post?.createdDateTime ??
     null;
 
-  //  내 글인지 판별(이게 핵심)
+  // 내 글인지 판별
   const postWriterId = useMemo(() => pickWriterId(post), [post]);
   const isMinePost = Boolean(
     meId && postWriterId && String(meId) === String(postWriterId),
   );
 
-  // ✅ 익명 / 익명1 / 익명2 ... 라벨링 (정렬 순서 변경 없이 현재 comments 순서대로 번호 부여)
+  // 익명 / 익명1 / 익명2 ... 라벨링 (정렬 순서 변경 없이 번호 부여)
   const anonLabelByMemberId = useMemo(() => {
     const map = new Map();
 
     const ownerId = postWriterId ? String(postWriterId) : null;
     if (ownerId) map.set(ownerId, "익명"); // 글 작성자 = 익명
 
-    // ✅ 번호 부여는 "오래된 댓글부터" (표시 정렬은 건드리지 않음)
     const sortedForLabel = [...(comments || [])].sort((a, b) => {
       const at = Date.parse(a.createdAt || "") || 0;
       const bt = Date.parse(b.createdAt || "") || 0;
       if (at !== bt) return at - bt; // 오래된 순
-      return String(a.id).localeCompare(String(b.id));
+      return String(a.id).localeCompare(String(a.id));
     });
 
     let next = 1;
-
     for (const c of sortedForLabel) {
       const mid = c?.memberId ? String(c.memberId) : null;
       if (!mid) continue;
@@ -406,13 +418,14 @@ export default function BoardView() {
 
   return (
     <DashboardShell crumbTop="게시판" crumbCurrent="글 상세보기">
-      <div className="w-full min-h-[calc(100vh-120px)] overflow-x-auto min-w-[1100px]">
-        <div className="w-full py-6 min-w-0">
-          {/* ===== 상단 헤더 카드 ===== */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden w-full min-w-0">
+      <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
+        <div className="min-w-[1100px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
+          {/* =========================
+            1) 상단: 게시글 카드
+           ========================= */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden shrink-0">
             <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60">
               <div className="flex items-start justify-between gap-4 min-w-0">
-                {/* Left */}
                 <div className="min-w-0">
                   <div className="flex items-start gap-4 min-w-0">
                     <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 grid place-items-center shadow-sm shrink-0">
@@ -424,6 +437,14 @@ export default function BoardView() {
                         <h1 className="text-[22px] font-semibold tracking-tight text-slate-900 truncate">
                           {title || "글 상세보기"}
                         </h1>
+                        <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-white text-slate-600">
+                          상세
+                        </span>
+                        {isMinePost ? (
+                          <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700">
+                            내 글
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500 font-medium">
@@ -456,17 +477,16 @@ export default function BoardView() {
                   </div>
                 </div>
 
-                {/* Right actions */}
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={onBack}
                     className="
-                    h-9 px-4 rounded-xl border border-slate-200 bg-white
-                    text-sm font-semibold text-slate-700
-                    hover:bg-slate-50 active:bg-slate-100 transition
-                    inline-flex items-center gap-2
-                  "
+                      h-9 px-4 rounded-xl border border-slate-200 bg-white
+                      text-sm font-semibold text-slate-700
+                      hover:bg-slate-50 active:bg-slate-100 transition
+                      inline-flex items-center gap-2
+                    "
                   >
                     <ArrowLeft className="h-4 w-4" />
                     목록
@@ -477,13 +497,12 @@ export default function BoardView() {
                       type="button"
                       onClick={onEditPost}
                       className="
-                      h-9 px-4 rounded-xl
-                      bg-indigo-600 text-white border border-indigo-600
-                      hover:bg-indigo-700 active:bg-indigo-800 transition
-                      inline-flex items-center gap-2
-                      text-sm font-semibold
-                      shadow-sm
-                    "
+                        h-9 px-4 rounded-xl
+                        bg-indigo-600 text-white border border-indigo-600
+                        hover:bg-indigo-700 active:bg-indigo-800 transition
+                        inline-flex items-center gap-2
+                        text-sm font-semibold shadow-sm
+                      "
                       title="수정"
                     >
                       <Pencil className="h-4 w-4" />
@@ -507,193 +526,121 @@ export default function BoardView() {
                 ) : null}
               </div>
             )}
+
+            {/* 본문: 높이/여백 줄임 */}
+            <div className="px-6 py-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5">
+                <div className="text-[15px] text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[80px]">
+                  {content || (loading ? "" : "내용이 없습니다.")}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* ===== 본문 + 댓글 2단 ===== */}
-          <div className="mt-6 grid grid-cols-[5fr_5fr] gap-6 min-w-0">
-            {/* ===== 본문 카드 ===== */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-w-0">
-              {/* 섹션 헤더 */}
-              <div className="px-6 py-4 border-b border-slate-100 bg-white">
+          {/* =========================
+            2) 댓글 박스
+           ========================= */}
+          <div className="flex-1 min-h-0 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+            {/* 댓글 헤더 */}
+            <div className="shrink-0 px-6 py-4 border-b border-slate-100 bg-white">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-1.5 rounded-full bg-indigo-600" />
                   <div>
                     <div className="text-[12px] font-semibold text-slate-800">
-                      게시글
+                      댓글
                     </div>
                     <div className="mt-0.5 text-[11px] text-slate-400">
-                      수정은 본인이 작성한 글만 가능합니다.
+                      의견을 남겨보세요.
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 실제 글 영역 */}
-              <div className="px-6 py-6">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-6">
-                  {/* 제목 */}
-                  <div className="pb-4 border-b border-slate-200">
-                    <h2 className="text-[18px] font-semibold text-slate-900 leading-snug">
-                      {title || "제목이 없습니다."}
-                    </h2>
-                  </div>
-
-                  {/* 내용 */}
-                  <div className="pt-5">
-                    <div
-                      className="
-            text-[15px]
-            text-slate-700
-            whitespace-pre-wrap
-            leading-relaxed
-            min-h-[300px]
-          "
-                    >
-                      {content || (loading ? "" : "내용이 없습니다.")}
-                    </div>
-                  </div>
-                </div>
+                <span className="inline-flex items-center gap-2 text-[11px] font-semibold px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700 tabular-nums">
+                  {comments.length}개
+                </span>
               </div>
             </div>
 
-            {/* ===== 댓글 카드 ===== */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-w-0">
-              {/* 섹션 헤더 */}
-              <div className="px-6 py-4 border-b border-slate-100 bg-white">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-1.5 rounded-full bg-indigo-600" />
-                    <div>
-                      <div className="text-[12px] font-semibold  text-slate-800">
-                        댓글
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-400">
-                        {comments.length}개
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] font-semibold  text-slate-400 tabular-nums">
-                    {comments.length}개
+            {/* 댓글 목록 */}
+            <div className="flex-1 min-h-0 overflow-y-auto pretty-scroll">
+              {commentLoading ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-500">
+                  댓글 불러오는 중...
+                </div>
+              ) : commentError ? (
+                <div className="px-6 py-4">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span className="break-words">{commentError}</span>
                   </div>
                 </div>
-              </div>
+              ) : comments.length === 0 ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-500">
+                  댓글이 없습니다.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {comments.map((c, idx) => {
+                    console.log("===== 댓글 판별 디버깅 =====");
+                    console.log("내 아이디 meId:", meId);
+                    console.log("댓글 객체:", c);
+                    console.log("댓글 memberId:", c.memberId);
+                    console.log("같은가?", String(meId) === String(c.memberId));
+                    console.log("===========================");
 
-              <div className="px-6 py-5">
-                {/* 리스트 영역 */}
-                <div
-                  className="
-                  rounded-2xl border border-slate-200 bg-slate-50
-                  max-h-[375px] overflow-y-auto
-                  p-3 space-y-2
-                "
-                >
-                  {commentLoading ? (
-                    <div className="px-3 py-10 text-center text-sm text-slate-500">
-                      댓글 불러오는 중...
-                    </div>
-                  ) : commentError ? (
-                    <div className="px-3 py-3 rounded-xl border border-rose-200 bg-rose-50 text-sm text-rose-700 flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span className="break-words">{commentError}</span>
-                    </div>
-                  ) : comments.length === 0 ? (
-                    <div className="px-3 py-10 text-center text-sm text-slate-500">
-                      댓글이 없습니다.
-                    </div>
-                  ) : (
-                    comments.map((c, idx) => {
-                      const isMine = Boolean(
-                        meId &&
-                        c.memberId &&
-                        String(c.memberId) === String(meId),
-                      );
-                      const editing = editingId === c.id;
+                    const isMine = Boolean(
+                      meId && c.memberId && String(c.memberId) === String(meId),
+                    );
+                    const editing = editingId === c.id;
+                    const displayAuthor =
+                      (c.anonymous && String(c.anonymous).trim()) ||
+                      (c.author && String(c.author).trim()) ||
+                      (c.memberId &&
+                        anonLabelByMemberId.get(String(c.memberId))) ||
+                      "익명";
 
-                      const displayAuthor =
-                        (c.author && String(c.author).trim()) ||
-                        (c.memberId &&
-                          anonLabelByMemberId.get(String(c.memberId))) ||
-                        "익명";
+                    // ✅ 내 댓글이면 항상 수정/삭제 노출
+                    const canEditThis = canEditRole && isMine;
 
-                      return (
-                        <div
-                          key={`${c.id}-${idx}`}
-                          className={[
-                            "rounded-2xl border bg-white px-4 py-4",
-                            isMine
-                              ? "border-indigo-200 ring-1 ring-indigo-100"
-                              : "border-slate-200",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            {/* 작성자 */}
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div
-                                  className="text-[12px] font-extrabold text-slate-800 truncate"
-                                  title={displayAuthor}
-                                >
-                                  {displayAuthor}
+                    return (
+                      <div key={`${c.id}-${idx}`} className="px-6 py-4">
+                        <div className="flex items-start gap-3">
+                          <TinyAvatar label={displayAuthor} />
+
+                          <div className="min-w-0 flex-1">
+                            {!editing ? (
+                              <div className="flex items-start gap-3">
+                                {/* 왼쪽 */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start gap-3 min-w-0">
+                                    <div className="shrink-0 text-[12px] font-extrabold text-slate-800">
+                                      {displayAuthor}
+                                    </div>
+
+                                    <div className="min-w-0 text-[13px] text-slate-700 whitespace-pre-wrap leading-relaxed break-words">
+                                      {String(c.content || "")}
+                                      {c.__optimistic ? (
+                                        <span className="ml-2 text-[11px] text-slate-400">
+                                          (전송중)
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
                                 </div>
 
-                                {isMine ? (
-                                  <span className="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                                    내 댓글
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
+                                {/* 오른쪽 */}
+                                <div className="shrink-0 flex items-center gap-2">
+                                  <div className="text-[11px] text-slate-400 tabular-nums">
+                                    {fmtDate(c.createdAt)}
+                                  </div>
 
-                            {/* 날짜 + 액션 */}
-                            <div className="flex items-center gap-2 shrink-0">
-                              {c.createdAt ? (
-                                <div className="text-[11px] text-slate-400 tabular-nums">
-                                  {fmtDate(c.createdAt)}
-                                </div>
-                              ) : null}
-
-                              {canEditRole &&
-                              isMine &&
-                              c.id &&
-                              !String(c.id).startsWith("local-") ? (
-                                <div className="flex items-center gap-1">
-                                  {editing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => saveEditComment(c)}
-                                        className="
-                                        h-8 px-3 rounded-xl
-                                        bg-indigo-600 text-white
-                                        text-[12px] font-semibold
-                                        hover:bg-indigo-700 active:bg-indigo-800 transition
-                                      "
-                                      >
-                                        저장
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={cancelEditComment}
-                                        className="
-                                        h-8 px-3 rounded-xl
-                                        border border-slate-200 bg-white
-                                        text-[12px] font-semibold text-slate-700
-                                        hover:bg-slate-50 active:bg-slate-100 transition
-                                      "
-                                      >
-                                        취소
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
+                                  {canEditThis ? (
+                                    <div className="flex items-center gap-1">
                                       <button
                                         type="button"
                                         onClick={() => startEditComment(c)}
-                                        className="
-                                        h-8 w-8 grid place-items-center rounded-xl
-                                        text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition
-                                      "
+                                        className="h-8 w-8 grid place-items-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
                                         title="댓글 수정"
                                       >
                                         <Pencil className="w-4 h-4" />
@@ -701,93 +648,110 @@ export default function BoardView() {
                                       <button
                                         type="button"
                                         onClick={() => removeComment(c)}
-                                        className="
-                                        h-8 w-8 grid place-items-center rounded-xl
-                                        text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition
-                                      "
+                                        className="h-8 w-8 grid place-items-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                                         title="댓글 삭제"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
-                                    </>
-                                  )}
+                                    </div>
+                                  ) : null}
                                 </div>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="mt-3">
-                            {editing ? (
-                              <textarea
-                                value={editingValue}
-                                onChange={(e) =>
-                                  setEditingValue(e.target.value)
-                                }
-                                className="
-                                w-full min-h-[84px] resize-none
-                                rounded-2xl border border-slate-200 bg-white
-                                px-4 py-3 text-[13px] text-slate-900
-                                outline-none transition
-                                focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
-                              "
-                                placeholder="댓글 내용을 수정하세요"
-                              />
-                            ) : (
-                              <div className="text-[14px] text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                {String(c.content || "")}
                               </div>
+                            ) : (
+                              <>
+                                {/* 수정 모드 */}
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-[12px] font-extrabold text-slate-800">
+                                    {displayAuthor}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => saveEditComment(c)}
+                                      className="h-8 px-3 rounded-lg bg-indigo-600 text-white text-[12px] font-extrabold hover:bg-indigo-700 active:bg-indigo-800 transition"
+                                    >
+                                      저장
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditComment}
+                                      className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-[12px] font-extrabold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition"
+                                    >
+                                      취소
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <textarea
+                                  value={editingValue}
+                                  onChange={(e) =>
+                                    setEditingValue(e.target.value)
+                                  }
+                                  className="
+                                    mt-3 w-full min-h-[92px] resize-none
+                                    border border-slate-200 bg-white
+                                    px-3 py-2 text-[13px] text-slate-900
+                                    outline-none transition
+                                    focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                                  "
+                                  placeholder="댓글 내용을 수정하세요"
+                                />
+                              </>
                             )}
                           </div>
                         </div>
-                      );
-                    })
-                  )}
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
+            </div>
 
-                {/* 입력 영역 */}
-                <div className="mt-4 rounded-2xl bg-white p-3">
-                  <div className="flex items-start gap-2">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          onSubmitComment();
-                        }
-                      }}
-                      placeholder="댓글을 입력하세요 (Shift+Enter 줄바꿈)"
-                      rows={3}
-                      className="
-                      min-h-[40px] max-h-[96px] resize-none
-    flex-1 rounded-2xl border border-slate-200 bg-slate-50
-    px-4 py-2 text-[13px] text-slate-900
-    outline-none transition
-    focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
-    placeholder:text-slate-400
-                    "
-                    />
-                    <button
-                      type="button"
-                      onClick={onSubmitComment}
-                      disabled={!String(newComment || "").trim()}
-                      className={[
-                        "h-11 px-4 rounded-2xl inline-flex items-center gap-2 text-[13px] font-extrabold transition shrink-0 shadow-sm",
-                        String(newComment || "").trim()
-                          ? "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800"
-                          : "bg-slate-200 text-slate-500 cursor-not-allowed",
-                      ].join(" ")}
-                    >
-                      <Send className="w-4 h-4" />
-                      등록
-                    </button>
-                  </div>
-                </div>
+            {/* 댓글 입력 */}
+            <div className="shrink-0 border-t border-slate-100 bg-white px-6 py-5">
+              <div className="flex items-end gap-3">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onSubmitComment();
+                    }
+                  }}
+                  placeholder="댓글을 입력하세요 (Shift+Enter 줄바꿈)"
+                  rows={2}
+                  className="
+                    flex-1 min-w-0 min-h-[44px] max-h-[96px] resize-none
+                    border border-slate-200 bg-slate-50
+                    px-3 py-2 text-[13px] text-slate-900
+                    outline-none transition
+                    focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                    placeholder:text-slate-400
+                  "
+                />
+
+                <button
+                  type="button"
+                  onClick={onSubmitComment}
+                  disabled={!String(newComment || "").trim()}
+                  className={clsx(
+                    "h-10 px-4 rounded-xl inline-flex items-center gap-2 text-[13px] font-extrabold transition shadow-sm shrink-0",
+                    String(newComment || "").trim()
+                      ? "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800"
+                      : "bg-slate-200 text-slate-500 cursor-not-allowed",
+                  )}
+                >
+                  <Send className="w-4 h-4" />
+                  등록
+                </button>
               </div>
+
+              {/* ✅ 바닥 여유 */}
+              <div className="h-10" />
             </div>
           </div>
-
-          <div className="h-8" />
+          {/* /댓글 박스 */}
         </div>
       </div>
     </DashboardShell>

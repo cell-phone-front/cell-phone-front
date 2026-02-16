@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 
 import { filterRows } from "@/lib/table-filter";
@@ -197,8 +198,17 @@ export default function TasksPage() {
   const [query, setQuery] = useState("");
   const router = useRouter();
 
-  // 통합검색(라우터) 전용: 페이지 검색창(query)과 완전 분리
+  // 통합검색(라우터) 전용
   const [routerFocus, setRouterFocus] = useState("");
+
+  // 전체보기 모달
+  const [fullOpen, setFullOpen] = useState(false);
+
+  // 상세 패널
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const fileRef = useRef(null);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -212,27 +222,41 @@ export default function TasksPage() {
     setPageIndex(0);
   }, [router.isReady, router.query?.focus, router.query?.keyword]);
 
-  const fileRef = useRef(null);
-
-  // 전체보기 모달
-  const [fullOpen, setFullOpen] = useState(false);
-
-  // 상세 패널
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState(null);
-
   const clearSelection = () => {
     setSelectedRow(null);
     setDetailOpen(false);
   };
 
-  useEffect(() => {
+  // ✅ 공용 로더(초기 로드/새로고침)
+  const fetchTasks = async (opts = {}) => {
+    const { silent = false } = opts;
     if (!token) return;
 
-    let alive = true;
+    try {
+      const json = await getTasks(token, "");
+      const rows = normalizeTaskList(json);
 
-    getTasks(token, "")
-      .then((json) => {
+      setData(rows);
+      setSelected(new Set());
+      setPageIndex(0);
+      setLoadError("");
+      setDirty(false);
+
+      setSelectedRow(null);
+      setDetailOpen(false);
+    } catch (err) {
+      console.error(err);
+      if (!silent) setLoadError(err?.message || "Task 불러오기 실패");
+    }
+  };
+
+  // ✅ 초기 로드 (중복 호출 제거)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!token) return;
+      try {
+        const json = await getTasks(token, "");
         if (!alive) return;
 
         const rows = normalizeTaskList(json);
@@ -245,18 +269,30 @@ export default function TasksPage() {
 
         setSelectedRow(null);
         setDetailOpen(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
+        if (!alive) return;
         setLoadError(err?.message || "Task 불러오기 실패");
-      });
+      }
+    })();
 
     return () => {
       alive = false;
     };
   }, [token]);
 
-  // ✅ 통합검색 + 페이지검색을 동시에 적용(AND)
+  // ✅ 새로고침 핸들러(행 추가 오른쪽에 배치할 버튼)
+  const refreshHandle = () => {
+    if (dirty) {
+      const ok = window.confirm(
+        "저장되지 않은 변경사항이 있습니다. 새로고침하면 사라집니다. 계속할까요?",
+      );
+      if (!ok) return;
+    }
+    fetchTasks();
+  };
+
+  // 통합검색 + 페이지검색을 동시에 적용(AND)
   const effectiveFilter = `${routerFocus} ${query}`.trim();
 
   const filtered = useMemo(() => {
@@ -365,9 +401,11 @@ export default function TasksPage() {
     const payload = data.map(({ _rid, flag, ...rest }) => rest);
 
     postTasks(payload, token)
-      .then(() => {
+      .then(async () => {
         window.alert("저장 완료");
         setDirty(false);
+        // ✅ 저장 후 서버 데이터로 동기화(권장)
+        await fetchTasks({ silent: true });
       })
       .catch((err) => {
         console.error(err);
@@ -431,7 +469,7 @@ export default function TasksPage() {
     <DashboardShell crumbTop="테이블" crumbCurrent="tasks">
       <div className="px-4 pt-4 w-full min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="min-w-[1280px] h-[calc(100vh-120px)] flex flex-col gap-4 pb-6">
-          {/* ===== 상단 카드 (Product 톤) ===== */}
+          {/* ===== 상단 카드 ===== */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-5 py-4">
               {/* title row */}
@@ -632,6 +670,7 @@ export default function TasksPage() {
                         onChange={fileChangeHandle}
                       />
 
+                      {/* ✅ 행 추가 */}
                       <button
                         type="button"
                         onClick={addRow}
@@ -644,6 +683,22 @@ export default function TasksPage() {
                         "
                       >
                         <Plus size={16} />행 추가
+                      </button>
+
+                      {/* ✅ 새로고침 (행 추가 오른쪽) */}
+                      <button
+                        type="button"
+                        onClick={refreshHandle}
+                        className="
+                          h-10 w-10 rounded-full
+                          border border-slate-200 bg-white
+                          text-slate-600
+                          hover:bg-slate-100 hover:text-indigo-600
+                          transition inline-flex items-center justify-center
+                        "
+                        title="새로고침"
+                      >
+                        <RefreshCw size={16} />
                       </button>
                     </div>
 
@@ -676,14 +731,15 @@ export default function TasksPage() {
                   <table className="w-full table-fixed border-collapse">
                     <colgroup>
                       <col style={{ width: "44px" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "16%" }} />
-                      <col style={{ width: "30%" }} />
-                      <col style={{ width: "120px" }} />
-                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "100px" }} />
+                      <col style={{ width: "92px" }} />
                     </colgroup>
+
                     <thead className="sticky top-0 z-10">
                       <tr className="text-left text-[12px] font-semibold text-slate-600 bg-slate-50">
                         <th className="border-b border-slate-200 px-3 py-3">
@@ -731,13 +787,13 @@ export default function TasksPage() {
                   <table className="w-full table-fixed border-collapse">
                     <colgroup>
                       <col style={{ width: "44px" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "16%" }} />
-                      <col style={{ width: "30%" }} />
-                      <col style={{ width: "120px" }} />
-                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "90px" }} />
+                      <col style={{ width: "92px" }} />
                     </colgroup>
 
                     <tbody className="text-[13px]">
@@ -772,7 +828,6 @@ export default function TasksPage() {
                               setDetailOpen(true);
                             }}
                           >
-                            {/* check */}
                             <td className="border-b border-slate-100 px-3 py-2">
                               <div
                                 className="flex justify-center"
@@ -963,7 +1018,7 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* Detail panel ✅ 높이 고정 + 내부 스크롤 동작을 위해 min-h-0 필수 */}
+              {/* Detail panel */}
               <div
                 className="h-full min-h-0 flex"
                 onMouseDown={(e) => e.stopPropagation()}

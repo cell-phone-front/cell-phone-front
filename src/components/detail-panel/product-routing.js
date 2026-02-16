@@ -55,7 +55,9 @@ export default function ProductRoutingDetailPanel({ open, row, onToggle }) {
               <div className="text-[13px] font-semibold text-slate-900 truncate">
                 상세 정보
               </div>
-              <div className="text-[11px] text-slate-500 truncate"></div>
+              <div className="text-[11px] text-slate-500 truncate">
+                {row ? row.name || "-" : ""}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -114,6 +116,10 @@ export default function ProductRoutingDetailPanel({ open, row, onToggle }) {
                 value={row.productId}
                 mono
               />
+
+              {/* ✅ 공정 경로(name) */}
+              <Field label="공정 경로 (Routing Name)" value={row.name} />
+
               <Field
                 label="공정 코드 (OperationId)"
                 value={row.operationId}
@@ -137,7 +143,7 @@ export default function ProductRoutingDetailPanel({ open, row, onToggle }) {
               <>
                 선택:{" "}
                 <span className="font-semibold text-slate-900">
-                  {row.id || "-"}
+                  {row.name || row.id || "-"}
                 </span>
               </>
             ) : (
