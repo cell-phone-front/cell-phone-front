@@ -1,4 +1,4 @@
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://3.36.47.128:8080";
 
 async function safeJson(res) {
   try {
