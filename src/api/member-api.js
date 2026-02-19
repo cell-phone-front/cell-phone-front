@@ -1,4 +1,4 @@
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 // (1) 로그인
 export async function loginCheck(name, id) {

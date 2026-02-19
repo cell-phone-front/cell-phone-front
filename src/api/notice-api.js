@@ -1,5 +1,5 @@
 // src/api/notice-api.js
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 /* =========================
  * (1) 공지 목록 조회

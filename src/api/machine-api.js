@@ -1,5 +1,5 @@
 // src/api/machine-api.js
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 // (1) 기계 전체 조회
 export async function getMachine(token, keyword = "") {

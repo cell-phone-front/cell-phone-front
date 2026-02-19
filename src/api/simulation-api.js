@@ -1,5 +1,5 @@
 // // // src/api/simulation-api.js
-// // const serverAddr = "http://localhost:8080";
+// // const serverAddr = "http://54.180.121.234:8080";
 
 // // // (1) 시뮬레이션 전체 조회
 // // export async function getSimulations(token) {
@@ -102,7 +102,7 @@
 
 // // src/api/simulation-api.js
 
-// const serverAddr = "http://localhost:8080";
+// const serverAddr = "http://54.180.121.234:8080";
 
 // async function safeJson(res) {
 //   const text = await res.text().catch(() => "");
@@ -223,7 +223,7 @@
 // src/api/simulation-api.js
 
 const host =
-  typeof window !== "undefined" ? window.location.hostname : "localhost";
+  typeof window !== "undefined" ? window.location.hostname : "54.180.121.234";
 const serverAddr = `http://${host}:8080`;
 
 async function safeJson(res) {

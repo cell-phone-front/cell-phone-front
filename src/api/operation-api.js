@@ -1,5 +1,5 @@
 // src/api/operation-api.js
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 // 공정단계 전체 조회 (+ 검색)
 export async function getOperations(token, keyword = "") {

@@ -1,5 +1,5 @@
 // src/api/task-api.js
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 // 작업 목록 조회 + 검색
 export async function getTasks(token, keyword = "") {

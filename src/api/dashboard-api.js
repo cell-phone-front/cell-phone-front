@@ -1,4 +1,4 @@
-const serverAddr = "http://localhost:8080";
+const serverAddr = "http://54.180.121.234:8080";
 
 export async function searchDashboard(token, keyword = "") {
   if (!token) throw new Error("token is required");
