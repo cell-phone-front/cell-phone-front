@@ -80,6 +80,12 @@ function getRowKey(n, idx) {
   return `notice-x-${n?.createdAt ?? "noDate"}-${n?.title ?? "noTitle"}-${idx}`;
 }
 
+function getDisplayFileName(v) {
+  if (!v) return "파일";
+  const s = String(v).split("/").pop(); // 경로 제거
+  const idx = s.indexOf("_");
+  return idx >= 0 ? s.substring(idx + 1) : s;
+}
 /**
  * 서버 응답에서 첨부파일 키가 fileUri로 내려오는 케이스 대응
  * { fileSize, fileType, fileUri: "15b5...jpg", id: "a0f093" }
@@ -130,11 +136,14 @@ function normalizeFiles(n) {
         f.filename ??
         f.fileName ??
         f.storedName ??
-        (url ? String(url).split("/").pop() : "파일");
+        url ?? 
+        "파일";
+        
+        const rawName = getDisplayFileName(name);
 
       return {
         id: id != null ? String(id) : null,
-        name: String(name || "파일"),
+        name: String(rawName || "파일"),
         url: url ? String(url) : null,
       };
     })

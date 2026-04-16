@@ -8,6 +8,13 @@ import {
 } from "@/lib/notice-util";
 import { downloadNoticeAttachment } from "@/api/notice-api";
 
+function getDisplayFileName(v) {
+  if (!v) return "파일";
+  const s = String(v).split("/").pop();
+  const idx = s.indexOf("_");
+  return idx >= 0 ? s.substring(idx + 1) : s;
+}
+
 export default function NoticeModal({ open, onClose, notice, token }) {
   React.useEffect(() => {
     if (!open) return;
@@ -110,10 +117,7 @@ export default function NoticeModal({ open, onClose, notice, token }) {
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-[12px] font-medium text-slate-800">
-                                  {f?.name || "파일"}
-                                </div>
-                                <div className="truncate text-[11px] text-slate-500">
-                                  {f?.url || ""}
+                                  {getDisplayFileName(f?.name || f?.url)}
                                 </div>
                               </div>
 

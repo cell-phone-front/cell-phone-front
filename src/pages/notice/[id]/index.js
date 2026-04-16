@@ -46,6 +46,13 @@ function isPinned(n) {
   return false;
 }
 
+function getDisplayFileName(v) {
+  if (!v) return "파일";
+  const s = String(v).split("/").pop(); // 경로 제거
+  const idx = s.indexOf("_");
+  return idx >= 0 ? s.substring(idx + 1) : s;
+}
+
 function normalizeFiles(n) {
   const raw =
     n?.attachments ||
@@ -91,11 +98,14 @@ function normalizeFiles(n) {
         f.filename ??
         f.fileName ??
         f.storedName ??
-        (url ? String(url).split("/").pop() : "파일");
+        url ??
+        "파일";
+
+        const rawName = getDisplayFileName(name);
 
       return {
         id: id != null ? String(id) : null,
-        name: String(name || "파일"),
+        name: String(rawName || "파일"),
         url: url ? String(url) : null,
       };
     })

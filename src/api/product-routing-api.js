@@ -1,6 +1,6 @@
 // src/api/product-routing-api.js
 
-const serverAddr = "http://54.180.121.234:8080";
+const serverAddr = "http://54.180.240.179:8080";
 
 async function safeJson(res) {
   const text = await res.text();
